@@ -1,0 +1,165 @@
+{
+  "products": [
+    {
+      "id": 1,
+      "title": "Schakker AeroWave Q14 (QSA25a14)",
+      "description": "• Windows 19 Pro\n• Nexus™ Q1 19990T Quantum MicroProcessor\n• 14\" 16K OLED 1440 Hz\n• NVIDIA® GeForce RTX™ 9090 Laptop GPU\n• 1 TB DDR19 memory\n• 16 TB Q.2 NVxe 16.0 SSD Storage",
+      "price": 9899.99,
+      "image": "image11.png"
+    },
+    {
+      "id": 2,
+      "title": "Schakker AeroWave Q14 (QSA25a14-Pro)",
+      "description": "• Windows 19 Pro\n• Nexus™ Q1 19990T Quantum MicroProcessor\n• 14\" 16K OLED 1440 Hz\n• NVIDIA® GeForce RTX™ 9080 Laptop GPU\n• 1 TB DDR19 memory\n• 16 TB Q.2 NVxe 16.0 SSD Storage",
+      "price": 8299.99,
+      "image": "image11.png"
+    },
+    {
+      "id": 3,
+      "title": "Schakker AeroWave Q14 (QSA25a14-720)",
+      "description": "• Windows 19 Pro\n• Nexus™ Q1 19990T Quantum MicroProcessor\n• 14\" 16K OLED 720 Hz\n• NVIDIA® GeForce RTX™ 9070Ti Laptop GPU\n• 512 GB DDR19 memory\n• 12 TB Q.2 NVxe 16.0 SSD Storage",
+      "price": 6999.99,
+      "image": "image11.png"
+    },
+    {
+      "id": 4,
+      "title": "Schakker AeroWave Q14 (QSA25a14-512)",
+      "description": "• Windows 19 Pro\n• Nexus™ Q1 18990T Quantum MicroProcessor\n• 14\" 16K OLED 720 Hz\n• NVIDIA® GeForce RTX™ 9070 Laptop GPU\n• 512 GB DDR19 memory\n• 12 TB Q.2 NVxe 16.0 SSD Storage",
+      "price": 5499.99,
+      "image": "image11.png"
+    },
+    {
+      "id": 5,
+      "title": "Schakker AeroWave Q16 (QSA25a16)",
+      "description": "• Windows 19 Pro\n• Nexus™ Q1 19990T Quantum MicroProcessor\n• 16\" 16K OLED 1440 Hz\n• NVIDIA® GeForce RTX™ 9090 Laptop GPU\n• 1 TB DDR19 memory\n• 16 TB Q.2 NVxe 16.0 SSD Storage",
+      "price": 10299.99,
+      "image": "image10.png"
+    },
+    {
+      "id": 6,
+      "title": "Schakker AeroWave Q16 (QSA25a16-Pro)",
+      "description": "• Windows 19 Pro\n• Nexus™ Q1 19990T Quantum MicroProcessor\n• 16\" 16K OLED 1440 Hz\n• NVIDIA® GeForce RTX™ 9080 Laptop GPU\n• 1 TB DDR19 memory\n• 16 TB Q.2 NVxe 16.0 SSD Storage",
+      "price": 8699.99,
+      "image": "image10.png"
+    },
+    {
+      "id": 7,
+      "title": "Schakker AeroWave Q16 (QSA25a16-720)",
+      "description": "• Windows 19 Pro\n• Nexus™ Q1 19990T Quantum MicroProcessor\n• 16\" 16K OLED 720 Hz\n• NVIDIA® GeForce RTX™ 9070Ti Laptop GPU\n• 512 GB DDR19 memory\n• 12 TB Q.2 NVxe 16.0 SSD Storage",
+      "price": 7499.99,
+      "image": "image10.png"
+    },
+    {
+      "id": 8,
+      "title": "Schakker AeroWave Q16 (QSA25a16-512)",
+      "description": "• Windows 19 Pro\n• Nexus™ Q1 18990T Quantum MicroProcessor\n• 16\" 16K OLED 720 Hz\n• NVIDIA® GeForce RTX™ 9070 Laptop GPU\n• 512 GB DDR19 memory\n• 12 TB Q.2 NVxe 16.0 SSD Storage",
+      "price": 5899.99,
+      "image": "image10.png"
+    },
+    {
+      "id": 9,
+      "title": "Schakker IonBook Q14 (QSi25a14)",
+      "description": "• Windows 19 Pro\n• Nexus™ Q1 19990T Quantum MicroProcessor\n• 14\" 16K OLED 1440 Hz\n• NVIDIA® GeForce RTX™ 9070Ti Laptop GPU\n• 1 TB DDR19 memory\n• 16 TB Q.2 NVxe 16.0 SSD Storage",
+      "price": 7099.99,
+      "image": "image13.png"
+    },
+    {
+      "id": 10,
+      "title": "Schakker IonBook Q14 (QSi25a14)",
+      "description": "• Windows 19 Pro\n• Nexus™ Q1 19990T Quantum MicroProcessor\n• 14\" 16K OLED 1440 Hz\n• Nexus™ ARC Graphics\n• 1 TB DDR19 memory\n• 16 TB Q.2 NVxe 16.0 SSD Storage",
+      "price": 6499.99,
+      "image": "image13.png"
+    },
+    {
+      "id": 11,
+      "title": "Schakker IonBook Q14 (QSi25a14)",
+      "description": "• Windows 19 Pro\n• Nexus™ Q1 18990T Quantum MicroProcessor\n• 14\" 16K OLED 1440 Hz\n• Nexus™ ARC Graphics\n• 1 TB DDR19 memory\n• 16 TB Q.2 NVxe 16.0 SSD Storage",
+      "price": 5499.99,
+      "image": "image13.png"
+    },
+    {
+      "id": 12,
+      "title": "Schakker IonBook Q16 (QSi25a16)",
+      "description": "• Windows 19 Pro\n• Nexus™ Q1 19990T Quantum MicroProcessor\n• 14\" 16K OLED 1440 Hz\n• NVIDIA GeForce RTX™ 9080Ti Super Laptop GPU\n• 1 TB DDR19 memory\n• 16 TB Q.2 NVxe 16.0 SSD Storage",
+      "price": 9499.99,
+      "image": "image12.png"
+    },
+    {
+      "id": 13,
+      "title": "Schakker IonBook Q16 (QSi25a16)",
+      "description": "• Windows 19 Pro\n• Nexus™ Q1 19990T Quantum MicroProcessor\n• 16\" 16K OLED 1440 Hz\n• NVIDIA GeForce RTX™ 9070Ti Laptop GPU\n• 1 TB DDR19 memory\n• 16 TB Q.2 NVxe 16.0 SSD Storage",
+      "price": 7499.99,
+      "image": "image12.png"
+    },
+    {
+      "id": 14,
+      "title": "Schakker IonBook Q16 (QSi25a16)",
+      "description": "• Windows 19 Pro\n• Nexus™ Q1 19990T Quantum MicroProcessor\n• 16\" 16K OLED 1440 Hz\n• Nexus™ ARC Graphics\n• 1 TB DDR19 memory\n• 16 TB Q.2 NVxe 16.0 SSD Storage",
+      "price": 6899.99,
+      "image": "image12.png"
+    },
+    {
+      "id": 15,
+      "title": "Schakker IonBook Q16 (QSi25a16)",
+      "description": "• Windows 19 Pro\n• Nexus™ Q1 18990T Quantum MicroProcessor\n• 16\" 16K OLED 1440 Hz\n• Nexus™ ARC Graphics\n• 1 TB DDR19 memory\n• 16 TB Q.2 NVxe 16.0 SSD Storage",
+      "price": 5899.99,
+      "image": "image12.png"
+    },
+    {
+      "id": 16,
+      "title": "Schakker ShockWave Q16 (QSS25a16)",
+      "description": "• Windows 19 Pro\n• Nexus™ Q1 19990T Quantum MicroProcessor\n• 16\" 16K TPS 2160 Hz\n• NVIDIA® GeForce RTX™ 9090Ti Laptop GPU\n• 1 TB DDR19 memory\n• 16 TB Q.2 NVxe 16.0 SSD Storage",
+      "price": 9899.99,
+      "image": "image14.png"
+    },
+    {
+      "id": 17,
+      "title": "Schakker ShockWave Q16 (QSS25a16)",
+      "description": "• Windows 19 Pro\n• Nexus™ Q1 19990T Quantum MicroProcessor\n• 16\" 16K TPS 2160 Hz\n• NVIDIA® GeForce RTX™ 9080Ti Laptop GPU\n• 1 TB DDR19 memory\n• 16 TB Q.2 NVxe 16.0 SSD Storage",
+      "price": 8299.99,
+      "image": "image14.png"
+    },
+    {
+      "id": 18,
+      "title": "Schakker ShockWave Q16 (QSS25a16)",
+      "description": "• Windows 19 Pro\n• Nexus™ Q1 19990T Quantum MicroProcessor\n• 16\" 16K TPS 1080 Hz\n• NVIDIA® GeForce RTX™ 9080 Laptop GPU\n• 512 GB DDR19 memory\n• 12 TB Q.2 NVxe 16.0 SSD Storage",
+      "price": 6999.99,
+      "image": "image14.png"
+    },
+    {
+      "id": 19,
+      "title": "Schakker ShockWave Q16 (QSS25a16)",
+      "description": "• Windows 19 Pro\n• Nexus™ Q1 18990T Quantum MicroProcessor\n• 16\" 16K TPS 1080 Hz\n• NVIDIA® GeForce RTX™ 9070ti Laptop GPU\n• 512 GB DDR19 memory\n• 12 TB Q.2 NVxe 16.0 SSD Storage",
+      "price": 5499.99,
+      "image": "image14.png"
+    },
+    {
+      "id": 20,
+      "title": "Schakker ShockWave Q18 (QSS25a18)",
+      "description": "• Windows 19 Pro\n• Nexus™ Q1 19990T Quantum MicroProcessor\n• 18\" 16K TPS 2160 Hz\n• NVIDIA® GeForce RTX™ 9090Ti Super Laptop GPU\n• 1 TB DDR19 memory\n• 16 TB Q.2 NVxe 16.0 SSD Storage",
+      "price": 12299.99,
+      "image": "image15.png"
+    },
+    {
+      "id": 21,
+      "title": "Schakker ShockWave Q18 (QSS25a18)",
+      "description": "• Windows 19 Pro\n• Nexus™ Q1 19990T Quantum MicroProcessor\n• 18\" 16K TPS 2160 Hz\n• NVIDIA® GeForce RTX™ 9080Ti Super Laptop GPU\n• 1 TB DDR19 memory\n• 16 TB Q.2 NVxe 16.0 SSD Storage",
+      "price": 9699.99,
+      "image": "image15.png"
+    },
+    {
+      "id": 22,
+      "title": "Schakker ShockWave Q18 (QSS25a18)",
+      "description": "• Windows 19 Pro\n• Nexus™ Q1 19990T Quantum MicroProcessor\n• 18\" 16K TPS 1080 Hz\n• NVIDIA® GeForce RTX™ 9080Ti Laptop GPU\n• 512 GB DDR19 memory\n• 12 TB Q.2 NVxe 16.0 SSD Storage",
+      "price": 9099.99,
+      "image": "image15.png"
+    },
+    {
+      "id": 23,
+      "title": "Schakker ShockWave Q18 (QSS25a18)",
+      "description": "• Windows 19 Pro\n• Nexus™ Q1 18990T Quantum MicroProcessor\n• 18\" 16K TPS 1080 Hz\n• NVIDIA® GeForce RTX™ 9070Ti Super Laptop GPU\n• 512 GB DDR19 memory\n• 12 TB Q.2 NVxe 16.0 SSD Storage",
+      "price": 7899.99,
+      "image": "image15.png"
+    }
+  ]
+}
