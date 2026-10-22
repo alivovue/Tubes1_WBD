@@ -1,84 +1,8 @@
-body {
-  margin: 0px;
-  padding: 0px;
-  overflow-x: hidden;
-}
-
 .background {
-  margin: 0px;
+  position: relative;
   width: 100%;
   height: 88.9vh;
-  background-image: url("../public/image1.png");
-  background-size: cover;
-  background-repeat: no-repeat;
-  background-position: 0px 0px;
-}
-
-.header1 {
-  position: absolute;
-  width: max-content;
-  height: 12%;
-  padding-top: 10px;
-  padding-left: 10px;
-  color: white;
-  font-family: "Century Gothic", sans-serif;
-  font-size: 35px;
-  letter-spacing: 5px;
-}
-
-.container {
-  position: relative;
-  height: 30px;
-  width: 100%;
-  top: 45px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 5%;
-}
-
-.container a {
-  position: relative;
-  text-decoration: none;
-  color: white;
-  font-family: "Century Gothic", sans-serif;
-  font-size: 20px;
-}
-
-.container a::before {
-  content: "";
-  position: absolute;
-  bottom: -5px;
-  left: 0;
-  width: 0%;
-  height: 2px;
-  background-color: white;
-  transition: all 0.2s;
-}
-
-.container a.active::before {
-  width: 100%;
-}
-
-.container a:hover::before {
-  width: 100%;
-}
-
-.container:hover a.active::before {
-  width: 0%;
-}
-
-.container a.active:hover::before {
-  width: 100%;
-}
-
-.search {
-  position: absolute;
-  top: 20px;
-  right: 3%;
-  color: white;
-  font-size: 30px;
-  margin-left: 200px;
+  background: url("../public/image1.png") 0 0 / cover no-repeat;
 }
 
 .text {
@@ -89,33 +13,39 @@ body {
   color: white;
 }
 
+.text h1,
+.text p,
+.learnmore,
+.text2,
+.text3,
+.text4 {
+  font-family: "Century Gothic", sans-serif;
+}
+
 .text h1 {
   font-size: 41px;
-  font-family: "Century Gothic", sans-serif;
   font-weight: lighter;
 }
 
 .text p {
   font-size: 20px;
-  font-family: "Century Gothic", sans-serif;
   font-weight: lighter;
 }
 
 .learnmore {
   position: absolute;
-  margin-top: 10px;
-  height: 45px;
-  width: 30%;
-  border-radius: 30px;
-  background-color: white;
-  color: black;
   display: flex;
   justify-content: center;
   align-items: center;
-  font-family: "Century Gothic", sans-serif;
+  width: 30%;
+  height: 45px;
+  margin-top: 10px;
+  border-radius: 30px;
+  background-color: white;
+  color: black;
   font-size: 20px;
-  transition: 0.2s;
   text-decoration: none;
+  transition: background-color 0.2s;
 }
 
 .learnmore:hover {
@@ -124,255 +54,147 @@ body {
 
 .rights {
   position: absolute;
-  top: 610px;
-  padding-left: 3%;
+  bottom: 16px;
+  left: 3%;
   color: rgb(135, 135, 135);
   font-weight: lighter;
-}
-
-.border {
-  position: absolute;
-  width: 100%;
-  height: 2px;
-  display: flex;
-}
-
-.border1 {
-  width: 50%;
-  background-color: rgb(237, 52, 154);
-}
-
-.border2 {
-  width: 50%;
-  background-color: rgb(36, 170, 253);
 }
 
 .section1 {
   display: flex;
   flex-direction: column;
-  margin-top: 0px;
-  color: rgb(255, 255, 255);
-  background-color: rgb(5, 5, 5);
-  height: 1900px;
   width: 100%;
+  height: 1900px;
+  background-color: rgb(5, 5, 5);
+  color: white;
+}
+
+.article,
+.article2,
+.article3 {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  height: 400px;
+  color: white;
+  gap: 10%;
 }
 
 .article {
-  position: relative;
   top: 100px;
-  color: rgb(255, 255, 255);
-  height: 400px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  width: 100%;
-  gap: 10%;
-}
-
-.image {
-  position: relative;
-  top: 15px;
-  height: 300px;
-  width: 300px;
-  background-image: url("../public/image4.png");
-  background-size: contain;
-  border-radius: 3%;
-}
-
-.text2 {
-  font-family: "Century Gothic", sans-serif;
-  width: 50%;
-}
-
-.text2 h1 {
-  font-weight: lighter;
-  font-size: 40px;
-}
-
-.text2 p {
-  font-size: 19px;
-  line-height: 35px;
 }
 
 .article2 {
-  position: relative;
   top: 300px;
-  color: rgb(255, 255, 255);
-  height: 400px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  width: 100%;
-  gap: 10%;
+}
+
+.article3 {
+  top: 500px;
+  flex-direction: column;
+}
+
+.image,
+.image2_1,
+.image2_2 {
+  position: relative;
+  top: 15px;
+  width: 300px;
+  height: 300px;
+  border-radius: 3%;
+}
+
+.image {
+  background: url("../public/image4.png") center / contain no-repeat;
+}
+
+.text2 {
+  width: 50%;
 }
 
 .text3 {
-  font-family: "Century Gothic", sans-serif;
   width: 40%;
 }
 
-.text3 h1 {
-  font-weight: lighter;
+.text2 h1,
+.text3 h1,
+.text4 h1 {
   font-size: 40px;
+  font-weight: lighter;
 }
 
-.text3 p {
+.text2 p,
+.text3 p,
+.text4 p {
   font-size: 19px;
   line-height: 35px;
 }
 
-.image2 {
+.image2,
+.image3 {
   position: relative;
   display: flex;
   justify-content: center;
   align-items: center;
+}
+
+.image2 {
   gap: 5%;
 }
 
 .image2_1 {
-  position: relative;
-  top: 15px;
-  height: 300px;
-  width: 300px;
-  background-image: url("../public/image5.png");
-  background-size: cover;
-  border-radius: 3%;
+  background: url("../public/image5.png") center / cover;
 }
 
 .image2_2 {
-  position: relative;
-  top: 15px;
-  height: 300px;
-  width: 300px;
-  background-image: url("../public/image6.png");
-  background-size: cover;
-  border-radius: 3%;
-  background-position: -5px 0px;
-}
-
-.article3 {
-  position: relative;
-  top: 500px;
-  color: rgb(255, 255, 255);
-  height: 400px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  width: 100%;
-  gap: 10%;
+  background: url("../public/image6.png") -5px 0 / cover;
 }
 
 .text4 {
-  font-family: "Century Gothic", sans-serif;
   width: 85%;
 }
 
-.text4 h1 {
+.text4 h1,
+.text4 p {
   display: flex;
-  text-align: center;
   justify-content: center;
-  font-weight: lighter;
-  font-size: 40px;
+  text-align: center;
 }
 
 .text4 p {
-  display: flex;
-  text-align: center;
-  font-size: 19px;
   font-weight: lighter;
-  line-height: 35px;
 }
 
 .image3 {
   margin-top: 50px;
-  position: relative;
-  display: flex;
-  justify-content: center;
-  align-items: center;
   gap: 1%;
 }
 
-.image3_1 {
-  position: relative;
-  top: 15px;
-  height: 240px;
-  width: 400px;
-  background-image: url("../public/image7.png");
-  background-size: cover;
-  border-radius: 3%;
-}
-
-.image3_2 {
-  position: relative;
-  top: 15px;
-  height: 240px;
-  width: 400px;
-  background-image: url("../public/image8.png");
-  background-size: cover;
-  background-position: -20px;
-  border-radius: 3%;
-}
-
+.image3_1,
+.image3_2,
 .image3_3 {
   position: relative;
   top: 15px;
-  height: 240px;
   width: 400px;
-  background-image: url("../public/image9.png");
-  background-size: cover;
+  height: 240px;
   border-radius: 3%;
+  background-size: cover;
 }
 
-.footer {
-  background-color: rgb(5, 5, 5);
-  width: 100%;
-  color: rgb(255, 255, 255);
-  padding: 20px;
-  text-align: center;
-  font-size: 20px;
+.image3_1 {
+  background-image: url("../public/image7.png");
 }
 
-.footer-links {
-  display: flex;
-  justify-content: center;
-  gap: 30px;
+.image3_2 {
+  background-image: url("../public/image8.png");
+  background-position: -20px;
 }
 
-.footer-links a {
-  color: rgb(255, 255, 255);
-  text-decoration: none;
-  font-weight: 500;
-  transition: 0.3s;
-}
-
-.footer-links a:hover {
-  color: rgb(0, 187, 255);
-}
-
-.footer-text {
-  font-size: 14px;
-  max-width: 800px;
-  justify-self: center;
+.image3_3 {
+  background-image: url("../public/image9.png");
 }
 
 .footer-copyright {
-  font-size: 14px;
-  margin-top: 5px;
   color: #d4d4d4;
-}
-
-.footer-sosmed {
-  margin-top: 10px;
-}
-
-.footer-sosmed a {
-  color: rgb(255, 255, 255);
-  font-size: 25px;
-  transition: 0.3s;
-  margin-left: 15px;
-}
-
-.footer-sosmed a:hover {
-  color: rgb(247, 91, 184);
 }

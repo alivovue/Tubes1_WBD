@@ -3,8 +3,6 @@ package backend
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -32,7 +30,6 @@ func TestPageTemplates(t *testing.T) {
 		{"/index3.html", "Toko", "Toko"},
 		{"/index4.html", "Medsos", "Medsos"},
 		{"/index5.html", "Tentang Kami", "Tentang Kami"},
-		{"/index6.html", "Weather API", "Cuaca"},
 	} {
 		t.Run(page.route, func(t *testing.T) {
 			response := request(handler, http.MethodGet, page.route)
@@ -68,10 +65,6 @@ func TestPageTemplates(t *testing.T) {
 	}
 	if strings.Contains(store, "script.js") {
 		t.Error("store still depends on the replaced product rendering script")
-	}
-	weather := request(handler, http.MethodGet, "/index6.html").Body.String()
-	if !strings.Contains(weather, "Loading weather...") || !strings.Contains(weather, `src="script2.js"`) {
-		t.Error("weather loading behavior changed")
 	}
 }
 
@@ -143,6 +136,7 @@ func TestAssetsAndPrivateFiles(t *testing.T) {
 	for _, route := range []string{
 		"/missing", "/Products.json", "/go.mod", "/main.go", "/backend/server.go",
 		"/backend/Products.json", "/frontend/templates/index.gohtml", "/public/",
+		"/index6.html", "/weather", "/script2.js", "/style6.css",
 	} {
 		if response := request(handler, http.MethodGet, route); response.Code != http.StatusNotFound {
 			t.Errorf("%s: status = %d, want 404", route, response.Code)
@@ -226,45 +220,5 @@ func TestProductSnapshotAndTemplateEscaping(t *testing.T) {
 	}
 	if !strings.Contains(body, "&lt;b&gt;Text&lt;/b&gt;\nSecond line") || !strings.Contains(body, "$9899.99") {
 		t.Error("product descriptions or prices changed")
-	}
-}
-
-type roundTripFunc func(*http.Request) (*http.Response, error)
-
-func (transport roundTripFunc) RoundTrip(request *http.Request) (*http.Response, error) {
-	return transport(request)
-}
-
-func TestWeatherProxy(t *testing.T) {
-	for _, test := range []struct {
-		name, upstream, expected string
-		failure                  error
-		upstreamStatus, status   int
-	}{
-		{name: "current weather only", upstream: `{"latitude":-6.2,"current_weather":{"temperature":30.5,"windspeed":12,"weathercode":3}}`, expected: `{"temperature":30.5,"windspeed":12,"weathercode":3}`, upstreamStatus: 200, status: 200},
-		{name: "upstream status preserves JSON handling", upstream: `{"current_weather":{"temperature":28}}`, expected: `{"temperature":28}`, upstreamStatus: 503, status: 200},
-		{name: "missing current weather", upstream: `{"latitude":-6.2}`, upstreamStatus: 200, status: 200},
-		{name: "invalid upstream JSON", upstream: `not JSON`, expected: "Failed to fetch weather data", upstreamStatus: 200, status: 500},
-		{name: "unreachable upstream", failure: errors.New("upstream unavailable"), expected: "Failed to fetch weather data", status: 500},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			client := &http.Client{Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
-				if request.Method != http.MethodGet || request.URL.String() != weatherURL {
-					t.Errorf("unexpected upstream request: %s %s", request.Method, request.URL)
-				}
-				if test.failure != nil {
-					return nil, test.failure
-				}
-				return &http.Response{StatusCode: test.upstreamStatus, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(test.upstream))}, nil
-			})}
-			handler, err := newHandler("..", client)
-			if err != nil {
-				t.Fatal(err)
-			}
-			response := request(handler, http.MethodGet, "/WEATHER/")
-			if response.Code != test.status || response.Body.String() != test.expected {
-				t.Errorf("response = %d %s, want %d %s", response.Code, response.Body.String(), test.status, test.expected)
-			}
-		})
 	}
 }

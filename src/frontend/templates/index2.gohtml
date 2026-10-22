@@ -4,40 +4,41 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Produk</title>
+    <link rel="stylesheet" href="common.css" />
     <link rel="stylesheet" href="style2.css" />
     <link
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
     />
   </head>
-  <body>
-    <div class="background"></div>
-    <header class="header1">Schakker.</header>
-    {{template "navigation" .}}
-    <a href="#" class="search"><i class="fas fa-search"></i></a>
-    <section class="content">
-      <a href="#" class="IonBook">
-        <h1>IonBook</h1>
-        <p>
-          Desain minimalis dengan sentuhan elegan dan performa andal. Pilihan
-          tepat untuk mendukung produktivitas dengan mobilitas tinggi.
-        </p>
-      </a>
-      <a href="#" class="AeroWave">
-        <h1>AeroWave</h1>
-        <p>
-          Kecepatan, portabilitas, dan kekuatan dalam satu perangkat. Didesain
-          untuk kinerja maksimal di mana pun dan kapan pun.
-        </p>
-      </a>
-      <a href="#" class="ShockWave">
-        <h1>ShockWave</h1>
-        <p>
-          Performa luar biasa dengan kekuatan tanpa kompromi. Siap menghadapi
-          tantangan berat, baik untuk gaming maupun pekerjaan profesional.
-        </p>
-      </a>
-    </section>
+  <body class="product-page">
+    <main class="background">
+      {{template "navigation" .}}
+      <a href="#" class="search" aria-label="Cari"><i class="fas fa-search"></i></a>
+      <section class="content">
+        <a href="#" class="IonBook">
+          <h1>IonBook</h1>
+          <p>
+            Desain minimalis dengan sentuhan elegan dan performa andal. Pilihan
+            tepat untuk mendukung produktivitas dengan mobilitas tinggi.
+          </p>
+        </a>
+        <a href="#" class="AeroWave">
+          <h1>AeroWave</h1>
+          <p>
+            Kecepatan, portabilitas, dan kekuatan dalam satu perangkat. Didesain
+            untuk kinerja maksimal di mana pun dan kapan pun.
+          </p>
+        </a>
+        <a href="#" class="ShockWave">
+          <h1>ShockWave</h1>
+          <p>
+            Performa luar biasa dengan kekuatan tanpa kompromi. Siap menghadapi
+            tantangan berat, baik untuk gaming maupun pekerjaan profesional.
+          </p>
+        </a>
+      </section>
+    </main>
     <div class="border">
       <div class="border1"></div>
       <div class="border2"></div>
