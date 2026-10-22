@@ -8,7 +8,7 @@ body {
   margin: 0px;
   width: 100%;
   height: 88.9vh;
-  background-image: url("image1.png");
+  background-image: url("../public/image1.png");
   background-size: cover;
   background-repeat: no-repeat;
   background-position: 0px 0px;
@@ -174,7 +174,7 @@ body {
   top: 15px;
   height: 300px;
   width: 300px;
-  background-image: url("image4.png");
+  background-image: url("../public/image4.png");
   background-size: contain;
   border-radius: 3%;
 }
@@ -234,7 +234,7 @@ body {
   top: 15px;
   height: 300px;
   width: 300px;
-  background-image: url("image5.png");
+  background-image: url("../public/image5.png");
   background-size: cover;
   border-radius: 3%;
 }
@@ -244,7 +244,7 @@ body {
   top: 15px;
   height: 300px;
   width: 300px;
-  background-image: url("image6.png");
+  background-image: url("../public/image6.png");
   background-size: cover;
   border-radius: 3%;
   background-position: -5px 0px;
@@ -298,7 +298,7 @@ body {
   top: 15px;
   height: 240px;
   width: 400px;
-  background-image: url("image7.png");
+  background-image: url("../public/image7.png");
   background-size: cover;
   border-radius: 3%;
 }
@@ -308,7 +308,7 @@ body {
   top: 15px;
   height: 240px;
   width: 400px;
-  background-image: url("image8.png");
+  background-image: url("../public/image8.png");
   background-size: cover;
   background-position: -20px;
   border-radius: 3%;
@@ -319,7 +319,7 @@ body {
   top: 15px;
   height: 240px;
   width: 400px;
-  background-image: url("image9.png");
+  background-image: url("../public/image9.png");
   background-size: cover;
   border-radius: 3%;
 }

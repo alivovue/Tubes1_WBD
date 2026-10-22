@@ -1,6 +1,6 @@
 import express from "express";
 import { readFile } from "fs/promises";
-import { dirname } from "path";
+import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 import fetch from "node-fetch";
 
@@ -8,13 +8,14 @@ const app = express();
 const port = 3000;
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-// Serve static files from the current directory
-app.use(express.static(__dirname));
+// Serve frontend pages and public assets
+app.use("/public", express.static(join(__dirname, "../../frontend/public")));
+app.use(express.static(join(__dirname, "../../frontend/src")));
 
 // Read product data from JSON file
 let data;
 try {
-  data = JSON.parse(await readFile("./Products.json", "utf-8"));
+  data = JSON.parse(await readFile(join(__dirname, "../Products.json"), "utf-8"));
 } catch (error) {
   console.error("Failed to read Products.json:", error);
   data = [];
