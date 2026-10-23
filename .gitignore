@@ -1,2 +1,6 @@
 node_modules/
 /src/bin/
+.env
+.env.*
+/src/.test-postgres/
+/src/.test-postgres.log
