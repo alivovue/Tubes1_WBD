@@ -7,6 +7,12 @@ import (
 )
 
 func (d *Store) SaveDatabaseMetadata(ctx context.Context, actor int64, in DatabaseMetadata, now time.Time) (int64, error) {
+	if in.DBMS == "" {
+		in.DBMS = "postgresql"
+	}
+	if len(in.DBMS) > 30 {
+		return 0, ErrInvalid
+	}
 	if in.ID < 0 || in.Name == "" || in.Host == "" || in.DatabaseName == "" || in.Username == "" || len(in.EncryptedPassword) == 0 || in.Port < 1 || in.Port > 65535 {
 		return 0, ErrInvalid
 	}
@@ -20,9 +26,9 @@ func (d *Store) SaveDatabaseMetadata(ctx context.Context, actor int64, in Databa
 	id := in.ID
 	err = d.Transaction(ctx, func(tx *Store) error {
 		if id == 0 {
-			return tx.q.QueryRowContext(ctx, `INSERT INTO managed_databases(display_name,host,port,database_name,db_username,encrypted_password,connection_options,is_active,created_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`, in.Name, in.Host, in.Port, in.DatabaseName, in.Username, in.EncryptedPassword, string(options), in.Active, actor).Scan(&id)
+			return tx.q.QueryRowContext(ctx, `INSERT INTO managed_databases(display_name,dbms_type,host,port,database_name,db_username,encrypted_password,connection_options,is_active,created_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id`, in.Name, in.DBMS, in.Host, in.Port, in.DatabaseName, in.Username, in.EncryptedPassword, string(options), in.Active, actor).Scan(&id)
 		}
-		if err := affected(tx.q.ExecContext(ctx, `UPDATE managed_databases SET display_name=$2,host=$3,port=$4,database_name=$5,db_username=$6,encrypted_password=$7,connection_options=COALESCE(connection_options,'{}'::jsonb)||$8::jsonb,is_active=$9,updated_at=CURRENT_TIMESTAMP WHERE id=$1`, id, in.Name, in.Host, in.Port, in.DatabaseName, in.Username, in.EncryptedPassword, string(options), in.Active)); err != nil {
+		if err := affected(tx.q.ExecContext(ctx, `UPDATE managed_databases SET display_name=$2,dbms_type=$3,host=$4,port=$5,database_name=$6,db_username=$7,encrypted_password=$8,connection_options=COALESCE(connection_options,'{}'::jsonb)||$9::jsonb,is_active=$10,updated_at=CURRENT_TIMESTAMP WHERE id=$1`, id, in.Name, in.DBMS, in.Host, in.Port, in.DatabaseName, in.Username, in.EncryptedPassword, string(options), in.Active)); err != nil {
 			return err
 		}
 		return tx.RevokeDatabaseSessions(ctx, id, now)
@@ -35,7 +41,7 @@ func (d *Store) SaveDatabaseMetadata(ctx context.Context, actor int64, in Databa
 
 func (d *Store) DatabaseMetadata(ctx context.Context, id int64) (DatabaseMetadata, error) {
 	var m DatabaseMetadata
-	err := d.q.QueryRowContext(ctx, `SELECT id,display_name,host,port,database_name,is_active,COALESCE(connection_options->>'sslmode','require'),db_username,encrypted_password FROM managed_databases WHERE id=$1 AND dbms_type='postgresql'`, id).Scan(&m.ID, &m.Name, &m.Host, &m.Port, &m.DatabaseName, &m.Active, &m.SSLMode, &m.Username, &m.EncryptedPassword)
+	err := d.q.QueryRowContext(ctx, `SELECT id,display_name,dbms_type,host,port,database_name,is_active,COALESCE(connection_options->>'sslmode','require'),db_username,encrypted_password FROM managed_databases WHERE id=$1`, id).Scan(&m.ID, &m.Name, &m.DBMS, &m.Host, &m.Port, &m.DatabaseName, &m.Active, &m.SSLMode, &m.Username, &m.EncryptedPassword)
 	return m, classify(err)
 }
 
@@ -66,7 +72,7 @@ func (d *Store) EffectivePermission(ctx context.Context, user, database int64) (
 }
 
 func (d *Store) AccessibleDatabases(ctx context.Context, user int64) ([]Database, error) {
-	rows, err := d.q.QueryContext(ctx, `SELECT d.id,d.display_name,CASE MAX(CASE p.access_level WHEN 'view_edit' THEN 2 ELSE 1 END) WHEN 2 THEN 'view_edit' ELSE 'view_only' END
+	rows, err := d.q.QueryContext(ctx, `SELECT d.id,d.display_name,d.dbms_type,CASE MAX(CASE p.access_level WHEN 'view_edit' THEN 2 ELSE 1 END) WHEN 2 THEN 'view_edit' ELSE 'view_only' END
 	 FROM managed_databases d JOIN group_database_permissions p ON p.database_id=d.id JOIN user_groups m ON m.group_id=p.group_id JOIN users u ON u.id=m.user_id
 	 WHERE u.id=$1 AND u.is_active AND d.is_active GROUP BY d.id,d.display_name ORDER BY d.display_name`, user)
 	if err != nil {
@@ -76,7 +82,7 @@ func (d *Store) AccessibleDatabases(ctx context.Context, user int64) ([]Database
 	result := make([]Database, 0)
 	for rows.Next() {
 		var database Database
-		if err := rows.Scan(&database.ID, &database.Name, &database.Permission); err != nil {
+		if err := rows.Scan(&database.ID, &database.Name, &database.DBMS, &database.Permission); err != nil {
 			return nil, classify(err)
 		}
 		result = append(result, database)
@@ -85,7 +91,7 @@ func (d *Store) AccessibleDatabases(ctx context.Context, user int64) ([]Database
 }
 
 func (d *Store) Databases(ctx context.Context) ([]Database, error) {
-	rows, err := d.q.QueryContext(ctx, `SELECT id,display_name,host,port,database_name,is_active,COALESCE(connection_options->>'sslmode','require') FROM managed_databases ORDER BY id`)
+	rows, err := d.q.QueryContext(ctx, `SELECT id,display_name,dbms_type,host,port,database_name,is_active,COALESCE(connection_options->>'sslmode','require') FROM managed_databases ORDER BY id`)
 	if err != nil {
 		return nil, classify(err)
 	}
@@ -93,7 +99,7 @@ func (d *Store) Databases(ctx context.Context) ([]Database, error) {
 	result := make([]Database, 0)
 	for rows.Next() {
 		var database Database
-		if err := rows.Scan(&database.ID, &database.Name, &database.Host, &database.Port, &database.DatabaseName, &database.Active, &database.SSLMode); err != nil {
+		if err := rows.Scan(&database.ID, &database.Name, &database.DBMS, &database.Host, &database.Port, &database.DatabaseName, &database.Active, &database.SSLMode); err != nil {
 			return nil, classify(err)
 		}
 		result = append(result, database)

@@ -1,78 +1,24 @@
-package dbmanagement
+package postgres
 
 import (
-	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
 	"strings"
 
-	"tubes1_wbd/backend/access"
-
-	"github.com/jackc/pgx/v5"
+	"tubes1_wbd/backend/dbmanagement/adapters"
 )
 
-type Schema struct {
-	Name  string
-	Owner string
-}
-type Table struct {
-	Schema        string
-	Name          string
-	Kind          string
-	EstimatedRows int64
-}
-type Column struct {
-	Name      string
-	Position  int
-	DataType  string
-	Nullable  bool
-	Default   *string
-	Identity  string
-	Generated string
-}
-type Constraint struct {
-	Name             string
-	Type             string
-	Definition       string
-	Columns          []string
-	ReferencedSchema *string
-	ReferencedTable  *string
-}
-type Index struct {
-	Name       string
-	Definition string
-	Method     string
-	Unique     bool
-	Primary    bool
-	Valid      bool
-}
-type TableDetail struct {
-	Table       Table
-	Columns     []Column
-	Constraints []Constraint
-	Indexes     []Index
-}
-type SortColumn struct {
-	Name       string
-	Descending bool
-}
-type PageOptions struct {
-	Limit   int
-	Offset  int
-	OrderBy []SortColumn
-}
-type DataColumn struct {
-	Name     string
-	DataType string
-}
-type DataPage struct {
-	Columns []DataColumn
-	Rows    [][]any
-	Limit   int
-	Offset  int
-	HasMore bool
-}
+type Schema = adapters.Schema
+type Table = adapters.Table
+type Column = adapters.Column
+type Constraint = adapters.Constraint
+type Index = adapters.Index
+type TableDetail = adapters.TableDetail
+type SortColumn = adapters.SortColumn
+type PageOptions = adapters.PageOptions
+type DataColumn = adapters.DataColumn
+type DataPage = adapters.DataPage
 
 func validIdentifier(value string) bool {
 	return value != "" && len(value) <= 63 && !strings.ContainsRune(value, 0)
@@ -82,31 +28,13 @@ func validSchema(value string) bool {
 	return validIdentifier(value) && value != "_schakker" && value != "information_schema" && !strings.HasPrefix(value, "pg_")
 }
 
-func (s *Service) read(ctx context.Context, actor, database int64, action func(context.Context, *sql.Tx) error) error {
-	ctx, cancel := context.WithTimeout(ctx, s.config.QueryTimeout)
-	defer cancel()
-	db, err := s.open(ctx, actor, database, access.ViewOnly)
-	if err != nil {
-		return err
-	}
-	defer db.Close()
-	tx, err := db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true, Isolation: sql.LevelRepeatableRead})
-	if err != nil {
-		return ErrConnection
-	}
-	defer tx.Rollback()
-	if err := action(ctx, tx); err != nil {
-		return err
-	}
-	if err := tx.Commit(); err != nil {
-		return ErrQuery
-	}
-	return nil
+func (s Adapter) read(ctx context.Context, q adapters.Querier, action func(context.Context, adapters.Querier) error) error {
+	return action(ctx, q)
 }
 
-func (s *Service) Schemas(ctx context.Context, actor, database int64) ([]Schema, error) {
+func (s Adapter) Schemas(ctx context.Context, q adapters.Querier) ([]Schema, error) {
 	result := make([]Schema, 0)
-	err := s.read(ctx, actor, database, func(ctx context.Context, tx *sql.Tx) error {
+	err := s.read(ctx, q, func(ctx context.Context, tx adapters.Querier) error {
 		rows, err := tx.QueryContext(ctx, `SELECT n.nspname,pg_get_userbyid(n.nspowner) FROM pg_catalog.pg_namespace n WHERE n.nspname NOT IN ('information_schema','_schakker') AND n.nspname NOT LIKE 'pg_%' AND has_schema_privilege(n.oid,'USAGE') ORDER BY n.nspname`)
 		if err != nil {
 			return ErrQuery
@@ -127,12 +55,12 @@ func (s *Service) Schemas(ctx context.Context, actor, database int64) ([]Schema,
 	return result, err
 }
 
-func (s *Service) Tables(ctx context.Context, actor, database int64, schema string) ([]Table, error) {
+func (s Adapter) Tables(ctx context.Context, q adapters.Querier, schema string) ([]Table, error) {
 	if !validSchema(schema) {
 		return nil, ErrInvalid
 	}
 	result := make([]Table, 0)
-	err := s.read(ctx, actor, database, func(ctx context.Context, tx *sql.Tx) error {
+	err := s.read(ctx, q, func(ctx context.Context, tx adapters.Querier) error {
 		var exists bool
 		if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM pg_catalog.pg_namespace WHERE nspname=$1 AND has_schema_privilege(oid,'USAGE'))`, schema).Scan(&exists); err != nil {
 			return ErrQuery
@@ -160,7 +88,7 @@ func (s *Service) Tables(ctx context.Context, actor, database int64, schema stri
 	return result, err
 }
 
-func describe(ctx context.Context, tx *sql.Tx, schema, table string) (TableDetail, error) {
+func describe(ctx context.Context, tx adapters.Querier, schema, table string) (TableDetail, error) {
 	result := TableDetail{Columns: []Column{}, Constraints: []Constraint{}, Indexes: []Index{}}
 	var oid int64
 	err := tx.QueryRowContext(ctx, `SELECT c.oid::bigint,n.nspname,c.relname,c.relkind::text,GREATEST(c.reltuples,0)::bigint FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname=$1 AND c.relname=$2 AND c.relkind IN ('r','p','v','m','f') AND has_schema_privilege(n.oid,'USAGE')`, schema, table).Scan(&oid, &result.Table.Schema, &result.Table.Name, &result.Table.Kind, &result.Table.EstimatedRows)
@@ -179,6 +107,10 @@ func describe(ctx context.Context, tx *sql.Tx, schema, table string) (TableDetai
 		if err := rows.Scan(&col.Name, &col.Position, &col.DataType, &col.Nullable, &col.Default, &col.Identity, &col.Generated); err != nil {
 			rows.Close()
 			return result, ErrQuery
+		}
+		if col.Generated != "" {
+			col.GeneratedExpression = col.Default
+			col.Default = nil
 		}
 		result.Columns = append(result.Columns, col)
 	}
@@ -224,15 +156,18 @@ func describe(ctx context.Context, tx *sql.Tx, schema, table string) (TableDetai
 	if rows.Err() != nil {
 		return result, ErrQuery
 	}
+	if err := enrich(ctx, tx, oid, &result); err != nil {
+		return result, err
+	}
 	return result, nil
 }
 
-func (s *Service) DescribeTable(ctx context.Context, actor, database int64, schema, table string) (TableDetail, error) {
+func (s Adapter) DescribeTable(ctx context.Context, q adapters.Querier, schema, table string) (TableDetail, error) {
 	if !validSchema(schema) || !validIdentifier(table) {
 		return TableDetail{}, ErrInvalid
 	}
 	var detail TableDetail
-	err := s.read(ctx, actor, database, func(ctx context.Context, tx *sql.Tx) error {
+	err := s.read(ctx, q, func(ctx context.Context, tx adapters.Querier) error {
 		var err error
 		detail, err = describe(ctx, tx, schema, table)
 		return err
@@ -240,91 +175,9 @@ func (s *Service) DescribeTable(ctx context.Context, actor, database int64, sche
 	return detail, err
 }
 
-func (s *Service) TableData(ctx context.Context, actor, database int64, schema, table string, options PageOptions) (DataPage, error) {
-	if !validSchema(schema) || !validIdentifier(table) || options.Offset < 0 || options.Limit < 0 || options.Limit > 500 || len(options.OrderBy) > 16 {
-		return DataPage{}, ErrInvalid
-	}
-	if options.Limit == 0 {
-		options.Limit = 100
-	}
-	page := DataPage{Columns: []DataColumn{}, Rows: [][]any{}, Limit: options.Limit, Offset: options.Offset}
-	err := s.read(ctx, actor, database, func(ctx context.Context, tx *sql.Tx) error {
-		detail, err := describe(ctx, tx, schema, table)
-		if err != nil {
-			return err
-		}
-		known := make(map[string]bool)
-		for _, column := range detail.Columns {
-			known[column.Name] = true
-		}
-		order := make([]string, 0, len(options.OrderBy))
-		for _, sort := range options.OrderBy {
-			if !known[sort.Name] {
-				return ErrInvalid
-			}
-			part := pgx.Identifier{sort.Name}.Sanitize()
-			if sort.Descending {
-				part += " DESC"
-			}
-			order = append(order, part)
-		}
-		if len(order) == 0 {
-			for _, constraint := range detail.Constraints {
-				if constraint.Type == "p" {
-					for _, column := range constraint.Columns {
-						order = append(order, pgx.Identifier{column}.Sanitize())
-					}
-					break
-				}
-			}
-		}
-		query := `SELECT * FROM ` + pgx.Identifier{schema, table}.Sanitize()
-		if len(order) > 0 {
-			query += " ORDER BY " + strings.Join(order, ",")
-		}
-		rows, err := tx.QueryContext(ctx, query+` LIMIT $1 OFFSET $2`, options.Limit+1, options.Offset)
-		if err != nil {
-			return ErrQuery
-		}
-		defer rows.Close()
-		types, err := rows.ColumnTypes()
-		if err != nil {
-			return ErrQuery
-		}
-		for _, column := range types {
-			page.Columns = append(page.Columns, DataColumn{Name: column.Name(), DataType: column.DatabaseTypeName()})
-		}
-		for rows.Next() {
-			values := make([]any, len(types))
-			dest := make([]any, len(types))
-			for i := range values {
-				dest[i] = &values[i]
-			}
-			if err := rows.Scan(dest...); err != nil {
-				return ErrQuery
-			}
-			if len(page.Rows) == options.Limit {
-				page.HasMore = true
-				break
-			}
-			for i, value := range values {
-				if b, ok := value.([]byte); ok {
-					values[i] = bytes.Clone(b)
-				}
-			}
-			page.Rows = append(page.Rows, values)
-		}
-		if rows.Err() != nil {
-			return ErrQuery
-		}
-		return nil
-	})
-	return page, err
-}
-
-func (s *Service) Fingerprint(ctx context.Context, actor, database int64) (string, error) {
+func (s Adapter) Fingerprint(ctx context.Context, q adapters.Querier) (string, error) {
 	var value string
-	err := s.read(ctx, actor, database, func(ctx context.Context, tx *sql.Tx) error {
+	err := s.read(ctx, q, func(ctx context.Context, tx adapters.Querier) error {
 		var err error
 		value, err = SchemaFingerprint(ctx, tx)
 		return err
@@ -332,7 +185,7 @@ func (s *Service) Fingerprint(ctx context.Context, actor, database int64) (strin
 	return value, err
 }
 
-func SchemaFingerprint(ctx context.Context, tx *sql.Tx) (string, error) {
+func SchemaFingerprint(ctx context.Context, tx adapters.Querier) (string, error) {
 	var value string
 	err := tx.QueryRowContext(ctx, `SELECT md5(COALESCE(string_agg(item,E'\n' ORDER BY item),'')) FROM (
 	SELECT json_build_array('schema',n.nspname)::text AS item FROM pg_catalog.pg_namespace n WHERE n.nspname NOT IN ('information_schema','_schakker') AND n.nspname NOT LIKE 'pg_%'
@@ -350,4 +203,103 @@ func SchemaFingerprint(ctx context.Context, tx *sql.Tx) (string, error) {
 		return "", ErrQuery
 	}
 	return value, nil
+}
+
+func (s Adapter) Snapshot(ctx context.Context, q adapters.Querier) (adapters.Snapshot, error) {
+	value, err := adapters.Capture(ctx, q, s)
+	if err != nil {
+		return value, err
+	}
+	value.Fingerprint, err = s.Fingerprint(ctx, q)
+	return value, err
+}
+
+func action(value string) string {
+	switch value {
+	case "a":
+		return "NO ACTION"
+	case "r":
+		return "RESTRICT"
+	case "c":
+		return "CASCADE"
+	case "n":
+		return "SET NULL"
+	case "d":
+		return "SET DEFAULT"
+	}
+	return ""
+}
+func enrich(ctx context.Context, q adapters.Querier, oid int64, result *TableDetail) error {
+	if result.Table.Kind == "v" || result.Table.Kind == "m" {
+		if err := q.QueryRowContext(ctx, `SELECT pg_catalog.pg_get_viewdef($1::oid,true)`, oid).Scan(&result.Table.Definition); err != nil {
+			return ErrQuery
+		}
+	}
+	rows, err := q.QueryContext(ctx, `SELECT c.conname,COALESCE(pg_catalog.pg_get_expr(c.conbin,c.conrelid),''),COALESCE((SELECT json_agg(a.attname ORDER BY k.position)::text FROM unnest(c.confkey) WITH ORDINALITY k(number,position) JOIN pg_catalog.pg_attribute a ON a.attrelid=c.confrelid AND a.attnum=k.number),'[]'),c.confupdtype::text,c.confdeltype::text FROM pg_catalog.pg_constraint c WHERE c.conrelid=$1`, oid)
+	if err != nil {
+		return ErrQuery
+	}
+	for rows.Next() {
+		var name, expression, columns, update, delete string
+		if rows.Scan(&name, &expression, &columns, &update, &delete) != nil {
+			rows.Close()
+			return ErrQuery
+		}
+		for i := range result.Constraints {
+			c := &result.Constraints[i]
+			if c.Name == name {
+				c.Expression = expression
+				c.UpdateRule = action(update)
+				c.DeleteRule = action(delete)
+				if json.Unmarshal([]byte(columns), &c.ReferencedColumns) != nil {
+					rows.Close()
+					return ErrQuery
+				}
+			}
+		}
+	}
+	if rows.Err() != nil {
+		rows.Close()
+		return ErrQuery
+	}
+	rows.Close()
+	rows, err = q.QueryContext(ctx, `SELECT c.relname,COALESCE(a.attname,''),pg_catalog.pg_get_indexdef(i.indexrelid,k.position::integer,true),k.position>i.indnkeyatts,COALESCE(pg_catalog.pg_get_expr(i.indpred,i.indrelid),''),EXISTS(SELECT 1 FROM pg_catalog.pg_constraint x WHERE x.conindid=i.indexrelid) FROM pg_catalog.pg_index i JOIN pg_catalog.pg_class c ON c.oid=i.indexrelid CROSS JOIN LATERAL unnest(i.indkey) WITH ORDINALITY k(number,position) LEFT JOIN pg_catalog.pg_attribute a ON a.attrelid=i.indrelid AND a.attnum=k.number WHERE i.indrelid=$1 ORDER BY c.relname,k.position`, oid)
+	if err != nil {
+		return ErrQuery
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var name, column, definition, predicate string
+		var included, owned bool
+		if rows.Scan(&name, &column, &definition, &included, &predicate, &owned) != nil {
+			return ErrQuery
+		}
+		for i := range result.Indexes {
+			index := &result.Indexes[i]
+			if index.Name != name {
+				continue
+			}
+			index.ConstraintOwned = owned
+			index.Predicate = predicate
+			if included {
+				index.Include = append(index.Include, column)
+				continue
+			}
+			key := adapters.IndexColumn{}
+			quoted := "\"" + strings.ReplaceAll(column, "\"", "\"\"") + "\""
+			if column != "" && (definition == column || definition == quoted) {
+				key.Name = column
+			} else if column != "" && (definition == column+" DESC" || definition == quoted+" DESC") {
+				key.Name = column
+				key.Descending = true
+			} else {
+				key.Expression = definition
+			}
+			index.Columns = append(index.Columns, key)
+		}
+	}
+	if rows.Err() != nil {
+		return ErrQuery
+	}
+	return nil
 }

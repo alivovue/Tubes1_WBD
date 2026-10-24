@@ -18,23 +18,26 @@ type MigrationDraft struct {
 }
 
 type MigrationExecution struct {
-	ID               int64
-	DatabaseID       int64
-	DraftID          *int64
-	ExecutedBy       int64
-	Username         string
-	Description      string
-	SQL              string
-	AttemptedVersion int64
-	AppliedVersion   *int64
-	Status           string
-	ErrorMessage     string
-	StartedAt        time.Time
-	FinishedAt       *time.Time
+	Mode                string
+	CompletedStatements int
+	TotalStatements     int
+	ID                  int64
+	DatabaseID          int64
+	DraftID             *int64
+	ExecutedBy          int64
+	Username            string
+	Description         string
+	SQL                 string
+	AttemptedVersion    int64
+	AppliedVersion      *int64
+	Status              string
+	ErrorMessage        string
+	StartedAt           time.Time
+	FinishedAt          *time.Time
 }
 
 const draftColumns = `id,database_id,created_by,title,input_mode,COALESCE(sql_text,''),created_at,updated_at`
-const executionColumns = `e.id,e.database_id,e.draft_id,e.executed_by,u.username,COALESCE(e.description,''),e.sql_text,e.attempted_version,e.applied_version,e.status,COALESCE(e.error_message,''),e.started_at,e.finished_at`
+const executionColumns = `e.id,e.database_id,e.draft_id,e.executed_by,u.username,COALESCE(e.description,''),e.sql_text,e.attempted_version,e.applied_version,e.status,COALESCE(e.error_message,''),e.started_at,e.finished_at,e.execution_mode,e.completed_statements,e.total_statements`
 
 func scanDraft(row scanner) (MigrationDraft, error) {
 	var d MigrationDraft
@@ -44,7 +47,7 @@ func scanDraft(row scanner) (MigrationDraft, error) {
 
 func scanExecution(row scanner) (MigrationExecution, error) {
 	var e MigrationExecution
-	err := row.Scan(&e.ID, &e.DatabaseID, &e.DraftID, &e.ExecutedBy, &e.Username, &e.Description, &e.SQL, &e.AttemptedVersion, &e.AppliedVersion, &e.Status, &e.ErrorMessage, &e.StartedAt, &e.FinishedAt)
+	err := row.Scan(&e.ID, &e.DatabaseID, &e.DraftID, &e.ExecutedBy, &e.Username, &e.Description, &e.SQL, &e.AttemptedVersion, &e.AppliedVersion, &e.Status, &e.ErrorMessage, &e.StartedAt, &e.FinishedAt, &e.Mode, &e.CompletedStatements, &e.TotalStatements)
 	return e, classify(err)
 }
 
@@ -100,19 +103,32 @@ func (d *Store) MigrationVersion(ctx context.Context, database int64) (int64, er
 }
 
 func (d *Store) StartExecution(ctx context.Context, e MigrationExecution) (MigrationExecution, error) {
+	if e.Mode == "" {
+		e.Mode = "transactional"
+	}
+	if e.Mode != "transactional" && e.Mode != "non_atomic" {
+		return MigrationExecution{}, ErrInvalid
+	}
 	var id int64
-	err := d.q.QueryRowContext(ctx, `INSERT INTO migration_executions(database_id,draft_id,executed_by,description,sql_text,attempted_version,status) VALUES($1,$2,$3,$4,$5,$6,'running') RETURNING id`, e.DatabaseID, e.DraftID, e.ExecutedBy, e.Description, e.SQL, e.AttemptedVersion).Scan(&id)
+	err := d.q.QueryRowContext(ctx, `INSERT INTO migration_executions(database_id,draft_id,executed_by,description,sql_text,attempted_version,status,execution_mode,total_statements) VALUES($1,$2,$3,$4,$5,$6,'running',$7,$8) RETURNING id`, e.DatabaseID, e.DraftID, e.ExecutedBy, e.Description, e.SQL, e.AttemptedVersion, e.Mode, e.TotalStatements).Scan(&id)
 	if err != nil {
 		return MigrationExecution{}, classify(err)
 	}
 	return d.Execution(ctx, e.DatabaseID, id)
 }
 
-func (d *Store) FinishExecution(ctx context.Context, database, id int64, status string, version *int64, message string, finished time.Time) error {
+func (d *Store) FinishExecution(ctx context.Context, database, id int64, status string, version *int64, message string, finished time.Time, completed ...int) error {
 	if (status != "succeeded" && status != "failed") || (status == "succeeded" && (version == nil || *version < 1)) || (status == "failed" && version != nil) {
 		return ErrInvalid
 	}
-	return affected(d.q.ExecContext(ctx, `UPDATE migration_executions SET status=$3,applied_version=$4,error_message=NULLIF($5,''),finished_at=$6 WHERE database_id=$1 AND id=$2 AND status='running'`, database, id, status, version, message, finished))
+	var progress *int
+	if len(completed) > 0 {
+		if completed[0] < 0 {
+			return ErrInvalid
+		}
+		progress = &completed[0]
+	}
+	return affected(d.q.ExecContext(ctx, `UPDATE migration_executions SET status=$3::text,applied_version=$4,error_message=NULLIF($5,''),finished_at=$6,completed_statements=COALESCE($7,CASE WHEN $3='succeeded' THEN total_statements ELSE completed_statements END) WHERE database_id=$1 AND id=$2 AND status='running'`, database, id, status, version, message, finished, progress))
 }
 
 func (d *Store) Execution(ctx context.Context, database, id int64) (MigrationExecution, error) {
@@ -142,4 +158,8 @@ func (d *Store) executions(ctx context.Context, query string, args ...any) ([]Mi
 		result = append(result, e)
 	}
 	return result, classify(rows.Err())
+}
+
+func (d *Store) RecordResolution(ctx context.Context, database, id, actor int64, note string) error {
+	return affected(d.q.ExecContext(ctx, `UPDATE migration_executions SET description=COALESCE(description,'')||E'\nManual resolution by '||$3::bigint::text||': '||$4 WHERE database_id=$1 AND id=$2 AND status='running'`, database, id, actor, note))
 }

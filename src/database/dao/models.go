@@ -45,6 +45,7 @@ type Grant struct {
 }
 
 type Database struct {
+	DBMS         string
 	ID           int64
 	Name         string
 	Host         string
