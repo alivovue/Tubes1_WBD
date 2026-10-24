@@ -12,7 +12,7 @@
 
 <div class="migration-layout">
   <section class="panel editor-panel">
-    <header class="panel__header panel__header--editor"><div><h2>Migration details</h2><p>Informasi ini akan disimpan di changelog.</p></div><span class="draft-indicator">Draft saved</span></header>
+    <header class="panel__header panel__header--editor"><div><h2>Migration details</h2><p>Informasi ini akan disimpan di changelog setelah endpoint backend tersedia.</p></div><span class="draft-indicator draft-indicator--pending">Draft not saved</span></header>
     <div class="editor-fields">
       <label class="field"><span>Target database</span><select><option>production_core · Production</option><option>identity_service · Development</option><option>sandbox_lab · Development</option></select></label>
       <label class="field"><span>Description</span><input type="text" value="Add last login tracking to employees" /></label>
@@ -37,7 +37,7 @@ CREATE INDEX idx_employee_login
 COMMIT;</textarea></div>
       <div class="code-editor__footer"><span>Ln 8, Col 8</span><span>UTF-8 · Spaces: 2</span></div>
     </div>
-    <div class="editor-actions"><button class="button button--secondary" type="button">Save draft</button><button class="button button--primary" type="button" data-analyze><svg><use href="#icon-search"></use></svg>Analyze migration</button></div>
+    <div class="editor-actions"><button class="button button--secondary" type="button" data-toast="Penyimpanan draft belum tersedia: backend baru mendefinisikan tabel migration_drafts, belum endpoint-nya.">Save draft</button><button class="button button--primary" type="button" data-analyze><svg><use href="#icon-search"></use></svg>Analyze migration</button></div>
   </section>
 
   <aside class="panel guidance-panel">

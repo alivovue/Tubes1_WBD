@@ -6,30 +6,31 @@
 
 <section class="explorer-shell">
   <aside class="schema-panel" aria-label="Database objects">
-    <label class="search-box search-box--small"><svg><use href="#icon-search"></use></svg><input type="search" placeholder="Find table..." /></label>
+    <label class="search-box search-box--small"><svg><use href="#icon-search"></use></svg><input type="search" placeholder="Find table..." data-table-search /></label>
     <div class="tree">
-      <button class="tree__root" type="button"><svg><use href="#icon-database"></use></svg><strong>production_core</strong><svg class="tree__chevron"><use href="#icon-chevron"></use></svg></button>
-      <div class="tree__branch">
-        <button class="tree__schema" type="button"><svg class="tree__chevron tree__chevron--open"><use href="#icon-chevron"></use></svg><span>public</span><small>8 tables</small></button>
-        <div class="tree__items">
-          <button class="tree__item is-active" type="button"><svg><use href="#icon-table"></use></svg>employees</button>
-          <button class="tree__item" type="button"><svg><use href="#icon-table"></use></svg>departments</button>
-          <button class="tree__item" type="button"><svg><use href="#icon-table"></use></svg>customers</button>
-          <button class="tree__item" type="button"><svg><use href="#icon-table"></use></svg>orders</button>
-          <button class="tree__item" type="button"><svg><use href="#icon-table"></use></svg>order_items</button>
-          <button class="tree__item" type="button"><svg><use href="#icon-table"></use></svg>products</button>
-          <button class="tree__item" type="button"><svg><use href="#icon-table"></use></svg>payments</button>
-          <button class="tree__item" type="button"><svg><use href="#icon-table"></use></svg>audit_logs</button>
+      <button class="tree__root" type="button" data-tree-toggle aria-expanded="true" aria-controls="database-tree"><svg><use href="#icon-database"></use></svg><strong>production_core</strong><svg class="tree__chevron tree__chevron--open"><use href="#icon-chevron"></use></svg></button>
+      <div class="tree__branch" id="database-tree">
+        <button class="tree__schema" type="button" data-tree-toggle aria-expanded="true" aria-controls="public-tables"><svg class="tree__chevron tree__chevron--open"><use href="#icon-chevron"></use></svg><span>public</span><small>8 tables</small></button>
+        <div class="tree__items" id="public-tables">
+          <button class="tree__item is-active" type="button" data-table-name="employees" data-table-ready="true"><svg><use href="#icon-table"></use></svg>employees</button>
+          <button class="tree__item" type="button" data-table-name="departments"><svg><use href="#icon-table"></use></svg>departments</button>
+          <button class="tree__item" type="button" data-table-name="customers"><svg><use href="#icon-table"></use></svg>customers</button>
+          <button class="tree__item" type="button" data-table-name="orders"><svg><use href="#icon-table"></use></svg>orders</button>
+          <button class="tree__item" type="button" data-table-name="order_items"><svg><use href="#icon-table"></use></svg>order_items</button>
+          <button class="tree__item" type="button" data-table-name="products"><svg><use href="#icon-table"></use></svg>products</button>
+          <button class="tree__item" type="button" data-table-name="payments"><svg><use href="#icon-table"></use></svg>payments</button>
+          <button class="tree__item" type="button" data-table-name="audit_logs"><svg><use href="#icon-table"></use></svg>audit_logs</button>
+          <p class="tree__empty" data-table-search-empty hidden>No matching tables.</p>
         </div>
-        <button class="tree__schema" type="button"><svg class="tree__chevron"><use href="#icon-chevron"></use></svg><span>reporting</span><small>4 views</small></button>
-        <button class="tree__schema" type="button"><svg class="tree__chevron"><use href="#icon-chevron"></use></svg><span>extensions</span><small>2 tables</small></button>
+        <button class="tree__schema" type="button" data-toast="Metadata schema reporting belum tersedia dari backend."><svg class="tree__chevron"><use href="#icon-chevron"></use></svg><span>reporting</span><small>4 views</small></button>
+        <button class="tree__schema" type="button" data-toast="Metadata schema extensions belum tersedia dari backend."><svg class="tree__chevron"><use href="#icon-chevron"></use></svg><span>extensions</span><small>2 tables</small></button>
       </div>
     </div>
   </aside>
 
   <div class="object-panel">
-    <header class="object-panel__header"><div><span class="object-icon"><svg><use href="#icon-table"></use></svg></span><div><p>public / table</p><h2>employees</h2></div></div><button class="icon-button" type="button" aria-label="Table actions">•••</button></header>
-    <div class="tabs" role="tablist" aria-label="Detail table">
+    <header class="object-panel__header"><div><span class="object-icon"><svg><use href="#icon-table"></use></svg></span><div><p>public / table</p><h2 data-object-name>employees</h2></div></div><button class="icon-button" type="button" aria-label="Table actions">•••</button></header>
+    <div class="tabs" role="tablist" aria-label="Detail table" data-object-tabs>
       <button class="tab is-active" role="tab" aria-selected="true" aria-controls="columns-panel" id="columns-tab" data-tab="columns-panel">Columns <span>8</span></button>
       <button class="tab" role="tab" aria-selected="false" aria-controls="constraints-panel" id="constraints-tab" data-tab="constraints-panel">Constraints <span>3</span></button>
       <button class="tab" role="tab" aria-selected="false" aria-controls="indexes-panel" id="indexes-tab" data-tab="indexes-panel">Indexes <span>2</span></button>
@@ -58,6 +59,11 @@
       <div class="table-wrap"><table class="data-table"><thead><tr><th>employee_code</th><th>full_name</th><th>email</th><th>status</th><th>created_at</th></tr></thead><tbody><tr><td>EMP-1001</td><td>Aditya Pratama</td><td>aditya.p@schakker.id</td><td><span class="badge badge--success">Active</span></td><td>2025-08-14 09:21</td></tr><tr><td>EMP-1002</td><td>Nadia Savitri</td><td>nadia.s@schakker.id</td><td><span class="badge badge--success">Active</span></td><td>2025-08-17 10:03</td></tr><tr><td>EMP-1003</td><td>Rizky Mahendra</td><td>rizky.m@schakker.id</td><td><span class="badge badge--neutral">Inactive</span></td><td>2025-09-02 14:42</td></tr></tbody></table></div>
       <footer class="pagination"><span>Showing 1–3 of 2,481 rows</span><div><button class="button button--secondary button--small" type="button" disabled>Previous</button><button class="button button--secondary button--small" type="button">Next</button></div></footer>
     </div>
+    <section class="object-unavailable" data-object-unavailable hidden>
+      <span class="object-unavailable__icon"><svg><use href="#icon-server"></use></svg></span>
+      <h3>Metadata belum tersedia</h3>
+      <p>Frontend sudah memilih tabel <code data-unavailable-table></code>, tetapi backend belum menyediakan endpoint metadata untuk columns, constraints, indexes, dan rows.</p>
+    </section>
   </div>
 </section>
 {{end}}

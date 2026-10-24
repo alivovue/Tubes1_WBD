@@ -63,6 +63,36 @@ func TestPageTemplates(t *testing.T) {
 	}
 }
 
+func TestFrontendDoesNotClaimUnavailableBackendWork(t *testing.T) {
+	handler, err := NewHandler("..")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for route, expected := range map[string]string{
+		"/login":             "Analysis backend not connected",
+		"/explorer":          "data-object-unavailable",
+		"/migrations/new":    "Draft not saved",
+		"/admin/connections": "Not verified",
+	} {
+		body := request(handler, http.MethodGet, route).Body.String()
+		if !strings.Contains(body, expected) {
+			t.Errorf("%s: missing backend-unavailable state %q", route, expected)
+		}
+	}
+
+	script, err := os.ReadFile(filepath.Join("..", "frontend", "static", "app.js"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	contents := string(script)
+	for _, forbidden := range []string{"window.location.assign", "Connection test queued", "All systems operational"} {
+		if strings.Contains(contents, forbidden) {
+			t.Errorf("frontend still contains unsupported success behavior %q", forbidden)
+		}
+	}
+}
+
 func TestProductAPI(t *testing.T) {
 	handler, err := NewHandler("..")
 	if err != nil {

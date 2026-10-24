@@ -47,10 +47,7 @@ function setupLogin() {
 
   form?.addEventListener("submit", (event) => {
     event.preventDefault();
-    const submit = one('[type="submit"]', form);
-    submit.disabled = true;
-    submit.textContent = "Signing in…";
-    window.setTimeout(() => window.location.assign("/dashboard"), 450);
+    showToast("Login belum tersedia: backend baru menyediakan skema users dan sessions, belum handler autentikasi.");
   });
 }
 
@@ -117,55 +114,79 @@ function setupTabs() {
   });
 }
 
+function setupExplorer() {
+  const explorer = one(".explorer-shell");
+  if (!explorer) return;
+
+  const search = one("[data-table-search]", explorer);
+  const tableItems = all("[data-table-name]", explorer);
+  const searchEmpty = one("[data-table-search-empty]", explorer);
+  const objectName = one("[data-object-name]", explorer);
+  const tabs = one("[data-object-tabs]", explorer);
+  const panels = all("[data-tab-panel]", explorer);
+  const unavailable = one("[data-object-unavailable]", explorer);
+  const unavailableTable = one("[data-unavailable-table]", explorer);
+
+  all("[data-tree-toggle]", explorer).forEach((toggle) => {
+    toggle.addEventListener("click", () => {
+      const target = document.getElementById(toggle.getAttribute("aria-controls"));
+      if (!target) return;
+      const expanded = toggle.getAttribute("aria-expanded") === "true";
+      toggle.setAttribute("aria-expanded", String(!expanded));
+      target.hidden = expanded;
+      one(".tree__chevron", toggle)?.classList.toggle("tree__chevron--open", !expanded);
+    });
+  });
+
+  search?.addEventListener("input", () => {
+    const query = search.value.trim().toLowerCase();
+    let visible = 0;
+    tableItems.forEach((item) => {
+      const matches = item.dataset.tableName.toLowerCase().includes(query);
+      item.hidden = !matches;
+      if (matches) visible += 1;
+    });
+    searchEmpty.hidden = visible !== 0;
+
+    const tableGroup = one("#public-tables", explorer);
+    const publicToggle = one('[aria-controls="public-tables"]', explorer);
+    if (query && tableGroup?.hidden) {
+      tableGroup.hidden = false;
+      publicToggle?.setAttribute("aria-expanded", "true");
+      one(".tree__chevron", publicToggle)?.classList.add("tree__chevron--open");
+    }
+  });
+
+  tableItems.forEach((item) => {
+    item.addEventListener("click", () => {
+      tableItems.forEach((candidate) => candidate.classList.toggle("is-active", candidate === item));
+      objectName.textContent = item.dataset.tableName;
+
+      const ready = item.dataset.tableReady === "true";
+      tabs.hidden = !ready;
+      unavailable.hidden = ready;
+      unavailableTable.textContent = item.dataset.tableName;
+
+      if (ready) {
+        const activeTab = one("[data-tab].is-active", tabs) || one("[data-tab]", tabs);
+        panels.forEach((panel) => {
+          panel.hidden = panel.id !== activeTab.dataset.tab;
+        });
+      } else {
+        panels.forEach((panel) => {
+          panel.hidden = true;
+        });
+      }
+    });
+  });
+}
+
 function setupMigration() {
   const analyze = one("[data-analyze]");
-  const analysis = one("[data-analysis]");
-  if (!analyze || !analysis) return;
+  if (!analyze) return;
 
   analyze.addEventListener("click", () => {
-    analyze.disabled = true;
-    analyze.textContent = "Analyzing…";
-    window.setTimeout(() => {
-      analysis.hidden = false;
-      all("[data-step]").forEach((step, index) => {
-        step.classList.toggle("is-complete", index === 0);
-        step.classList.toggle("is-active", index === 1);
-      });
-      analyze.disabled = false;
-      analyze.textContent = "Analyze again";
-      analysis.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 550);
-  });
-
-  const modal = one("#execute-modal");
-  const confirm = one("[data-execute-confirm]", modal);
-  const execute = one("[data-execute]", modal);
-  const close = () => {
-    modal.hidden = true;
-    document.body.style.overflow = "";
-  };
-
-  all('[data-modal-open="execute-modal"]').forEach((button) => {
-    button.addEventListener("click", () => {
-      modal.hidden = false;
-      document.body.style.overflow = "hidden";
-      confirm.focus();
-    });
-  });
-  all("[data-modal-close]", modal).forEach((button) => button.addEventListener("click", close));
-  confirm.addEventListener("change", () => {
-    execute.disabled = !confirm.checked;
-  });
-  execute.addEventListener("click", () => {
-    close();
-    all("[data-step]").forEach((step, index) => {
-      step.classList.toggle("is-complete", index < 2);
-      step.classList.toggle("is-active", index === 2);
-    });
-    showToast("Prototype frontend: migration siap diteruskan ke endpoint backend.");
-  });
-  window.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && !modal.hidden) close();
+    showToast("Analyze belum tersedia: backend belum memiliki endpoint validasi SQL atau migration analysis.");
   });
 }
 
@@ -190,6 +211,7 @@ setupSidebar();
 setupLogin();
 setupDatabaseFilter();
 setupTabs();
+setupExplorer();
 setupMigration();
 setupPermissionSelects();
 setupToastTriggers();
