@@ -106,15 +106,26 @@ type pageData struct {
 }
 
 func NewHandler(root string) (http.Handler, error) {
-	services, closeDB, err := servicesFromEnvironment()
+	services, closeDB, err := servicesFromEnvironment(root)
 	if err != nil {
 		return nil, err
 	}
 	handler, err := NewHandlerWithServices(root, services)
 	if err != nil {
 		closeDB()
+		return nil, err
 	}
-	return handler, err
+	return &managedHandler{Handler: handler, close: closeDB}, nil
+}
+
+type managedHandler struct {
+	http.Handler
+	close func()
+}
+
+func (h *managedHandler) Close() error {
+	h.close()
+	return nil
 }
 
 func NewHandlerWithServices(root string, services Services) (http.Handler, error) {

@@ -5,3 +5,4 @@ node_modules/
 !/src/.env.example
 /src/.test-postgres/
 /src/.test-postgres.log
+/src/.schakker/
