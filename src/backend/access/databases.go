@@ -12,9 +12,14 @@ import (
 )
 
 type ConnectionInput struct {
-	Name, Host, DatabaseName, Username, Password, SSLMode string
-	Port                                                  int
-	Active                                                bool
+	Name         string `json:"name"`
+	Host         string `json:"host"`
+	DatabaseName string `json:"database_name"`
+	Username     string `json:"db_username"`
+	Password     string `json:"password"`
+	SSLMode      string `json:"sslmode"`
+	Port         int    `json:"port"`
+	Active       bool   `json:"is_active"`
 }
 
 func (in ConnectionInput) validate(secure bool) error {
@@ -136,15 +141,15 @@ func (s *Service) AccessibleDatabases(ctx context.Context, user int64) ([]Databa
 }
 
 type AdminData struct {
-	Users       []User
-	Groups      []Group
-	Memberships []Membership
-	Databases   []Database
-	Grants      []Grant
+	Users       []User       `json:"users"`
+	Groups      []Group      `json:"groups"`
+	Memberships []Membership `json:"memberships"`
+	Databases   []Database   `json:"databases"`
+	Grants      []Grant      `json:"grants"`
 }
 
 func (s *Service) Administration(ctx context.Context, actor int64) (AdminData, error) {
-	var result AdminData
+	result := AdminData{Users: []User{}, Groups: []Group{}, Memberships: []Membership{}, Databases: []Database{}, Grants: []Grant{}}
 	var allowed bool
 	if err := s.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM users WHERE id=$1 AND is_active AND is_platform_admin)`, actor).Scan(&allowed); err != nil {
 		return result, err

@@ -43,7 +43,7 @@ type Config struct {
 	Key                                                          []byte
 	SecureCookies                                                bool
 	IdleTimeout, AbsoluteLifetime, RotationInterval, GracePeriod time.Duration
-	// Now is injectable for deterministic expiration tests. Leave nil in production.
+	// Now overrides the clock. Leave nil to use time.Now.
 	Now func() time.Time
 }
 

@@ -64,17 +64,3 @@ rolls back those changes. Database creation itself is a separate operation.
   code, with no policy durations chosen here.
 - Password hashes, token hashes, and encrypted credentials must be supplied by
   future application code. The schema does not hash or encrypt values itself.
-
-## Verify the schema
-
-Use a separate, empty test database. From `src/`:
-
-```sh
-createdb -h localhost -p 5432 -U postgres schakker_platform_test
-psql -X -h localhost -p 5432 -U postgres -d schakker_platform_test \
-  -v ON_ERROR_STOP=1 -f database/schema.sql -f database/tests.sql
-```
-
-The tests exercise inserts, relationships, uniqueness, allowed values, session
-rotation storage, and successful/failed migration version records. Test rows
-and the temporary test helper are rolled back.

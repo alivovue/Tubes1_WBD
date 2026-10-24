@@ -22,13 +22,18 @@ type User struct {
 }
 
 type Group struct {
-	ID                int64
-	Name, Description string
+	ID          int64  `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
 }
-type Membership struct{ UserID, GroupID int64 }
+type Membership struct {
+	UserID  int64 `json:"user_id"`
+	GroupID int64 `json:"group_id"`
+}
 type Grant struct {
-	GroupID, DatabaseID int64
-	Permission          Permission
+	GroupID    int64      `json:"group_id"`
+	DatabaseID int64      `json:"database_id"`
+	Permission Permission `json:"permission"`
 }
 
 // Database intentionally contains no connection credential or username.
