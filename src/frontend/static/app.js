@@ -3,92 +3,57 @@
 const one = (selector, root = document) => root.querySelector(selector);
 const all = (selector, root = document) => [...root.querySelectorAll(selector)];
 
-function showToast(message) {
-  const region = one("[data-toast-region]");
-  if (!region) return;
-
-  const toast = document.createElement("div");
-  toast.className = "toast";
-  toast.setAttribute("role", "status");
-  toast.innerHTML = '<svg aria-hidden="true"><use href="#icon-check"></use></svg>';
-  toast.append(document.createTextNode(message));
-  region.append(toast);
-  window.setTimeout(() => toast.remove(), 4200);
-}
-
 function setupSidebar() {
   const sidebar = one("[data-sidebar]");
   const toggle = one("[data-sidebar-toggle]");
   if (!sidebar || !toggle) return;
-
   const setOpen = (open) => {
     sidebar.classList.toggle("is-open", open);
     toggle.setAttribute("aria-expanded", String(open));
     document.body.style.overflow = open ? "hidden" : "";
   };
-
   toggle.addEventListener("click", () => setOpen(!sidebar.classList.contains("is-open")));
   all("[data-sidebar-close]").forEach((button) => button.addEventListener("click", () => setOpen(false)));
-  window.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") setOpen(false);
-  });
+  window.addEventListener("keydown", (event) => { if (event.key === "Escape") setOpen(false); });
 }
 
-function setupLogin() {
-  const form = one("[data-demo-login]");
+function setupPassword() {
   const password = one("[data-password]");
-  const passwordToggle = one("[data-password-toggle]");
-
-  passwordToggle?.addEventListener("click", () => {
+  one("[data-password-toggle]")?.addEventListener("click", (event) => {
     const show = password.type === "password";
     password.type = show ? "text" : "password";
-    passwordToggle.setAttribute("aria-label", show ? "Sembunyikan password" : "Tampilkan password");
-  });
-
-  form?.addEventListener("submit", (event) => {
-    event.preventDefault();
-    showToast("Login belum tersedia: backend baru menyediakan skema users dan sessions, belum handler autentikasi.");
+    event.currentTarget.setAttribute("aria-label", show ? "Sembunyikan password" : "Tampilkan password");
   });
 }
 
-function setupDatabaseFilter() {
-  const container = one("[data-filter-items]");
-  if (!container) return;
-
+function setupSearch() {
   const input = one("[data-search-input]");
-  const buttons = all("[data-filter]", one("[data-filter-group]"));
-  const items = all("[data-filter-item]", container);
-  const empty = one("[data-filter-empty]", container);
-  let environment = "all";
-
-  const apply = () => {
+  const items = all("[data-filter-item]");
+  input?.addEventListener("input", () => {
     const query = input.value.trim().toLowerCase();
     let visible = 0;
     items.forEach((item) => {
-      const matchesEnvironment = environment === "all" || item.dataset.environment === environment;
-      const matchesQuery = !query || item.dataset.search.includes(query);
-      const show = matchesEnvironment && matchesQuery;
-      item.hidden = !show;
-      if (show) visible += 1;
+      item.hidden = !item.dataset.search.toLowerCase().includes(query);
+      if (!item.hidden) visible++;
     });
-    empty.hidden = visible !== 0;
-  };
-
-  input.addEventListener("input", apply);
-  buttons.forEach((button) => {
-    button.addEventListener("click", () => {
-      environment = button.dataset.filter;
-      buttons.forEach((candidate) => candidate.classList.toggle("is-active", candidate === button));
-      apply();
+    const empty = one("[data-filter-empty]");
+    if (empty) empty.hidden = visible !== 0;
+  });
+  const tableSearch = one("[data-table-search]");
+  tableSearch?.addEventListener("input", () => {
+    let visible = 0;
+    all("[data-table-name]").forEach((item) => {
+      item.hidden = !item.dataset.tableName.toLowerCase().includes(tableSearch.value.trim().toLowerCase());
+      if (!item.hidden) visible++;
     });
+    const empty = one("[data-table-search-empty]");
+    if (empty) empty.hidden = visible !== 0;
   });
 }
 
 function setupTabs() {
   const tabs = all("[data-tab]");
-  if (!tabs.length) return;
   const panels = all("[data-tab-panel]");
-
   const activate = (tab) => {
     tabs.forEach((candidate) => {
       const selected = candidate === tab;
@@ -96,122 +61,212 @@ function setupTabs() {
       candidate.setAttribute("aria-selected", String(selected));
       candidate.tabIndex = selected ? 0 : -1;
     });
-    panels.forEach((panel) => {
-      panel.hidden = panel.id !== tab.dataset.tab;
-    });
+    panels.forEach((panel) => { panel.hidden = panel.id !== tab.dataset.tab; });
   };
-
   tabs.forEach((tab, index) => {
     tab.addEventListener("click", () => activate(tab));
     tab.addEventListener("keydown", (event) => {
       if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
       event.preventDefault();
-      const direction = event.key === "ArrowRight" ? 1 : -1;
-      const next = tabs[(index + direction + tabs.length) % tabs.length];
-      activate(next);
-      next.focus();
+      const next = tabs[(index + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length];
+      activate(next); next.focus();
     });
   });
-}
-
-function setupExplorer() {
-  const explorer = one(".explorer-shell");
-  if (!explorer) return;
-
-  const search = one("[data-table-search]", explorer);
-  const tableItems = all("[data-table-name]", explorer);
-  const searchEmpty = one("[data-table-search-empty]", explorer);
-  const objectName = one("[data-object-name]", explorer);
-  const tabs = one("[data-object-tabs]", explorer);
-  const panels = all("[data-tab-panel]", explorer);
-  const unavailable = one("[data-object-unavailable]", explorer);
-  const unavailableTable = one("[data-unavailable-table]", explorer);
-
-  all("[data-tree-toggle]", explorer).forEach((toggle) => {
-    toggle.addEventListener("click", () => {
-      const target = document.getElementById(toggle.getAttribute("aria-controls"));
-      if (!target) return;
-      const expanded = toggle.getAttribute("aria-expanded") === "true";
-      toggle.setAttribute("aria-expanded", String(!expanded));
-      target.hidden = expanded;
-      one(".tree__chevron", toggle)?.classList.toggle("tree__chevron--open", !expanded);
-    });
-  });
-
-  search?.addEventListener("input", () => {
-    const query = search.value.trim().toLowerCase();
-    let visible = 0;
-    tableItems.forEach((item) => {
-      const matches = item.dataset.tableName.toLowerCase().includes(query);
-      item.hidden = !matches;
-      if (matches) visible += 1;
-    });
-    searchEmpty.hidden = visible !== 0;
-
-    const tableGroup = one("#public-tables", explorer);
-    const publicToggle = one('[aria-controls="public-tables"]', explorer);
-    if (query && tableGroup?.hidden) {
-      tableGroup.hidden = false;
-      publicToggle?.setAttribute("aria-expanded", "true");
-      one(".tree__chevron", publicToggle)?.classList.add("tree__chevron--open");
-    }
-  });
-
-  tableItems.forEach((item) => {
-    item.addEventListener("click", () => {
-      tableItems.forEach((candidate) => candidate.classList.toggle("is-active", candidate === item));
-      objectName.textContent = item.dataset.tableName;
-
-      const ready = item.dataset.tableReady === "true";
-      tabs.hidden = !ready;
-      unavailable.hidden = ready;
-      unavailableTable.textContent = item.dataset.tableName;
-
-      if (ready) {
-        const activeTab = one("[data-tab].is-active", tabs) || one("[data-tab]", tabs);
-        panels.forEach((panel) => {
-          panel.hidden = panel.id !== activeTab.dataset.tab;
-        });
-      } else {
-        panels.forEach((panel) => {
-          panel.hidden = true;
-        });
-      }
-    });
-  });
+  const initial = tabs.find((tab) => tab.dataset.tab === new URLSearchParams(location.search).get("tab"));
+  if (initial) activate(initial);
 }
 
 function setupMigration() {
-  const analyze = one("[data-analyze]");
-  if (!analyze) return;
-
-  analyze.addEventListener("click", () => {
-    showToast("Analyze belum tersedia: backend belum memiliki endpoint validasi SQL atau migration analysis.");
+  const form = one("[data-migration-form]");
+  if (!form) return;
+  const sql = one("[data-sql-editor]", form);
+  const review = one("[data-review]", form);
+  const execute = one("[data-execute]", form);
+  const confirmed = one("[data-execute-confirm]", form);
+  const nonAtomic = one("[data-non-atomic]", form);
+  let stale = !review;
+  const update = () => { if (execute) execute.disabled = stale || !confirmed.checked || (nonAtomic && !nonAtomic.checked); };
+  sql.addEventListener("input", () => {
+    if (review) {
+      stale = true;
+      one("[data-review-stale]").hidden = false;
+      const analysis = one("[data-analysis]");
+      if (analysis) analysis.hidden = true;
+    }
+    update();
   });
+  confirmed?.addEventListener("change", update);
+  nonAtomic?.addEventListener("change", update);
+  form.addEventListener("submit", (event) => {
+    if (event.submitter?.value === "execute" && (stale || !confirmed.checked || (nonAtomic && !nonAtomic.checked))) event.preventDefault();
+  });
+  update();
 }
 
-function setupPermissionSelects() {
+function setupVisualBuilder() {
+  const form = one("[data-visual-form]");
+  if (!form) return;
+  const hidden = one("[data-operations]", form);
+  const list = one("[data-operation-list]", form);
+  const kind = one("[data-op-kind]", form);
+  const schema = one("[data-op-schema]", form);
+  const table = one("[data-op-table]", form);
+  const error = one("[data-builder-error]", form);
+  const addButton = one("[data-operation-add]", form);
+  let operations = [];
+  let editing = -1;
+  try { const parsed = JSON.parse(hidden.value || "[]"); if (Array.isArray(parsed)) operations = parsed; } catch { error.textContent = "The previous change set could not be loaded."; error.hidden = false; }
+  const button = (label, callback) => {
+    const result = document.createElement("button");
+    result.type = "button"; result.className = "button button--secondary button--small";
+    result.textContent = label; result.addEventListener("click", callback); return result;
+  };
+  const field = (label, type = "text", value = "") => {
+    const wrapper = document.createElement("label"); wrapper.className = "field";
+    const title = document.createElement("span"); title.textContent = label;
+    const input = document.createElement("input"); input.type = type;
+    if (type === "checkbox") input.checked = Boolean(value); else input.value = value ?? "";
+    wrapper.append(title, input); return { wrapper, input };
+  };
+  const addColumn = (column = {}, primary = false) => {
+    const row = document.createElement("div"); row.className = "builder-row form-grid";
+    const items = [field("Name", "text", column.Name), field("SQL type", "text", column.DataType), field("Default SQL expression", "text", column.Default), field("Nullable", "checkbox", column.Nullable ?? true), field("Primary key", "checkbox", primary)];
+    items.forEach(({ wrapper }) => row.append(wrapper));
+    row.append(button("Remove", () => row.remove())); one("[data-column-list]", form).append(row);
+    row.read = () => ({ column: { Name: items[0].input.value.trim(), DataType: items[1].input.value.trim(), Default: items[2].input.value.trim() || null, Nullable: items[4].input.checked ? false : items[3].input.checked }, primary: items[4].input.checked });
+  };
+  const addPair = (target, name = "", value = "") => {
+    const row = document.createElement("div"); row.className = "builder-row form-grid";
+    const column = field("Column", "text", name);
+    const input = field("Value", "text", typeof value === "object" && value !== null ? JSON.stringify(value) : value);
+    const select = document.createElement("select"); select.setAttribute("aria-label", "Value type");
+    ["text", "number", "boolean", "null"].forEach((type) => { const option = document.createElement("option"); option.value = type; option.textContent = type; select.append(option); });
+    select.value = value === null ? "null" : typeof value === "boolean" ? "boolean" : typeof value === "number" ? "number" : "text";
+    const typeField = document.createElement("label"); typeField.className = "field";
+    const typeLabel = document.createElement("span"); typeLabel.textContent = "Value type"; typeField.append(typeLabel, select);
+    row.append(column.wrapper, input.wrapper, typeField, button("Remove", () => row.remove()));
+    one(`[data-pairs="${target}"]`, form).append(row);
+    row.read = () => {
+      const key = column.input.value.trim(); if (!key) throw new Error("Every value and filter needs a column name.");
+      let result = input.input.value;
+      if (select.value === "null") result = null;
+      if (select.value === "number") {
+        if (!/^-?(?:\d+)(?:\.\d+)?(?:[eE][+-]?\d+)?$/.test(result.trim()) || !Number.isFinite(Number(result))) throw new Error("Enter a valid finite number.");
+        result = Number(result);
+        if (Number.isInteger(result) && !Number.isSafeInteger(result)) throw new Error("This integer exceeds browser precision. Enter it as text to preserve the value.");
+      }
+      if (select.value === "boolean") { if (result !== "true" && result !== "false") throw new Error("Boolean values must be true or false."); result = result === "true"; }
+      return [key, result];
+    };
+  };
+  const pairs = (target) => {
+    const result = Object.create(null);
+    all(".builder-row", one(`[data-pairs="${target}"]`, form)).forEach((row) => {
+      const [key, value] = row.read(); if (Object.hasOwn(result, key)) throw new Error("Duplicate column in row values or filter."); result[key] = value;
+    });
+    return result;
+  };
+  const refreshFields = () => {
+    all("[data-op-fields]", form).forEach((panel) => { panel.hidden = !panel.dataset.opFields.split(" ").includes(kind.value); });
+    all("[data-column-definition]", form).forEach((item) => { item.hidden = kind.value === "drop_column"; });
+    all("[data-index-definition]", form).forEach((item) => { item.hidden = kind.value === "drop_index"; });
+  };
+  const edit = (index) => {
+    const op = operations[index]; editing = index;
+    kind.value = op.Kind; schema.value = op.Schema; table.value = op.Table;
+    const column = op.Column || {};
+    one("[data-column-name]", form).value = column.Name || "";
+    one("[data-column-type]", form).value = column.DataType || "";
+    one("[data-column-default]", form).value = column.Default || "";
+    one("[data-column-nullable]", form).checked = Boolean(column.Nullable);
+    const indexDefinition = op.Index || {};
+    one("[data-index-name]", form).value = indexDefinition.Name || "";
+    one("[data-index-columns]", form).value = (indexDefinition.Columns || []).map((item) => item.Name).join(", ");
+    one("[data-index-unique]", form).checked = Boolean(indexDefinition.Unique);
+    one("[data-column-list]", form).replaceChildren();
+    const definition = op.Definition || {};
+    const primary = (definition.Constraints || []).find((constraint) => constraint.Type === "p");
+    (definition.Columns || []).forEach((item) => addColumn(item, primary?.Columns.includes(item.Name)));
+    if (!definition.Columns?.length) addColumn();
+    ["values", "where"].forEach((target) => {
+      one(`[data-pairs="${target}"]`, form).replaceChildren();
+      Object.entries(op[target === "values" ? "Values" : "Where"] || {}).forEach(([key, value]) => addPair(target, key, value));
+    });
+    addButton.textContent = "Save operation changes"; refreshFields(); kind.focus();
+  };
+  const render = () => {
+    hidden.value = JSON.stringify(operations); list.replaceChildren();
+    operations.forEach((op, index) => {
+      const item = document.createElement("li");
+      const title = document.createElement("strong"); title.textContent = `${index + 1}. ${op.Kind} · ${op.Schema}.${op.Table}`;
+      const actions = document.createElement("div"); actions.className = "heading-actions";
+      const up = button("Up", () => { [operations[index - 1], operations[index]] = [operations[index], operations[index - 1]]; editing = -1; addButton.textContent = "Add operation to change set"; render(); }); up.disabled = index === 0;
+      const down = button("Down", () => { [operations[index + 1], operations[index]] = [operations[index], operations[index + 1]]; editing = -1; addButton.textContent = "Add operation to change set"; render(); }); down.disabled = index === operations.length - 1;
+      actions.append(up, down, button("Edit", () => edit(index)), button("Remove", () => { operations.splice(index, 1); editing = -1; addButton.textContent = "Add operation to change set"; render(); }));
+      item.append(title, actions); list.append(item);
+    });
+  };
+  kind.addEventListener("change", refreshFields);
+  one("[data-column-add]", form).addEventListener("click", () => addColumn());
+  all("[data-pair-add]", form).forEach((trigger) => trigger.addEventListener("click", () => addPair(trigger.dataset.pairAdd)));
+  addButton.addEventListener("click", () => {
+    try {
+      const op = { Kind: kind.value, Schema: schema.value.trim(), Table: table.value.trim() };
+      if (!op.Schema || !op.Table) throw new Error("Enter the schema and table name.");
+      if (op.Kind === "create_table") {
+        const rows = all(".builder-row", one("[data-column-list]", form)).map((row) => row.read());
+        if (!rows.length || rows.some((row) => !row.column.Name || !row.column.DataType)) throw new Error("Every table needs columns with names and SQL types.");
+        op.Definition = { Columns: rows.map((row) => row.column), Constraints: [] };
+        const primary = rows.filter((row) => row.primary).map((row) => row.column.Name);
+        if (primary.length) op.Definition.Constraints.push({ Name: op.Table + "_pkey", Type: "p", Columns: primary });
+      }
+      if (op.Kind.endsWith("_column")) {
+        op.Column = { Name: one("[data-column-name]", form).value.trim() };
+        if (!op.Column.Name) throw new Error("Enter a column name.");
+        if (op.Kind !== "drop_column") {
+          op.Column.DataType = one("[data-column-type]", form).value.trim();
+          op.Column.Nullable = one("[data-column-nullable]", form).checked;
+          op.Column.Default = one("[data-column-default]", form).value.trim() || null;
+          if (!op.Column.DataType) throw new Error("Enter the SQL type.");
+        }
+      }
+      if (op.Kind.endsWith("_index")) {
+        op.Index = { Name: one("[data-index-name]", form).value.trim(), Method: "btree" };
+        if (!op.Index.Name) throw new Error("Enter an index name.");
+        if (op.Kind === "add_index") {
+          op.Index.Unique = one("[data-index-unique]", form).checked;
+          op.Index.Columns = one("[data-index-columns]", form).value.split(",").map((name) => ({ Name: name.trim() }));
+          if (op.Index.Columns.some((item) => !item.Name)) throw new Error("Enter index columns.");
+        }
+      }
+      if (op.Kind === "insert_row" || op.Kind === "update_row") op.Values = pairs("values");
+      if (op.Kind === "update_row") { op.Where = pairs("where"); if (!Object.keys(op.Where).length) throw new Error("Updates require at least one filter."); }
+      if (editing < 0) operations.push(op); else operations[editing] = op;
+      editing = -1; addButton.textContent = "Add operation to change set"; error.hidden = true; render();
+    } catch (problem) { error.textContent = problem.message; error.hidden = false; }
+  });
+  form.addEventListener("submit", (event) => {
+    if (!operations.length || editing >= 0) { event.preventDefault(); error.textContent = editing >= 0 ? "Save the edited operation before analysis." : "Add at least one operation before analysis."; error.hidden = false; }
+    hidden.value = JSON.stringify(operations);
+  });
+  addColumn(); addPair("values"); addPair("where"); refreshFields(); render();
+}
+
+function setupForms() {
+  all("[data-confirm]").forEach((form) => form.addEventListener("submit", (event) => { if (!window.confirm(form.dataset.confirm)) event.preventDefault(); }));
   all(".permission-select").forEach((select) => {
     const update = () => {
-      select.classList.remove("permission-select--view", "permission-select--edit");
-      if (select.value === "View Only") select.classList.add("permission-select--view");
-      if (select.value === "View + Edit") select.classList.add("permission-select--edit");
+      select.classList.toggle("permission-select--view", select.value === "view_only");
+      select.classList.toggle("permission-select--edit", select.value === "view_edit");
     };
-    select.addEventListener("change", update);
-  });
-}
-
-function setupToastTriggers() {
-  all("[data-toast]").forEach((trigger) => {
-    trigger.addEventListener("click", () => showToast(trigger.dataset.toast));
+    select.addEventListener("change", update); update();
   });
 }
 
 setupSidebar();
-setupLogin();
-setupDatabaseFilter();
+setupPassword();
+setupSearch();
 setupTabs();
-setupExplorer();
 setupMigration();
-setupPermissionSelects();
-setupToastTriggers();
+setupVisualBuilder();
+setupForms();

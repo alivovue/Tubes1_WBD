@@ -3,6 +3,8 @@ package main
 import (
 	"log"
 	"net/http"
+	"os"
+	"time"
 
 	"tubes1_wbd/backend"
 )
@@ -13,6 +15,11 @@ func main() {
 		log.Fatal(err)
 	}
 
-	log.Println("Server running on http://localhost:3000")
-	log.Fatal(http.ListenAndServe(":3000", handler))
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "3000"
+	}
+	server := &http.Server{Addr: ":" + port, Handler: handler, ReadHeaderTimeout: 10 * time.Second, ReadTimeout: 30 * time.Second, WriteTimeout: 3 * time.Minute, IdleTimeout: 90 * time.Second}
+	log.Printf("Server running on http://localhost:%s", port)
+	log.Fatal(server.ListenAndServe())
 }

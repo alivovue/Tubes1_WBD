@@ -27,7 +27,7 @@
       <svg><use href="#icon-history"></use></svg><span>Changelog</span>
     </a>
 
-    <p class="nav-label nav-label--admin">Administration <span>Admin</span></p>
+    {{if .User.IsAdmin}}<p class="nav-label nav-label--admin">Administration <span>Admin</span></p>
     <a class="nav-item{{if eq .Active "admin-users"}} is-active{{end}}" href="/admin/users"{{if eq .Active "admin-users"}} aria-current="page"{{end}}>
       <svg><use href="#icon-users"></use></svg><span>Employees</span>
     </a>
@@ -40,12 +40,13 @@
     <a class="nav-item{{if eq .Active "admin-access"}} is-active{{end}}" href="/admin/access"{{if eq .Active "admin-access"}} aria-current="page"{{end}}>
       <svg><use href="#icon-shield"></use></svg><span>Access Control</span>
     </a>
+    {{end}}
   </nav>
 
   <div class="sidebar__footer">
-    <div class="avatar avatar--small">IN</div>
-    <div class="user-summary"><strong>Ishak Napitupulu</strong><span>Platform Admin</span></div>
-    <a class="icon-button" href="/" aria-label="Keluar"><svg><use href="#icon-logout"></use></svg></a>
+    <div class="avatar avatar--small">{{initials .User.DisplayName}}</div>
+    <div class="user-summary"><strong>{{.User.DisplayName}}</strong><span>{{if .User.IsAdmin}}Platform Admin{{else}}Employee{{end}}</span></div>
+    <form method="post" action="/logout"><input type="hidden" name="csrf" value="{{.CSRF}}" /><button class="icon-button" type="submit" aria-label="Keluar"><svg><use href="#icon-logout"></use></svg></button></form>
   </div>
 </aside>
 {{end}}

@@ -1,66 +1,56 @@
 {{define "content"}}
-<section class="page-heading page-heading--compact">
-  <div><p class="eyebrow">Migration workflow</p><h1>Create SQL migration</h1><p>Analisis dan tinjau SQL sebelum perubahan dieksekusi.</p></div>
-  <span class="badge badge--edit badge--large"><svg><use href="#icon-edit"></use></svg>View + Edit</span>
-</section>
-
-<ol class="stepper" aria-label="Tahap migration">
-  <li class="is-active" data-step="compose"><span>1</span><div><strong>Compose</strong><small>Write migration</small></div></li>
-  <li data-step="review"><span>2</span><div><strong>Review</strong><small>Analyze SQL</small></div></li>
-  <li data-step="execute"><span>3</span><div><strong>Execute</strong><small>Apply changes</small></div></li>
-</ol>
-
+<section class="page-heading page-heading--compact"><div><p class="eyebrow">Migration workflow</p><h1>Create migration</h1><p>Compose → Analyze → Review → Execute. Only Execute applies changes.</p></div>{{if .Database.ID}}<a class="button button--secondary" href="{{link "/migrations" "db" .Database.ID}}">Changelog</a>{{end}}</section>
+<form class="toolbar" method="get" action="/migrations/new"><label class="field"><span>Target database · View + Edit</span><select name="db">{{range .Databases}}<option value="{{.ID}}" {{if eq .ID $.Database.ID}}selected{{end}}>{{.Name}} · {{.DBMS}}</option>{{end}}</select></label><button class="button button--secondary" type="submit">Select database</button></form>
+{{if .Database.ID}}
 <div class="migration-layout">
-  <section class="panel editor-panel">
-    <header class="panel__header panel__header--editor"><div><h2>Migration details</h2><p>Informasi ini akan disimpan di changelog setelah endpoint backend tersedia.</p></div><span class="draft-indicator draft-indicator--pending">Draft not saved</span></header>
-    <div class="editor-fields">
-      <label class="field"><span>Target database</span><select><option>production_core · Production</option><option>identity_service · Development</option><option>sandbox_lab · Development</option></select></label>
-      <label class="field"><span>Description</span><input type="text" value="Add last login tracking to employees" /></label>
-    </div>
-    <div class="code-editor">
-      <div class="code-editor__bar"><span>migration.sql</span><span>PostgreSQL</span></div>
-      <div class="code-editor__body"><pre aria-hidden="true">1
-2
-3
-4
-5
-6
-7
-8</pre><textarea spellcheck="false" aria-label="SQL migration" data-sql-editor>BEGIN;
-
-ALTER TABLE employees
-  ADD COLUMN last_login_at TIMESTAMPTZ;
-
-CREATE INDEX idx_employee_login
-  ON employees(last_login_at);
-
-COMMIT;</textarea></div>
-      <div class="code-editor__footer"><span>Ln 8, Col 8</span><span>UTF-8 · Spaces: 2</span></div>
-    </div>
-    <div class="editor-actions"><button class="button button--secondary" type="button" data-toast="Penyimpanan draft belum tersedia: backend baru mendefinisikan tabel migration_drafts, belum endpoint-nya.">Save draft</button><button class="button button--primary" type="button" data-analyze><svg><use href="#icon-search"></use></svg>Analyze migration</button></div>
-  </section>
-
-  <aside class="panel guidance-panel">
-    <header class="panel__header"><div><h2>Before you continue</h2><p>Checklist untuk migration yang aman.</p></div></header>
-    <ul class="check-list"><li><svg><use href="#icon-check"></use></svg><span><strong>Wrap in a transaction</strong>Gunakan BEGIN dan COMMIT agar perubahan bersifat atomik.</span></li><li><svg><use href="#icon-check"></use></svg><span><strong>Use a clear description</strong>Jelaskan tujuan, bukan hanya sintaks perubahan.</span></li><li><svg><use href="#icon-check"></use></svg><span><strong>Review destructive statements</strong>DROP dan perubahan tipe data memerlukan perhatian khusus.</span></li></ul>
-    <div class="permission-callout"><svg><use href="#icon-shield"></use></svg><div><strong>Effective permission</strong><p>View + Edit via <b>Platform Engineering</b></p></div></div>
-  </aside>
+<section class="panel editor-panel"><header class="panel__header"><div><h2>{{if .Review}}Review SQL{{else}}SQL editor{{end}}</h2><p>{{.Database.Name}} · {{.Database.DBMS}}</p></div><span class="badge badge--edit">View + Edit</span></header>
+<form method="post" action="/migrations/new" data-migration-form>
+ <input type="hidden" name="csrf" value="{{.CSRF}}" /><input type="hidden" name="db" value="{{.Database.ID}}" /><input type="hidden" name="draft" value="{{if .DraftID}}{{.DraftID}}{{end}}" /><input type="hidden" name="draft_updated" value="{{.DraftUpdated}}" />
+ {{if .Review}}<input type="hidden" name="review" value="{{.ReviewJSON}}" data-review />{{end}}
+ <div class="editor-fields"><label class="field"><span>Description / draft title</span><input type="text" name="description" value="{{.Description}}" maxlength="255" required /></label></div>
+ <div class="code-editor"><div class="code-editor__bar"><span>migration.sql</span><span>{{.Database.DBMS}}</span></div><div class="code-editor__body"><textarea name="sql" spellcheck="false" aria-label="SQL migration" data-sql-editor required placeholder="ALTER TABLE ...;">{{.SQL}}</textarea></div></div>
+ <p class="integration-form muted">The backend manages transactions. Enter migration statements without BEGIN or COMMIT.{{if .DraftID}} Save edited draft SQL before analysis.{{end}}</p>
+ <div class="editor-actions"><button class="button button--secondary" name="action" value="save_draft" type="submit">Save draft</button><button class="button button--primary" name="action" value="analyze" type="submit">{{if .Review}}Re-analyze SQL{{else}}Analyze migration{{end}}</button></div>
+ {{if .Review}}
+ <div class="notice notice--warning" data-review-stale hidden><div>SQL changed. Analyze again before execution; the previous diff and plans no longer apply.</div></div>
+ <div class="integration-form" data-execute-section>
+ {{if not .Review.Transactional}}<label class="check-control"><input type="checkbox" name="accept_non_atomic" data-non-atomic /><span>I accept non-atomic execution. Statements may commit individually and a failure can leave partial changes.</span></label>{{end}}
+ <label class="check-control"><input type="checkbox" name="confirm" data-execute-confirm /><span>I reviewed the SQL and approve applying it to {{.Database.Name}}.</span></label>
+ <button class="button button--danger" name="action" value="execute" type="submit" data-execute disabled>Execute migration</button>
+ </div>{{end}}
+</form></section>
+<aside class="panel guidance-panel"><header class="panel__header"><h2>Saved drafts</h2></header><div class="integration-form">
+{{range .Drafts}}<article class="draft-entry"><a href="{{link "/migrations/new" "db" $.Database.ID "draft" .ID}}">{{.Title}}</a><small>{{stamp .UpdatedAt}}</small><form method="post" action="/migrations/new" data-confirm="Delete this draft?"><input type="hidden" name="csrf" value="{{$.CSRF}}" /><input type="hidden" name="db" value="{{$.Database.ID}}" /><input type="hidden" name="draft" value="{{.ID}}" /><button class="button button--secondary button--small" type="submit" name="action" value="delete_draft">Delete</button></form></article>{{else}}<p>No saved drafts for this database.</p>{{end}}
+</div></aside>
 </div>
-
-<section class="panel analysis-panel" data-analysis hidden>
-  <header class="panel__header"><div><p class="eyebrow eyebrow--success">Analysis complete</p><h2>Review generated migration</h2><p>SQL lolos pemeriksaan awal. Periksa kembali sebelum eksekusi.</p></div><span class="analysis-score"><svg><use href="#icon-check"></use></svg>No blocking issues</span></header>
-  <div class="analysis-grid"><article><span>Statements</span><strong>2</strong></article><article><span>Affected objects</span><strong>employees, idx_employee_login</strong></article><article><span>Transaction</span><strong>Enabled</strong></article><article><span>Risk level</span><strong class="text-warning">Medium</strong></article></div>
-  <div class="notice notice--warning"><svg><use href="#icon-alert"></use></svg><div><strong>Table lock may occur</strong><p>ALTER TABLE dapat mengambil lock singkat pada tabel employees. Jalankan saat traffic rendah.</p></div></div>
-  <label class="field"><span>Editable SQL review</span><textarea class="review-editor" spellcheck="false">BEGIN;
-
-ALTER TABLE employees ADD COLUMN last_login_at TIMESTAMPTZ;
-CREATE INDEX idx_employee_login ON employees(last_login_at);
-
-COMMIT;</textarea></label>
-  <div class="editor-actions"><a class="button button--secondary" href="/migrations">Cancel</a><button class="button button--danger" type="button" data-modal-open="execute-modal">Review & execute <svg><use href="#icon-arrow"></use></svg></button></div>
-</section>
-
-<div class="modal" id="execute-modal" role="dialog" aria-modal="true" aria-labelledby="execute-title" hidden>
-  <div class="modal__backdrop" data-modal-close></div><div class="modal__card"><span class="modal__icon"><svg><use href="#icon-alert"></use></svg></span><h2 id="execute-title">Execute on production?</h2><p>Migration akan dijalankan secara transaksional pada <strong>production_core</strong>. Jika gagal, seluruh perubahan akan di-rollback.</p><label class="check-control check-control--confirm"><input type="checkbox" data-execute-confirm /><span>Saya memahami dampak perubahan ini.</span></label><div class="modal__actions"><button class="button button--secondary" type="button" data-modal-close>Back</button><button class="button button--danger" type="button" data-execute disabled>Execute migration</button></div></div>
-</div>
+{{if .Review}}
+<section class="panel analysis-panel" data-analysis><header class="panel__header"><div><h2>Migration analysis</h2><p>Informational preview of the current SQL. Execution rechecks permission, version and schema.</p></div></header><div class="analysis-grid"><article><span>Statements</span><strong>{{len .Review.Plans}}</strong></article><article><span>Base version</span><strong>{{.Review.BaseVersion}}</strong></article><article><span>Execution mode</span><strong>{{.Review.Mode}}</strong></article></div>
+ {{range .Review.Warnings}}<div class="notice notice--warning"><div>{{.}}</div></div>{{end}}
+ <div class="integration-form"><h3>Schema diff</h3>{{if .Review.SchemaDiffAvailable}}{{with .Review.SchemaDiff}}
+ {{if .Destructive}}<div class="notice notice--warning"><div>The candidate includes destructive schema changes. Review the generated SQL carefully.</div></div>{{end}}
+ <ul class="change-list">{{range .Changes}}<li><strong>{{.Kind}}</strong> · {{.Schema}}.{{.Table}} {{.Name}}<details><summary>Compared schema states</summary><pre>Before: {{pretty .Before}}
+After: {{pretty .After}}</pre></details></li>{{else}}<li>No structural changes.</li>{{end}}</ul>
+ <h3>Data-change summary</h3><ul class="change-list">{{range .DataChanges}}<li><strong>{{.Kind}}</strong> · {{.Schema}}.{{.Table}}<pre>Values: {{pretty .Values}}
+Filter: {{pretty .Where}}</pre></li>{{else}}<li>No structured row changes.</li>{{end}}</ul>{{end}}{{else}}<p>{{.Review.SchemaDiffMessage}}</p>{{end}}
+ <h3>Query execution plans</h3>{{range .Review.Plans}}<article class="plan-entry"><pre>{{.Statement}}</pre>{{if .Available}}{{range .Nodes}}{{template "plan_node" .}}{{end}}<details><summary>Native EXPLAIN JSON</summary><pre>{{pretty .JSON}}</pre></details>{{else}}<p>{{.Message}}</p>{{end}}</article>{{end}}
+ </div></section>{{end}}
+<section class="panel" data-visual-builder><header class="panel__header"><div><h2>Visual change set</h2><p>Accumulate and reorder operations. Analyze generates editable SQL, compares schema states and previews row changes.</p></div></header>
+<form class="form-stack integration-form" method="post" action="/migrations/new" data-visual-form>
+ <input type="hidden" name="csrf" value="{{.CSRF}}" /><input type="hidden" name="db" value="{{.Database.ID}}" /><input type="hidden" name="action" value="analyze_visual" /><input type="hidden" name="operations" value="{{.OperationsJSON}}" data-operations />
+ <label class="field"><span>Description</span><input name="description" value="{{.Description}}" required maxlength="255" /></label>
+ <div class="form-grid"><label class="field"><span>Operation</span><select data-op-kind><option value="create_table">Create table</option><option value="drop_table">Drop table</option><option value="add_column">Add column</option><option value="alter_column">Alter column</option><option value="drop_column">Drop column</option><option value="add_index">Add index</option><option value="drop_index">Drop index</option><option value="insert_row">Insert row</option><option value="update_row">Update rows</option></select></label><label class="field"><span>Schema</span><input data-op-schema list="schema-names" value="{{if .Schemas}}{{(index .Schemas 0).Name}}{{end}}" /></label><label class="field"><span>Table</span><input data-op-table /></label></div>
+ <datalist id="schema-names">{{range .Schemas}}<option value="{{.Name}}"></option>{{end}}</datalist>
+ <div data-op-fields="create_table"><h3>Columns</h3><div data-column-list></div><button class="button button--secondary button--small" type="button" data-column-add>Add column</button></div>
+ <div class="form-grid" data-op-fields="add_column alter_column drop_column" hidden><label class="field"><span>Column name</span><input data-column-name /></label><label class="field" data-column-definition><span>SQL type</span><input data-column-type placeholder="integer / varchar(255)" /></label><label class="field" data-column-definition><span>Default SQL expression (optional)</span><input data-column-default /></label><label class="check-control" data-column-definition><input type="checkbox" data-column-nullable checked /><span>Nullable</span></label></div>
+ <div class="form-grid" data-op-fields="add_index drop_index" hidden><label class="field"><span>Index name</span><input data-index-name /></label><label class="field" data-index-definition><span>Columns (comma separated)</span><input data-index-columns /></label><label class="check-control" data-index-definition><input type="checkbox" data-index-unique /><span>Unique index</span></label></div>
+ <div data-op-fields="insert_row update_row" hidden><h3>Row values</h3><div data-pairs="values"></div><button class="button button--secondary button--small" type="button" data-pair-add="values">Add value</button></div>
+ <div data-op-fields="update_row" hidden><h3>Filter · all conditions must match</h3><div data-pairs="where"></div><button class="button button--secondary button--small" type="button" data-pair-add="where">Add condition</button></div>
+ <p class="text-warning" role="alert" data-builder-error hidden></p><button class="button button--secondary" type="button" data-operation-add>Add operation to change set</button>
+ <ol class="operation-list" data-operation-list></ol>
+ <div class="editor-actions"><button class="button button--primary" type="submit">Analyze change set</button></div>
+</form></section>
+{{else}}<p class="empty-state">You need View + Edit access to a database to compose migrations. View Only users can inspect the changelog.</p><a class="button button--secondary" href="/migrations">View changelog</a>{{end}}
+{{end}}
+{{define "plan_node"}}
+<div class="plan-node"><strong>{{.Operation}}</strong>{{if .Relation}} · {{.Relation}}{{end}}{{if .Index}} · index {{.Index}}{{end}}{{if .JoinType}} · {{.JoinType}}{{end}}{{if .EstimatedRows}} · estimated rows {{cell .EstimatedRows}}{{end}}{{if .TotalCost}} · cost {{cell .TotalCost}}{{end}}{{range .Children}}{{template "plan_node" .}}{{end}}</div>
 {{end}}

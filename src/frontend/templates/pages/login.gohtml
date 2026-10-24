@@ -26,7 +26,7 @@
   <b>ON</b> employees(last_login_at);
 
 <span>COMMIT;</span></pre>
-      <div class="code-window__status"><svg><use href="#icon-code"></use></svg> Interface preview · Analysis backend not connected</div>
+      <div class="code-window__status"><svg><use href="#icon-code"></use></svg> Analyze · Review · Execute</div>
     </div>
     <p class="auth-showcase__footer">Schakker Technologies · Internal systems</p>
   </section>
@@ -40,7 +40,9 @@
       <p class="eyebrow">Employee portal</p>
       <h2 id="login-title">Welcome back</h2>
       <p class="auth-card__lead">Masuk menggunakan akun internal Schakker Anda.</p>
-      <form class="form-stack" data-demo-login>
+      {{if .Error}}<div class="notice notice--warning" role="alert"><div>{{.Error}}</div></div>{{end}}
+      <form class="form-stack" method="post" action="/login">
+        <input type="hidden" name="csrf" value="{{.CSRF}}" />
         <label class="field">
           <span>Username</span>
           <input name="username" type="text" placeholder="contoh: ishak.n" autocomplete="username" required />
@@ -52,14 +54,10 @@
             <button type="button" data-password-toggle aria-label="Tampilkan password"><svg><use href="#icon-eye"></use></svg></button>
           </span>
         </label>
-        <div class="form-options">
-          <label class="check-control"><input type="checkbox" name="remember" /><span>Ingat perangkat ini</span></label>
-          <a href="#">Lupa password?</a>
-        </div>
         <button class="button button--primary button--wide" type="submit">Masuk ke workspace <svg><use href="#icon-arrow"></use></svg></button>
       </form>
-      <div class="security-note"><svg><use href="#icon-shield"></use></svg><span>Akses terbatas untuk karyawan. Aktivitas login akan dicatat.</span></div>
-      <p class="auth-help">Kesulitan masuk? <a href="#">Hubungi Platform Admin</a></p>
+      <div class="security-note"><svg><use href="#icon-shield"></use></svg><span>Akses terbatas untuk karyawan. Gunakan akun yang dibuat oleh admin.</span></div>
+      <p class="auth-help">Kesulitan masuk? Hubungi Platform Admin Anda.</p>
     </div>
   </section>
 </main>

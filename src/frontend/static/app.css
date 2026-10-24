@@ -1423,3 +1423,34 @@ svg {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
 }
+
+.integration-form { padding: 24px; }
+.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; align-items: end; }
+.form-stack > .button { justify-self: start; }
+.inline-editor { min-width: 240px; padding: 16px 0; }
+.integration-connection { display: grid; gap: 20px; }
+.integration-connection .inline-editor { min-width: 0; }
+.detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; margin: 0 0 24px; }
+.detail-grid dt { color: var(--text-muted, #8a95a9); font-size: 12px; }
+.detail-grid dd { margin: 6px 0 0; overflow-wrap: anywhere; }
+.draft-entry, .plan-entry { padding: 16px 0; border-bottom: 1px solid var(--border, #283146); }
+.draft-entry small { display: block; margin: 8px 0; }
+.change-list, .operation-list { display: grid; gap: 16px; margin: 16px 0; padding-left: 20px; }
+.operation-list li > .heading-actions { margin-top: 8px; flex-wrap: wrap; }
+.builder-row { margin-bottom: 16px; }
+.plan-node { margin: 12px 0 12px 16px; padding-left: 12px; border-left: 1px solid var(--border, #283146); }
+.plan-entry pre, .change-list pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 380px; overflow: auto; }
+.member-list { margin: 16px 0; padding-left: 20px; }
+summary { cursor: pointer; color: var(--text-muted, #a4aec0); padding: 10px 0; }
+.group-card > form, .group-card > details { margin-top: 16px; }
+.tree__schema, .tree__item { text-decoration: none; }
+.access-table form { display: grid; gap: 8px; }
+.data-table td { max-width: 420px; overflow-wrap: anywhere; }
+.code-editor__body > textarea { width: 100%; min-height: 260px; }
+.notice[hidden], .form-grid[hidden] { display: none; }
+.muted { color: var(--text-muted, #a4aec0); }
+@media (max-width: 600px) { .integration-form { padding: 16px; } .form-grid { grid-template-columns: 1fr; } }
+.code-editor__body { grid-template-columns: minmax(0, 1fr); }
+
+.tabs { overflow-y: hidden; }
+.editor-fields { grid-template-columns: 1fr; }

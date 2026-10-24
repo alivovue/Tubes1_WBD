@@ -2,5 +2,6 @@ node_modules/
 /src/bin/
 .env
 .env.*
+!/src/.env.example
 /src/.test-postgres/
 /src/.test-postgres.log
