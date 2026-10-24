@@ -17,6 +17,7 @@ import (
 	"tubes1_wbd/backend/migration"
 	"tubes1_wbd/database/dao"
 	"tubes1_wbd/database/setup"
+	fixtures "tubes1_wbd/test/data"
 )
 
 var ErrAdminSetupRequired = errors.New("initial admin setup is required; start with ./run.sh from the repository root")
@@ -42,15 +43,42 @@ func servicesFromEnvironment(root string) (Services, func(), error) {
 	defer cancel()
 	var db *sql.DB
 	stopDatabase := func() {}
-	if dsn == "" {
+	useMockWebsite := os.Getenv("SCHAKKER_USE_MOCK_WEBSITE") == "yes"
+	useMockManaged := os.Getenv("SCHAKKER_USE_MOCK_MANAGED") == "yes"
+	var mocks *fixtures.Factory
+	if useMockWebsite || useMockManaged {
+		if production {
+			return Services{}, nil, errors.New("mock databases are available in development only")
+		}
+		state := os.Getenv("SCHAKKER_FIXTURE_STATE")
+		if state == "" {
+			return Services{}, nil, errors.New("mock database state was not provided by the launcher")
+		}
+		mocks, err = fixtures.OpenSelected(ctx, state, useMockWebsite, useMockManaged)
+		if err != nil {
+			return Services{}, nil, err
+		}
+	}
+	if useMockWebsite {
+		db, err = mocks.Cluster.Open(ctx, fixtures.WebsiteName)
+	} else if dsn == "" {
 		db, stopDatabase, err = setup.OpenLocal(ctx, directory)
 	} else {
 		db, err = setup.Open(ctx, dsn)
 	}
 	if err != nil {
+		if mocks != nil {
+			mocks.Close()
+		}
 		return Services{}, nil, err
 	}
-	closeDB := func() { db.Close(); stopDatabase() }
+	closeDB := func() {
+		db.Close()
+		stopDatabase()
+		if mocks != nil {
+			mocks.Close()
+		}
+	}
 	fail := func(err error) (Services, func(), error) { closeDB(); return Services{}, nil, err }
 	if err := setup.EnsureInitialized(ctx, db); err != nil {
 		return fail(err)
@@ -67,6 +95,7 @@ func servicesFromEnvironment(root string) (Services, func(), error) {
 	if err != nil {
 		return fail(err)
 	}
+	bootstrapPassword := ""
 	if !exists {
 		username, password := os.Getenv("SCHAKKER_ADMIN_USERNAME"), os.Getenv("SCHAKKER_ADMIN_PASSWORD")
 		display := os.Getenv("SCHAKKER_ADMIN_NAME")
@@ -79,6 +108,7 @@ func servicesFromEnvironment(root string) (Services, func(), error) {
 		if err := auth.BootstrapAdmin(ctx, username, display, password); err != nil {
 			return fail(errors.New("initial admin could not be created; use a valid username and a password containing 12–72 bytes"))
 		}
+		bootstrapPassword = password
 	}
 	databases, err := dbmanagement.NewService(store, auth, dbmanagement.DefaultConfig(key, production))
 	if err != nil {
@@ -87,6 +117,16 @@ func servicesFromEnvironment(root string) (Services, func(), error) {
 	migrations, err := migration.NewService(store, auth, databases)
 	if err != nil {
 		return fail(err)
+	}
+	if useMockWebsite {
+		if err := fixtures.PopulateWebsite(ctx, db, store, auth, bootstrapPassword); err != nil {
+			return fail(err)
+		}
+	}
+	if useMockManaged {
+		if err := mocks.AttachManaged(ctx, store, auth, databases); err != nil {
+			return fail(err)
+		}
 	}
 	return Services{Access: auth, Databases: databases, Migrations: migrations, Production: production}, closeDB, nil
 }

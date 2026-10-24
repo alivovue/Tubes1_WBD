@@ -6,3 +6,5 @@ node_modules/
 /src/.test-postgres/
 /src/.test-postgres.log
 /src/.schakker/
+/src/test/output/*
+!/src/test/output/.gitkeep
