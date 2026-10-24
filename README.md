@@ -1,66 +1,178 @@
-# Tubes1_WBD
+# Schakker
 
-The website renders HTML with `html/template`, serves its existing styles and
-images, and provides the product API. Access control is a backend package;
-the website does not use it yet.
+Schakker adalah aplikasi pengelolaan database dengan autentikasi pengguna, akses berbasis grup, penjelajah skema dan data, serta pengelolaan migrasi SQL. Database internal website menyimpan akun, sesi, permission, dan riwayat migrasi. Database target yang dikelola dapat menggunakan PostgreSQL atau MariaDB.
 
-## Repository structure
+## 1. Dependensi yang perlu dipasang
+
+Petunjuk berikut ditujukan untuk Linux, terutama Ubuntu/Debian. Untuk Windows, gunakan Ubuntu melalui WSL2 dan pasang dependensi di lingkungan Ubuntu tersebut.
+
+| Dependensi | Kebutuhan | Sumber unduhan |
+| --- | --- | --- |
+| Go | Versi 1.26 atau lebih baru. Proyek mencantumkan toolchain `go1.26.10` di `src/go.mod`. | [Instalasi Go resmi](https://go.dev/doc/install) |
+| PostgreSQL | Versi 14 atau lebih baru, termasuk program server `postgres`, `initdb`, dan `pg_ctl`. Diperlukan untuk database lokal dan integration test. | [Unduhan PostgreSQL](https://www.postgresql.org/download/) |
+| PostgreSQL client | Menyediakan `psql` untuk pemeriksaan database bila diperlukan. | [Paket PostgreSQL Ubuntu](https://www.postgresql.org/download/linux/ubuntu/) |
+| Bash | Versi 4 atau lebih baru untuk menjalankan `run.sh`. | Paket `bash` pada distribusi Linux. |
+| Browser | Untuk membuka antarmuka website. | Browser yang tersedia di komputer Anda. |
+
+MariaDB Server bersifat **opsional**, jika ingin mengelola target MariaDB. Adapter mendukung MariaDB 10.6 atau lebih baru; pilih rilis yang masih didukung melalui [unduhan resmi MariaDB](https://mariadb.org/download/). Database mock dan integration test yang disediakan menggunakan PostgreSQL.
+
+### Instalasi di Ubuntu/Debian
+
+Pasang PostgreSQL dan Bash:
+
+```bash
+sudo apt update
+sudo apt install postgresql postgresql-client bash
+```
+
+Untuk Go, ikuti [petunjuk instalasi resmi](https://go.dev/doc/install), pilih paket Linux sesuai arsitektur komputer, dan pastikan perintah `go` tersedia pada `PATH`.
+
+Periksa hasil instalasi:
+
+```bash
+go version
+psql --version
+bash --version
+ls /usr/lib/postgresql/*/bin/{initdb,pg_ctl,postgres}
+```
+
+Pada instalasi PostgreSQL di luar lokasi standar, atur `SCHAKKER_POSTGRES_BIN` seperti dijelaskan pada bagian konfigurasi opsional.
+
+Dependensi Go pada `src/go.mod` diunduh otomatis ketika proyek dibangun. Siapkan koneksi internet pada penggunaan pertama jika dependensi atau toolchain belum tersedia di cache.
+
+## 2. Menjalankan website
+
+Buka terminal di root repositori, yaitu folder yang berisi `README.md` dan `run.sh`, lalu jalankan:
+
+```bash
+./run.sh
+```
+
+Jalankan sebagai pengguna biasa. Launcher akan membangun aplikasi, menyiapkan database PostgreSQL privat untuk proyek, membuat tabel yang diperlukan, dan membuat serta menyimpan master key secara otomatis. Pengaturan bawaan dapat digunakan tanpa membuat file `.env`.
+
+Jika muncul `Permission denied` saat membuka launcher, gunakan:
+
+```bash
+bash run.sh
+```
+
+### Pilihan saat launcher dijalankan
+
+Launcher menampilkan empat pertanyaan berikut:
+
+| Pertanyaan | Jawaban `y` | Jawaban `n` | Bawaan saat menekan Enter |
+| --- | --- | --- | --- |
+| Menjalankan unit test? | Menjalankan pengujian dengan dependensi database yang di-stub. | Melewati unit test. | `y` |
+| Menjalankan integration test PostgreSQL? | Menjalankan IT-01 sampai IT-15 dengan database pengujian terisolasi. | Melewati integration test. | `y` |
+| Mempertahankan database mock website? | Menggunakan database contoh untuk akun, grup, sesi, dan riwayat website. | Menggunakan database website normal atau koneksi yang dikonfigurasi. | `n` |
+| Mempertahankan database mock managed? | Menyediakan database target contoh berisi tabel `employees` dengan data Alice dan Bob. | Menjalankan website tanpa target mock tersebut. | `n` |
+
+Jika ada pengujian yang dipilih tetapi gagal, launcher menyimpan hasilnya dan menghentikan proses sebelum website dijalankan.
+
+Database mock website dan managed dapat dipilih secara terpisah:
+
+| Mock website | Mock managed | Hasil |
+| --- | --- | --- |
+| `n` | `n` | Menggunakan database website normal. Target database dapat didaftarkan melalui halaman admin. |
+| `y` | `n` | Menggunakan database website contoh; target database dapat didaftarkan sendiri. |
+| `n` | `y` | Menggunakan database website normal dengan tambahan target managed contoh. |
+| `y` | `y` | Menggunakan database website contoh dan target managed contoh. |
+
+Setiap integration test menggunakan salinan database tersendiri. Database mock yang dipertahankan untuk website berisi data awal, bukan perubahan dari skenario pengujian.
+
+### Membuat admin dan masuk
+
+Jika database website yang dipilih belum memiliki pengguna, launcher meminta:
+
+1. Username admin; nilai bawaan `admin`.
+2. Nama tampilan; nilai bawaan `Platform Admin`.
+3. Password sepanjang **12–72 byte**, kemudian konfirmasinya. Password tidak ditampilkan saat diketik.
+
+Setelah terminal menampilkan alamat server, buka:
+
+**http://localhost:3000**
+
+Masuk menggunakan akun admin yang baru dibuat. Pada database mock website baru, akun `mock.writer` dan `mock.reader` menggunakan password yang dipilih saat pembuatan admin pertama.
+
+### Mengakses database target
+
+Jika menggunakan target mock, launcher mendaftarkan koneksinya dan menyiapkan permission grup contoh. Jika mendaftarkan target sendiri:
+
+1. Buka **Administration → DB Connections** dan simpan koneksi PostgreSQL atau MariaDB.
+2. Buka **Groups**, buat grup, lalu tambahkan pengguna yang memerlukan akses, termasuk akun admin jika diperlukan.
+3. Buka **Access Control** dan berikan permission `View Only` atau `View + Edit` untuk grup tersebut.
+4. Buka **My Databases** untuk menjelajahi target atau membuat migrasi sesuai permission.
+
+Peran Platform Admin dan permission database dikelola terpisah. Akses database diberikan melalui keanggotaan grup.
+
+### Menghentikan dan menjalankan kembali
+
+Tekan **Ctrl+C** pada terminal launcher untuk menghentikan website dan instance PostgreSQL yang dimulainya.
+
+Data lokal, master key, dan database mock yang dipertahankan disimpan di `src/.schakker/`. Pertahankan folder ini agar data dan kunci tetap konsisten antar sesi. Folder tersebut dikecualikan dari Git.
+
+Untuk menggunakan kembali database mock yang sebelumnya dipertahankan, jalankan `./run.sh`, lewati integration test, lalu pilih `y` untuk database mock yang ingin digunakan kembali. Jika menjalankan integration test lagi dan memilih mempertahankan mock, launcher menggunakan kumpulan fixture baru dari pengujian tersebut.
+
+## 3. Pengujian dan hasilnya
+
+Launcher menyimpan hasil pengujian otomatis pada:
 
 ```text
-src/
-  go.mod                    # Go module and backend dependencies
-  main.go                   # Original website entry point
-  backend/
-    server.go               # Original website routes and product loading
-    Products.json           # Product data loaded at startup
-    access/                 # Backend services, JSON API and middleware
-  database/                 # Platform metadata schema and setup instructions
-  frontend/
-    templates/              # Go HTML templates and shared navigation/footer
-    static/                 # CSS and browser JavaScript
-    public/                 # Images
+src/test/output/<waktu-run>/
+├── unit.log
+├── integration.log
+└── summary.txt
 ```
 
-## Run locally
+File log dibuat sesuai suite yang dipilih. `summary.txt` mencatat status lulus atau gagal. Laporan hasil pengujian dikecualikan dari Git.
 
-Use the Go version declared in `src/go.mod` (Go 1.26+, suggested toolchain
-1.26.10), then run from the repository root:
+Lokasi kode pengujian dan data contoh:
 
-```sh
+```text
+src/test/
+├── unit/                 # Unit test dengan framework testing bawaan Go
+├── integration/          # IT-01 sampai IT-15 dengan PostgreSQL nyata
+├── data/
+│   ├── website/          # SQL data contoh akun, grup, dan keanggotaan
+│   └── managed/          # SQL tabel dan data target contoh
+└── output/               # Laporan pengujian dari launcher
+```
+
+Untuk menjalankan pengujian secara langsung dari terminal:
+
+```bash
 cd src
-go run .
+go test -count=1 ./test/unit/...
+go test -count=1 -timeout=5m ./test/integration/...
 ```
 
-Open http://localhost:3000. The original page URLs (`/index.html` through
-`/index5.html`) remain available, and `/` opens the home page. This command
-requires no PostgreSQL database, master key, or authentication configuration.
+Unit test dapat dijalankan tanpa server database. Integration test menyiapkan PostgreSQL privat dan database pengujian secara otomatis. Perintah `go test` langsung menampilkan hasil di terminal; gunakan launcher untuk menyimpan laporan secara otomatis ke `src/test/output/`.
 
-Product cards render in the store template. The `/Products` API returns the
-product JSON. Images remain available under `/public/`, and styles retain
-their existing URLs.
+## 4. Konfigurasi opsional
 
-The Go module and entry point are both in `src/`. Node.js and npm are no longer
-needed to run the site.
+Untuk mengubah pengaturan bawaan, salin contoh konfigurasi dari root repositori:
 
-## Access-control backend
-
-`src/backend/access` provides authentication, sessions, group permissions,
-platform administration, PostgreSQL connection management, and JSON endpoints.
-Initialize an `access.Service` with a PostgreSQL metadata database and
-`access.Config`, then mount its `Handler()` when integrating the frontend.
-
-The API has no HTML templates, CSS, login page, or dashboard. The original
-website routes remain independent; no access-control routes are mounted there.
-
-## Build
-
-From `src/`:
-
-```sh
-go vet ./...
-go build -o bin/server .
-./bin/server
+```bash
+cp src/.env.example src/.env
 ```
 
-Run the binary from `src/` so it can find `backend/Products.json` and the
-`frontend/` templates and assets.
+Edit `src/.env`, kemudian jalankan kembali `./run.sh`. Launcher memuat file ini secara otomatis.
+
+| Variabel | Kegunaan |
+| --- | --- |
+| `PORT` | Port website; bawaan `3000`. |
+| `SCHAKKER_STATE_DIR` | Lokasi penyimpanan data lokal; bawaan `.schakker`, relatif terhadap `src/`. |
+| `SCHAKKER_POSTGRES_BIN` | Direktori berisi `postgres`, `initdb`, dan `pg_ctl` jika tidak terdeteksi otomatis. Contoh: `/usr/lib/postgresql/14/bin`. |
+| `SCHAKKER_DATABASE_URL` | Koneksi PostgreSQL internal website yang sudah tersedia. Jika dikosongkan, aplikasi menyiapkan database lokal. Database dengan koneksi khusus harus sudah ada; skema dibuat otomatis jika kosong. |
+| `SCHAKKER_MASTER_KEY` | Kunci 32 byte dalam format hex atau Base64. Jika dikosongkan pada mode pengembangan, aplikasi membuat dan menyimpannya otomatis. |
+| `SCHAKKER_ADMIN_USERNAME` | Username admin pertama jika ingin melewati pertanyaan pembuatan akun. |
+| `SCHAKKER_ADMIN_NAME` | Nama tampilan admin pertama. |
+| `SCHAKKER_ADMIN_PASSWORD` | Password admin pertama jika diberikan melalui konfigurasi. Tidak mengubah password akun yang sudah ada. |
+
+Contoh mengganti port untuk satu kali menjalankan aplikasi:
+
+```bash
+PORT=3001 ./run.sh
+```
+
+Jika `PORT` juga diisi di `src/.env`, nilai dari file tersebut akan dimuat oleh launcher. Untuk memakai contoh perintah di atas, biarkan `PORT` tidak ditentukan di file atau ubah langsung nilai pada file tersebut.
