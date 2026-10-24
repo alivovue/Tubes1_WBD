@@ -14,32 +14,39 @@ import (
 	"strings"
 )
 
-type product struct {
-	ID          int     `json:"id"`
-	Title       string  `json:"title"`
-	Description string  `json:"description"`
-	Price       float64 `json:"price"`
-	Image       string  `json:"image"`
-}
-
 type page struct {
 	template string
+	layout   string
+	title    string
 	active   string
+	section  string
 }
 
 var pages = map[string]page{
-	"/":            {"index.gohtml", "intro"},
-	"/index.html":  {"index.gohtml", "intro"},
-	"/index2.html": {"index2.gohtml", "products"},
-	"/index3.html": {"index3.gohtml", "store"},
-	"/index4.html": {"index4.gohtml", "social"},
-	"/index5.html": {"index5.gohtml", "about"},
+	"/":                  {"login.gohtml", "auth_layout", "Masuk", "login", "Authentication"},
+	"/login":             {"login.gohtml", "auth_layout", "Masuk", "login", "Authentication"},
+	"/dashboard":         {"dashboard.gohtml", "app_layout", "Dashboard", "dashboard", "Overview"},
+	"/databases":         {"databases.gohtml", "app_layout", "My Databases", "databases", "Workspace"},
+	"/explorer":          {"explorer.gohtml", "app_layout", "Database Explorer", "databases", "Workspace"},
+	"/migrations/new":    {"migration_editor.gohtml", "app_layout", "SQL Migration", "migration-editor", "Workspace"},
+	"/migrations":        {"migration_history.gohtml", "app_layout", "Changelog", "migration-history", "Workspace"},
+	"/admin/users":       {"admin_users.gohtml", "app_layout", "Employees", "admin-users", "Administration"},
+	"/admin/groups":      {"admin_groups.gohtml", "app_layout", "Groups", "admin-groups", "Administration"},
+	"/admin/connections": {"admin_connections.gohtml", "app_layout", "Database Connections", "admin-connections", "Administration"},
+	"/admin/access":      {"admin_access.gohtml", "app_layout", "Access Control", "admin-access", "Administration"},
+}
+
+var legacyRoutes = map[string]string{
+	"/index.html":  "/",
+	"/index2.html": "/databases",
+	"/index3.html": "/databases",
+	"/index4.html": "/dashboard",
+	"/index5.html": "/dashboard",
 }
 
 type application struct {
-	templates   *template.Template
+	templates   map[string]*template.Template
 	productJSON json.RawMessage
-	products    []product
 	static      http.Handler
 	public      http.Handler
 }
@@ -47,24 +54,48 @@ type application struct {
 // NewHandler serves the frontend templates, assets, and existing API endpoints.
 // root is the directory containing backend/ and frontend/ (the root src/ folder).
 func NewHandler(root string) (http.Handler, error) {
-	templates, err := template.ParseGlob(filepath.Join(root, "frontend", "templates", "*.gohtml"))
+	templates, err := loadTemplates(filepath.Join(root, "frontend", "templates"))
 	if err != nil {
 		return nil, fmt.Errorf("parse frontend templates: %w", err)
 	}
-	productJSON, products := loadProducts(filepath.Join(root, "backend", "Products.json"))
+	productJSON := loadProducts(filepath.Join(root, "backend", "Products.json"))
 
 	app := &application{
 		templates:   templates,
 		productJSON: productJSON,
-		products:    products,
 		static:      http.FileServer(http.Dir(filepath.Join(root, "frontend", "static"))),
 		public:      http.StripPrefix("/public/", http.FileServer(http.Dir(filepath.Join(root, "frontend", "public")))),
 	}
 	return http.HandlerFunc(app.serveHTTP), nil
 }
 
+// Parse every page with its layout and shared partials. Keeping each page in a
+// separate template set lets all page files define the same "content" block.
+func loadTemplates(root string) (map[string]*template.Template, error) {
+	shared := []string{
+		filepath.Join(root, "partials", "icons.gohtml"),
+		filepath.Join(root, "partials", "sidebar.gohtml"),
+		filepath.Join(root, "partials", "topbar.gohtml"),
+	}
+	parsed := make(map[string]*template.Template)
+	for _, page := range pages {
+		if _, exists := parsed[page.template]; exists {
+			continue
+		}
+		files := []string{filepath.Join(root, "layouts", page.layout+".gohtml")}
+		files = append(files, shared...)
+		files = append(files, filepath.Join(root, "pages", page.template))
+		tmpl, err := template.ParseFiles(files...)
+		if err != nil {
+			return nil, fmt.Errorf("parse %s: %w", page.template, err)
+		}
+		parsed[page.template] = tmpl
+	}
+	return parsed, nil
+}
+
 // Load product data once at startup, retaining the original [] fallback on error.
-func loadProducts(filename string) (json.RawMessage, []product) {
+func loadProducts(filename string) json.RawMessage {
 	data, err := os.ReadFile(filename)
 	var compact bytes.Buffer
 	if err == nil {
@@ -72,16 +103,9 @@ func loadProducts(filename string) (json.RawMessage, []product) {
 	}
 	if err != nil {
 		log.Printf("Failed to read Products.json: %v", err)
-		return json.RawMessage("[]"), nil
+		return json.RawMessage("[]")
 	}
-
-	var catalog struct {
-		Products []product `json:"products"`
-	}
-	if err := json.Unmarshal(data, &catalog); err != nil {
-		log.Printf("Failed to decode product cards: %v", err)
-	}
-	return json.RawMessage(compact.Bytes()), catalog.Products
+	return json.RawMessage(compact.Bytes())
 }
 
 func (app *application) serveHTTP(w http.ResponseWriter, r *http.Request) {
@@ -106,6 +130,10 @@ func (app *application) serveHTTP(w http.ResponseWriter, r *http.Request) {
 			app.servePage(w, r, page)
 			return
 		}
+		if target, ok := legacyRoutes[r.URL.Path]; ok {
+			http.Redirect(w, r, target, http.StatusMovedPermanently)
+			return
+		}
 		if ext := path.Ext(r.URL.Path); ext == ".css" || ext == ".js" {
 			app.static.ServeHTTP(w, r)
 			return
@@ -116,12 +144,18 @@ func (app *application) serveHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (app *application) servePage(w http.ResponseWriter, r *http.Request, page page) {
 	data := struct {
-		Active   string
-		Products []product
-	}{Active: page.active, Products: app.products}
+		Title   string
+		Active  string
+		Section string
+	}{Title: page.title, Active: page.active, Section: page.section}
 
 	var rendered bytes.Buffer
-	if err := app.templates.ExecuteTemplate(&rendered, page.template, data); err != nil {
+	tmpl, ok := app.templates[page.template]
+	if !ok {
+		http.Error(w, "Page template is unavailable", http.StatusInternalServerError)
+		return
+	}
+	if err := tmpl.ExecuteTemplate(&rendered, page.layout, data); err != nil {
 		log.Printf("Failed to render page: %v", err)
 		http.Error(w, "Failed to render page", http.StatusInternalServerError)
 		return

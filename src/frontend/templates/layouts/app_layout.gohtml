@@ -1,0 +1,28 @@
+{{define "app_layout"}}
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#090d14" />
+    <title>{{.Title}} · Schakker Data Platform</title>
+    <link rel="stylesheet" href="/app.css" />
+    <script src="/app.js" defer></script>
+  </head>
+  <body class="app-body">
+    <a class="skip-link" href="#main-content">Lewati ke konten utama</a>
+    {{template "icons" .}}
+    <div class="app-shell">
+      {{template "sidebar" .}}
+      <button class="sidebar-backdrop" type="button" data-sidebar-close aria-label="Tutup navigasi"></button>
+      <div class="app-stage">
+        {{template "topbar" .}}
+        <main class="page" id="main-content" tabindex="-1">
+          {{template "content" .}}
+        </main>
+      </div>
+    </div>
+    <div class="toast-region" aria-live="polite" aria-atomic="true" data-toast-region></div>
+  </body>
+</html>
+{{end}}

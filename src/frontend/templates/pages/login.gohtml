@@ -1,0 +1,66 @@
+{{define "content"}}
+<main class="auth-shell">
+  <section class="auth-showcase" aria-labelledby="showcase-title">
+    <a class="brand brand--auth" href="/" aria-label="Schakker Data Platform">
+      <span class="brand__mark" aria-hidden="true"><span></span><span></span></span>
+      <span><strong>Schakker.</strong><small>Data Platform</small></span>
+    </a>
+    <div class="auth-showcase__copy">
+      <p class="eyebrow">One workspace. Every database.</p>
+      <h1 id="showcase-title">Ship database changes with clarity and control.</h1>
+      <p>Kelola skema, tinjau SQL, dan telusuri setiap perubahan dari satu ruang kerja yang aman.</p>
+      <ul class="feature-list">
+        <li><span><svg><use href="#icon-check"></use></svg></span>Permission berbasis grup</li>
+        <li><span><svg><use href="#icon-check"></use></svg></span>Migration history yang dapat diaudit</li>
+        <li><span><svg><use href="#icon-check"></use></svg></span>Eksplorasi database tanpa berpindah alat</li>
+      </ul>
+    </div>
+    <div class="code-window" aria-hidden="true">
+      <div class="code-window__bar"><i></i><i></i><i></i><span>migration_042.sql</span></div>
+      <pre><span>BEGIN;</span>
+
+<b>ALTER TABLE</b> employees
+  <b>ADD COLUMN</b> last_login_at TIMESTAMPTZ;
+
+<b>CREATE INDEX</b> idx_employee_login
+  <b>ON</b> employees(last_login_at);
+
+<span>COMMIT;</span></pre>
+      <div class="code-window__status"><svg><use href="#icon-code"></use></svg> Interface preview · Analysis backend not connected</div>
+    </div>
+    <p class="auth-showcase__footer">Schakker Technologies · Internal systems</p>
+  </section>
+
+  <section class="auth-panel" aria-labelledby="login-title">
+    <div class="auth-card">
+      <div class="auth-card__mobile-brand">
+        <span class="brand__mark" aria-hidden="true"><span></span><span></span></span>
+        <strong>Schakker.</strong>
+      </div>
+      <p class="eyebrow">Employee portal</p>
+      <h2 id="login-title">Welcome back</h2>
+      <p class="auth-card__lead">Masuk menggunakan akun internal Schakker Anda.</p>
+      <form class="form-stack" data-demo-login>
+        <label class="field">
+          <span>Username</span>
+          <input name="username" type="text" placeholder="contoh: ishak.n" autocomplete="username" required />
+        </label>
+        <label class="field">
+          <span>Password</span>
+          <span class="input-with-action">
+            <input name="password" type="password" placeholder="Masukkan password" autocomplete="current-password" required data-password />
+            <button type="button" data-password-toggle aria-label="Tampilkan password"><svg><use href="#icon-eye"></use></svg></button>
+          </span>
+        </label>
+        <div class="form-options">
+          <label class="check-control"><input type="checkbox" name="remember" /><span>Ingat perangkat ini</span></label>
+          <a href="#">Lupa password?</a>
+        </div>
+        <button class="button button--primary button--wide" type="submit">Masuk ke workspace <svg><use href="#icon-arrow"></use></svg></button>
+      </form>
+      <div class="security-note"><svg><use href="#icon-shield"></use></svg><span>Akses terbatas untuk karyawan. Aktivitas login akan dicatat.</span></div>
+      <p class="auth-help">Kesulitan masuk? <a href="#">Hubungi Platform Admin</a></p>
+    </div>
+  </section>
+</main>
+{{end}}

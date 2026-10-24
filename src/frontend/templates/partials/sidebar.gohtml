@@ -1,0 +1,51 @@
+{{define "sidebar"}}
+<aside class="sidebar" data-sidebar aria-label="Navigasi aplikasi">
+  <div class="sidebar__header">
+    <a class="brand" href="/dashboard" aria-label="Schakker Data Platform">
+      <span class="brand__mark" aria-hidden="true"><span></span><span></span></span>
+      <span><strong>Schakker.</strong><small>Data Platform</small></span>
+    </a>
+    <button class="icon-button sidebar__close" type="button" data-sidebar-close aria-label="Tutup navigasi">
+      <svg><use href="#icon-close"></use></svg>
+    </button>
+  </div>
+
+  <nav class="sidebar__nav">
+    <p class="nav-label">Overview</p>
+    <a class="nav-item{{if eq .Active "dashboard"}} is-active{{end}}" href="/dashboard"{{if eq .Active "dashboard"}} aria-current="page"{{end}}>
+      <svg><use href="#icon-grid"></use></svg><span>Dashboard</span>
+    </a>
+
+    <p class="nav-label">Workspace</p>
+    <a class="nav-item{{if eq .Active "databases"}} is-active{{end}}" href="/databases"{{if eq .Active "databases"}} aria-current="page"{{end}}>
+      <svg><use href="#icon-database"></use></svg><span>My Databases</span>
+    </a>
+    <a class="nav-item{{if eq .Active "migration-editor"}} is-active{{end}}" href="/migrations/new"{{if eq .Active "migration-editor"}} aria-current="page"{{end}}>
+      <svg><use href="#icon-code"></use></svg><span>SQL Migration</span>
+    </a>
+    <a class="nav-item{{if eq .Active "migration-history"}} is-active{{end}}" href="/migrations"{{if eq .Active "migration-history"}} aria-current="page"{{end}}>
+      <svg><use href="#icon-history"></use></svg><span>Changelog</span>
+    </a>
+
+    <p class="nav-label nav-label--admin">Administration <span>Admin</span></p>
+    <a class="nav-item{{if eq .Active "admin-users"}} is-active{{end}}" href="/admin/users"{{if eq .Active "admin-users"}} aria-current="page"{{end}}>
+      <svg><use href="#icon-users"></use></svg><span>Employees</span>
+    </a>
+    <a class="nav-item{{if eq .Active "admin-groups"}} is-active{{end}}" href="/admin/groups"{{if eq .Active "admin-groups"}} aria-current="page"{{end}}>
+      <svg><use href="#icon-layers"></use></svg><span>Groups</span>
+    </a>
+    <a class="nav-item{{if eq .Active "admin-connections"}} is-active{{end}}" href="/admin/connections"{{if eq .Active "admin-connections"}} aria-current="page"{{end}}>
+      <svg><use href="#icon-server"></use></svg><span>DB Connections</span>
+    </a>
+    <a class="nav-item{{if eq .Active "admin-access"}} is-active{{end}}" href="/admin/access"{{if eq .Active "admin-access"}} aria-current="page"{{end}}>
+      <svg><use href="#icon-shield"></use></svg><span>Access Control</span>
+    </a>
+  </nav>
+
+  <div class="sidebar__footer">
+    <div class="avatar avatar--small">IN</div>
+    <div class="user-summary"><strong>Ishak Napitupulu</strong><span>Platform Admin</span></div>
+    <a class="icon-button" href="/" aria-label="Keluar"><svg><use href="#icon-logout"></use></svg></a>
+  </div>
+</aside>
+{{end}}

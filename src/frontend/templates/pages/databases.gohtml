@@ -1,0 +1,44 @@
+{{define "content"}}
+<section class="page-heading">
+  <div><p class="eyebrow">Workspace</p><h1>My Databases</h1><p>Database yang dapat Anda akses berdasarkan keanggotaan grup.</p></div>
+  <a class="button button--secondary" href="/migrations"><svg><use href="#icon-history"></use></svg>View changelog</a>
+</section>
+
+<section class="toolbar" aria-label="Filter database">
+  <label class="search-box"><svg><use href="#icon-search"></use></svg><input type="search" placeholder="Search databases..." data-search-input /></label>
+  <div class="filter-group" data-filter-group>
+    <button class="chip is-active" type="button" data-filter="all">All <span>4</span></button>
+    <button class="chip" type="button" data-filter="production">Production</button>
+    <button class="chip" type="button" data-filter="staging">Staging</button>
+    <button class="chip" type="button" data-filter="development">Development</button>
+  </div>
+</section>
+
+<section class="database-grid" data-filter-items aria-label="Daftar database">
+  <article class="database-card" data-filter-item data-environment="production" data-search="production_core customer order billing">
+    <div class="database-card__top"><span class="db-mark db-mark--blue">P</span><span class="badge badge--danger"><i></i>Production</span></div>
+    <h2>production_core</h2><p>Primary transactional database for customer, order, and billing services.</p>
+    <dl class="database-meta"><div><dt>Engine</dt><dd>PostgreSQL 16.2</dd></div><div><dt>Region</dt><dd>ap-southeast-3</dd></div><div><dt>Schemas</dt><dd>12</dd></div><div><dt>Tables</dt><dd>86</dd></div></dl>
+    <div class="database-card__footer"><span class="badge badge--edit"><svg><use href="#icon-edit"></use></svg>View + Edit</span><a class="button button--secondary button--small" href="/explorer">Open explorer <svg><use href="#icon-arrow"></use></svg></a></div>
+  </article>
+  <article class="database-card" data-filter-item data-environment="staging" data-search="analytics_warehouse reporting metrics">
+    <div class="database-card__top"><span class="db-mark db-mark--violet">A</span><span class="badge badge--neutral"><i></i>Staging</span></div>
+    <h2>analytics_warehouse</h2><p>Consolidated reporting and product analytics data warehouse.</p>
+    <dl class="database-meta"><div><dt>Engine</dt><dd>PostgreSQL 15.6</dd></div><div><dt>Region</dt><dd>ap-southeast-3</dd></div><div><dt>Schemas</dt><dd>8</dd></div><div><dt>Tables</dt><dd>124</dd></div></dl>
+    <div class="database-card__footer"><span class="badge badge--view"><svg><use href="#icon-eye"></use></svg>View Only</span><a class="button button--secondary button--small" href="/explorer">Open explorer <svg><use href="#icon-arrow"></use></svg></a></div>
+  </article>
+  <article class="database-card" data-filter-item data-environment="development" data-search="identity_service user session access">
+    <div class="database-card__top"><span class="db-mark db-mark--pink">I</span><span class="badge badge--warning"><i></i>Development</span></div>
+    <h2>identity_service</h2><p>Employee identity, session, and application access service.</p>
+    <dl class="database-meta"><div><dt>Engine</dt><dd>PostgreSQL 16.1</dd></div><div><dt>Region</dt><dd>Local cluster</dd></div><div><dt>Schemas</dt><dd>4</dd></div><div><dt>Tables</dt><dd>31</dd></div></dl>
+    <div class="database-card__footer"><span class="badge badge--edit"><svg><use href="#icon-edit"></use></svg>View + Edit</span><a class="button button--secondary button--small" href="/explorer">Open explorer <svg><use href="#icon-arrow"></use></svg></a></div>
+  </article>
+  <article class="database-card" data-filter-item data-environment="development" data-search="sandbox_lab experiments training">
+    <div class="database-card__top"><span class="db-mark db-mark--green">S</span><span class="badge badge--warning"><i></i>Development</span></div>
+    <h2>sandbox_lab</h2><p>Isolated workspace for query experiments and internal training.</p>
+    <dl class="database-meta"><div><dt>Engine</dt><dd>PostgreSQL 16.2</dd></div><div><dt>Region</dt><dd>Local cluster</dd></div><div><dt>Schemas</dt><dd>3</dd></div><div><dt>Tables</dt><dd>18</dd></div></dl>
+    <div class="database-card__footer"><span class="badge badge--edit"><svg><use href="#icon-edit"></use></svg>View + Edit</span><a class="button button--secondary button--small" href="/explorer">Open explorer <svg><use href="#icon-arrow"></use></svg></a></div>
+  </article>
+  <p class="empty-state" data-filter-empty hidden>Tidak ada database yang cocok dengan filter ini.</p>
+</section>
+{{end}}

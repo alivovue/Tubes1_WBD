@@ -1,0 +1,66 @@
+{{define "content"}}
+<section class="page-heading page-heading--compact">
+  <div><p class="eyebrow">Migration workflow</p><h1>Create SQL migration</h1><p>Analisis dan tinjau SQL sebelum perubahan dieksekusi.</p></div>
+  <span class="badge badge--edit badge--large"><svg><use href="#icon-edit"></use></svg>View + Edit</span>
+</section>
+
+<ol class="stepper" aria-label="Tahap migration">
+  <li class="is-active" data-step="compose"><span>1</span><div><strong>Compose</strong><small>Write migration</small></div></li>
+  <li data-step="review"><span>2</span><div><strong>Review</strong><small>Analyze SQL</small></div></li>
+  <li data-step="execute"><span>3</span><div><strong>Execute</strong><small>Apply changes</small></div></li>
+</ol>
+
+<div class="migration-layout">
+  <section class="panel editor-panel">
+    <header class="panel__header panel__header--editor"><div><h2>Migration details</h2><p>Informasi ini akan disimpan di changelog setelah endpoint backend tersedia.</p></div><span class="draft-indicator draft-indicator--pending">Draft not saved</span></header>
+    <div class="editor-fields">
+      <label class="field"><span>Target database</span><select><option>production_core · Production</option><option>identity_service · Development</option><option>sandbox_lab · Development</option></select></label>
+      <label class="field"><span>Description</span><input type="text" value="Add last login tracking to employees" /></label>
+    </div>
+    <div class="code-editor">
+      <div class="code-editor__bar"><span>migration.sql</span><span>PostgreSQL</span></div>
+      <div class="code-editor__body"><pre aria-hidden="true">1
+2
+3
+4
+5
+6
+7
+8</pre><textarea spellcheck="false" aria-label="SQL migration" data-sql-editor>BEGIN;
+
+ALTER TABLE employees
+  ADD COLUMN last_login_at TIMESTAMPTZ;
+
+CREATE INDEX idx_employee_login
+  ON employees(last_login_at);
+
+COMMIT;</textarea></div>
+      <div class="code-editor__footer"><span>Ln 8, Col 8</span><span>UTF-8 · Spaces: 2</span></div>
+    </div>
+    <div class="editor-actions"><button class="button button--secondary" type="button" data-toast="Penyimpanan draft belum tersedia: backend baru mendefinisikan tabel migration_drafts, belum endpoint-nya.">Save draft</button><button class="button button--primary" type="button" data-analyze><svg><use href="#icon-search"></use></svg>Analyze migration</button></div>
+  </section>
+
+  <aside class="panel guidance-panel">
+    <header class="panel__header"><div><h2>Before you continue</h2><p>Checklist untuk migration yang aman.</p></div></header>
+    <ul class="check-list"><li><svg><use href="#icon-check"></use></svg><span><strong>Wrap in a transaction</strong>Gunakan BEGIN dan COMMIT agar perubahan bersifat atomik.</span></li><li><svg><use href="#icon-check"></use></svg><span><strong>Use a clear description</strong>Jelaskan tujuan, bukan hanya sintaks perubahan.</span></li><li><svg><use href="#icon-check"></use></svg><span><strong>Review destructive statements</strong>DROP dan perubahan tipe data memerlukan perhatian khusus.</span></li></ul>
+    <div class="permission-callout"><svg><use href="#icon-shield"></use></svg><div><strong>Effective permission</strong><p>View + Edit via <b>Platform Engineering</b></p></div></div>
+  </aside>
+</div>
+
+<section class="panel analysis-panel" data-analysis hidden>
+  <header class="panel__header"><div><p class="eyebrow eyebrow--success">Analysis complete</p><h2>Review generated migration</h2><p>SQL lolos pemeriksaan awal. Periksa kembali sebelum eksekusi.</p></div><span class="analysis-score"><svg><use href="#icon-check"></use></svg>No blocking issues</span></header>
+  <div class="analysis-grid"><article><span>Statements</span><strong>2</strong></article><article><span>Affected objects</span><strong>employees, idx_employee_login</strong></article><article><span>Transaction</span><strong>Enabled</strong></article><article><span>Risk level</span><strong class="text-warning">Medium</strong></article></div>
+  <div class="notice notice--warning"><svg><use href="#icon-alert"></use></svg><div><strong>Table lock may occur</strong><p>ALTER TABLE dapat mengambil lock singkat pada tabel employees. Jalankan saat traffic rendah.</p></div></div>
+  <label class="field"><span>Editable SQL review</span><textarea class="review-editor" spellcheck="false">BEGIN;
+
+ALTER TABLE employees ADD COLUMN last_login_at TIMESTAMPTZ;
+CREATE INDEX idx_employee_login ON employees(last_login_at);
+
+COMMIT;</textarea></label>
+  <div class="editor-actions"><a class="button button--secondary" href="/migrations">Cancel</a><button class="button button--danger" type="button" data-modal-open="execute-modal">Review & execute <svg><use href="#icon-arrow"></use></svg></button></div>
+</section>
+
+<div class="modal" id="execute-modal" role="dialog" aria-modal="true" aria-labelledby="execute-title" hidden>
+  <div class="modal__backdrop" data-modal-close></div><div class="modal__card"><span class="modal__icon"><svg><use href="#icon-alert"></use></svg></span><h2 id="execute-title">Execute on production?</h2><p>Migration akan dijalankan secara transaksional pada <strong>production_core</strong>. Jika gagal, seluruh perubahan akan di-rollback.</p><label class="check-control check-control--confirm"><input type="checkbox" data-execute-confirm /><span>Saya memahami dampak perubahan ini.</span></label><div class="modal__actions"><button class="button button--secondary" type="button" data-modal-close>Back</button><button class="button button--danger" type="button" data-execute disabled>Execute migration</button></div></div>
+</div>
+{{end}}
