@@ -22,7 +22,7 @@ func (d *Store) SaveDatabaseMetadata(ctx context.Context, actor int64, in Databa
 		if id == 0 {
 			return tx.q.QueryRowContext(ctx, `INSERT INTO managed_databases(display_name,host,port,database_name,db_username,encrypted_password,connection_options,is_active,created_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`, in.Name, in.Host, in.Port, in.DatabaseName, in.Username, in.EncryptedPassword, string(options), in.Active, actor).Scan(&id)
 		}
-		if err := affected(tx.q.ExecContext(ctx, `UPDATE managed_databases SET display_name=$2,host=$3,port=$4,database_name=$5,db_username=$6,encrypted_password=$7,connection_options=$8,is_active=$9,updated_at=CURRENT_TIMESTAMP WHERE id=$1`, id, in.Name, in.Host, in.Port, in.DatabaseName, in.Username, in.EncryptedPassword, string(options), in.Active)); err != nil {
+		if err := affected(tx.q.ExecContext(ctx, `UPDATE managed_databases SET display_name=$2,host=$3,port=$4,database_name=$5,db_username=$6,encrypted_password=$7,connection_options=COALESCE(connection_options,'{}'::jsonb)||$8::jsonb,is_active=$9,updated_at=CURRENT_TIMESTAMP WHERE id=$1`, id, in.Name, in.Host, in.Port, in.DatabaseName, in.Username, in.EncryptedPassword, string(options), in.Active)); err != nil {
 			return err
 		}
 		return tx.RevokeDatabaseSessions(ctx, id, now)
@@ -31,6 +31,18 @@ func (d *Store) SaveDatabaseMetadata(ctx context.Context, actor int64, in Databa
 		return 0, err
 	}
 	return id, nil
+}
+
+func (d *Store) DatabaseMetadata(ctx context.Context, id int64) (DatabaseMetadata, error) {
+	var m DatabaseMetadata
+	err := d.q.QueryRowContext(ctx, `SELECT id,display_name,host,port,database_name,is_active,COALESCE(connection_options->>'sslmode','require'),db_username,encrypted_password FROM managed_databases WHERE id=$1 AND dbms_type='postgresql'`, id).Scan(&m.ID, &m.Name, &m.Host, &m.Port, &m.DatabaseName, &m.Active, &m.SSLMode, &m.Username, &m.EncryptedPassword)
+	return m, classify(err)
+}
+
+func (d *Store) DatabaseNamespace(ctx context.Context, id int64, candidate string) (string, error) {
+	var namespace string
+	err := d.q.QueryRowContext(ctx, `UPDATE managed_databases SET connection_options=jsonb_set(COALESCE(connection_options,'{}'::jsonb),'{migration_namespace}',to_jsonb(COALESCE(NULLIF(connection_options->>'migration_namespace',''),$2)::text)) WHERE id=$1 RETURNING connection_options->>'migration_namespace'`, id, candidate).Scan(&namespace)
+	return namespace, classify(err)
 }
 
 func (d *Store) DisableDatabaseMetadata(ctx context.Context, id int64, now time.Time) error {

@@ -21,28 +21,40 @@ type executor interface {
 }
 
 type Store struct {
-	db   *sql.DB
-	q    executor
-	inTx bool
+	db        *sql.DB
+	q         executor
+	inTx      bool
+	conn      *sql.Conn
+	lockSlots chan struct{}
 }
 
 func New(db *sql.DB) (*Store, error) {
 	if db == nil {
 		return nil, errors.New("website database is required")
 	}
-	return &Store{db: db, q: db}, nil
+	capacity := db.Stats().MaxOpenConnections / 2
+	if capacity < 1 {
+		capacity = 1
+	}
+	return &Store{db: db, q: db, lockSlots: make(chan struct{}, capacity)}, nil
 }
 
 func (d *Store) Transaction(ctx context.Context, change func(*Store) error) error {
 	if d.inTx {
 		return change(d)
 	}
-	tx, err := d.db.BeginTx(ctx, nil)
+	var tx *sql.Tx
+	var err error
+	if d.conn != nil {
+		tx, err = d.conn.BeginTx(ctx, nil)
+	} else {
+		tx, err = d.db.BeginTx(ctx, nil)
+	}
 	if err != nil {
 		return classify(err)
 	}
 	defer tx.Rollback()
-	if err := change(&Store{db: d.db, q: tx, inTx: true}); err != nil {
+	if err := change(&Store{db: d.db, q: tx, inTx: true, conn: d.conn, lockSlots: d.lockSlots}); err != nil {
 		return classify(err)
 	}
 	return classify(tx.Commit())
