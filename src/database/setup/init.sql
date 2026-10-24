@@ -1,4 +1,3 @@
--- Run with psql while connected to a maintenance database, such as postgres.
 \set ON_ERROR_STOP on
 
 CREATE DATABASE schakker_platform
