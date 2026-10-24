@@ -24,12 +24,17 @@ func TestPageTemplates(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, page := range []struct{ route, title, active string }{
-		{"/", "Schakker", "Pengantar"},
-		{"/index.html", "Schakker", "Pengantar"},
-		{"/index2.html", "Produk", "Produk"},
-		{"/index3.html", "Toko", "Toko"},
-		{"/index4.html", "Medsos", "Medsos"},
-		{"/index5.html", "Tentang Kami", "Tentang Kami"},
+		{"/", "Masuk", "Employee portal"},
+		{"/login", "Masuk", "Employee portal"},
+		{"/dashboard", "Dashboard", `href="/dashboard" aria-current="page"`},
+		{"/databases", "My Databases", `href="/databases" aria-current="page"`},
+		{"/explorer", "Database Explorer", `href="/databases" aria-current="page"`},
+		{"/migrations/new", "SQL Migration", `href="/migrations/new" aria-current="page"`},
+		{"/migrations", "Changelog", `href="/migrations" aria-current="page"`},
+		{"/admin/users", "Employees", `href="/admin/users" aria-current="page"`},
+		{"/admin/groups", "Groups", `href="/admin/groups" aria-current="page"`},
+		{"/admin/connections", "Database Connections", `href="/admin/connections" aria-current="page"`},
+		{"/admin/access", "Access Control", `href="/admin/access" aria-current="page"`},
 	} {
 		t.Run(page.route, func(t *testing.T) {
 			response := request(handler, http.MethodGet, page.route)
@@ -38,33 +43,23 @@ func TestPageTemplates(t *testing.T) {
 				t.Fatalf("status = %d, body = %s", response.Code, body)
 			}
 			for _, expected := range []string{
-				"<title>" + page.title + "</title>",
-				`href="#" class="active">` + page.active + "</a>",
-				`<footer class="footer">`,
+				"<title>" + page.title + " · Schakker Data Platform</title>",
+				page.active,
 			} {
 				if !strings.Contains(body, expected) {
 					t.Errorf("missing %q", expected)
 				}
 			}
-			if strings.Contains(body, "{{") || strings.Count(body, `class="active"`) != 1 {
-				t.Error("template actions remain or active navigation is incorrect")
+			if strings.Contains(body, "{{") {
+				t.Error("template actions remain in rendered page")
 			}
 		})
 	}
-	store := request(handler, http.MethodGet, "/index3.html").Body.String()
-	var catalog struct{ Products []product }
-	data, err := os.ReadFile("Products.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := json.Unmarshal(data, &catalog); err != nil {
-		t.Fatal(err)
-	}
-	if count := strings.Count(store, `class="product"`); count != len(catalog.Products) {
-		t.Errorf("rendered %d product cards, want %d", count, len(catalog.Products))
-	}
-	if strings.Contains(store, "script.js") {
-		t.Error("store still depends on the replaced product rendering script")
+	for route, target := range legacyRoutes {
+		response := request(handler, http.MethodGet, route)
+		if response.Code != http.StatusMovedPermanently || response.Header().Get("Location") != target {
+			t.Errorf("legacy route %s = %d %q, want 301 %q", route, response.Code, response.Header().Get("Location"), target)
+		}
 	}
 }
 
@@ -94,7 +89,7 @@ func TestProductAPI(t *testing.T) {
 			t.Errorf("%s: missing JSON content type", route)
 		}
 	}
-	for _, route := range []string{"/", "/index3.html", "/Products"} {
+	for _, route := range []string{"/", "/dashboard", "/Products"} {
 		response := request(handler, http.MethodHead, route)
 		if response.Code != http.StatusOK || response.Body.Len() != 0 {
 			t.Errorf("HEAD %s: status = %d, body length = %d", route, response.Code, response.Body.Len())
@@ -135,7 +130,7 @@ func TestAssetsAndPrivateFiles(t *testing.T) {
 	}
 	for _, route := range []string{
 		"/missing", "/Products.json", "/go.mod", "/main.go", "/backend/server.go",
-		"/backend/Products.json", "/frontend/templates/index.gohtml", "/public/",
+		"/backend/Products.json", "/frontend/templates/pages/dashboard.gohtml", "/public/",
 		"/index6.html", "/weather", "/script2.js", "/style6.css",
 	} {
 		if response := request(handler, http.MethodGet, route); response.Code != http.StatusNotFound {
@@ -147,22 +142,27 @@ func TestAssetsAndPrivateFiles(t *testing.T) {
 func fixtureRoot(t *testing.T, products []byte) string {
 	t.Helper()
 	root := t.TempDir()
+	templateSource := filepath.Join("..", "frontend", "templates")
 	templateDir := filepath.Join(root, "frontend", "templates")
-	if err := os.MkdirAll(templateDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	templates, err := filepath.Glob(filepath.Join("..", "frontend", "templates", "*.gohtml"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, filename := range templates {
+	if err := filepath.WalkDir(templateSource, func(filename string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		relative, err := filepath.Rel(templateSource, filename)
+		if err != nil {
+			return err
+		}
+		target := filepath.Join(templateDir, relative)
+		if entry.IsDir() {
+			return os.MkdirAll(target, 0o755)
+		}
 		contents, err := os.ReadFile(filename)
 		if err != nil {
-			t.Fatal(err)
+			return err
 		}
-		if err := os.WriteFile(filepath.Join(templateDir, filepath.Base(filename)), contents, 0o644); err != nil {
-			t.Fatal(err)
-		}
+		return os.WriteFile(target, contents, 0o644)
+	}); err != nil {
+		t.Fatal(err)
 	}
 	if err := os.Mkdir(filepath.Join(root, "backend"), 0o755); err != nil {
 		t.Fatal(err)
@@ -192,15 +192,11 @@ func TestProductFallback(t *testing.T) {
 			if response.Code != http.StatusOK || response.Body.String() != "[]" {
 				t.Errorf("fallback = %d %s, want 200 []", response.Code, response.Body.String())
 			}
-			store := request(handler, http.MethodGet, "/index3.html")
-			if store.Code != http.StatusOK || strings.Contains(store.Body.String(), `class="product"`) {
-				t.Error("store should render without product cards when data is unavailable")
-			}
 		})
 	}
 }
 
-func TestProductSnapshotAndTemplateEscaping(t *testing.T) {
+func TestProductSnapshot(t *testing.T) {
 	initial := []byte(`{"products":[{"id":1,"title":"<script>alert(1)</script>","description":"<b>Text</b>\nSecond line","price":9899.99,"image":"public/image11.png"}]}`)
 	root := fixtureRoot(t, initial)
 	handler, err := NewHandler(root)
@@ -213,12 +209,5 @@ func TestProductSnapshotAndTemplateEscaping(t *testing.T) {
 	response := request(handler, http.MethodGet, "/Products")
 	if !bytes.Equal(response.Body.Bytes(), initial) {
 		t.Error("products should remain the snapshot loaded at startup")
-	}
-	body := request(handler, http.MethodGet, "/index3.html").Body.String()
-	if strings.Contains(body, "<script>alert(1)</script>") || !strings.Contains(body, "&lt;script&gt;alert(1)&lt;/script&gt;") {
-		t.Error("product title must be rendered as text")
-	}
-	if !strings.Contains(body, "&lt;b&gt;Text&lt;/b&gt;\nSecond line") || !strings.Contains(body, "$9899.99") {
-		t.Error("product descriptions or prices changed")
 	}
 }
