@@ -45,8 +45,9 @@ func servicesFromEnvironment(root string) (Services, func(), error) {
 	stopDatabase := func() {}
 	useMockWebsite := os.Getenv("SCHAKKER_USE_MOCK_WEBSITE") == "yes"
 	useMockManaged := os.Getenv("SCHAKKER_USE_MOCK_MANAGED") == "yes"
+	useMockMariaDB := os.Getenv("SCHAKKER_USE_MOCK_MARIADB") == "yes"
 	var mocks *fixtures.Factory
-	if useMockWebsite || useMockManaged {
+	if useMockWebsite || useMockManaged || useMockMariaDB {
 		if production {
 			return Services{}, nil, errors.New("mock databases are available in development only")
 		}
@@ -54,7 +55,7 @@ func servicesFromEnvironment(root string) (Services, func(), error) {
 		if state == "" {
 			return Services{}, nil, errors.New("mock database state was not provided by the launcher")
 		}
-		mocks, err = fixtures.OpenSelected(ctx, state, useMockWebsite, useMockManaged)
+		mocks, err = fixtures.OpenWithOptions(ctx, state, fixtures.Options{Website: useMockWebsite, Managed: useMockManaged, MariaDB: useMockMariaDB})
 		if err != nil {
 			return Services{}, nil, err
 		}
@@ -125,6 +126,11 @@ func servicesFromEnvironment(root string) (Services, func(), error) {
 	}
 	if useMockManaged {
 		if err := mocks.AttachManaged(ctx, store, auth, databases); err != nil {
+			return fail(err)
+		}
+	}
+	if useMockMariaDB {
+		if err := mocks.MariaDB.AttachManaged(ctx, store, auth, databases); err != nil {
 			return fail(err)
 		}
 	}

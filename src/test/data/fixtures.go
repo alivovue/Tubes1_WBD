@@ -40,9 +40,13 @@ var managedSQL string
 
 type Factory struct {
 	Cluster     *setup.LocalCluster
+	MariaDB     *MariaDB
 	password    string
 	managedName string
 	id          string
+}
+type Options struct {
+	Website, Managed, MariaDB bool
 }
 type Databases struct {
 	Website, Managed         *sql.DB
@@ -54,24 +58,51 @@ func Open(ctx context.Context, directory string) (*Factory, error) {
 	return OpenSelected(ctx, directory, true, true)
 }
 func OpenSelected(ctx context.Context, directory string, website, managed bool) (*Factory, error) {
-	if err := os.MkdirAll(directory, 0700); err != nil {
+	return OpenWithOptions(ctx, directory, Options{Website: website, Managed: managed})
+}
+func OpenWithOptions(ctx context.Context, directory string, options Options) (*Factory, error) {
+	if err := ensureFixtureDirectory(directory); err != nil {
 		return nil, err
+	}
+	factory := &Factory{}
+	var err error
+	if options.Website || options.Managed {
+		factory, err = openPostgres(ctx, directory, options.Website, options.Managed)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if options.MariaDB {
+		factory.MariaDB, err = openMariaDB(ctx, filepath.Join(directory, "mariadb"))
+		if err != nil {
+			factory.Close()
+			return nil, err
+		}
+	}
+	return factory, nil
+}
+func ensureFixtureDirectory(directory string) error {
+	if err := os.MkdirAll(directory, 0700); err != nil {
+		return err
 	}
 	marker := filepath.Join(directory, ".schakker-fixtures")
 	if _, err := os.Stat(marker); errors.Is(err, os.ErrNotExist) {
 		entries, err := os.ReadDir(directory)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		if len(entries) != 0 {
-			return nil, errors.New("mock databases require a dedicated empty fixture directory")
+			return errors.New("mock databases require a dedicated empty fixture directory")
 		}
 		if err := os.WriteFile(marker, []byte("schakker-test-fixtures-v1\n"), 0600); err != nil {
-			return nil, err
+			return err
 		}
 	} else if err != nil {
-		return nil, err
+		return err
 	}
+	return nil
+}
+func openPostgres(ctx context.Context, directory string, website, managed bool) (*Factory, error) {
 	cluster, err := setup.StartLocalCluster(ctx, directory, setup.LocalOptions{TCPRole: managedRole})
 	if err != nil {
 		return nil, err
@@ -158,7 +189,13 @@ func OpenSelected(ctx context.Context, directory string, website, managed bool) 
 	return factory, nil
 }
 func (f *Factory) Close() {
-	if f != nil && f.Cluster != nil {
+	if f == nil {
+		return
+	}
+	if f.MariaDB != nil {
+		f.MariaDB.Close()
+	}
+	if f.Cluster != nil {
 		f.Cluster.Close()
 	}
 }
@@ -286,6 +323,9 @@ func PopulateWebsite(ctx context.Context, website *sql.DB, store *dao.Store, aut
 	return nil
 }
 func (f *Factory) AttachManaged(ctx context.Context, store *dao.Store, auth *access.Service, databases *dbmanagement.Service) error {
+	return attachManaged(ctx, store, auth, databases, f.Connection(f.managedName))
+}
+func attachManaged(ctx context.Context, store *dao.Store, auth *access.Service, databases *dbmanagement.Service, input dbmanagement.ConnectionInput) error {
 	if err := PopulateWebsite(ctx, nil, store, auth, ""); err != nil {
 		return err
 	}
@@ -306,13 +346,13 @@ func (f *Factory) AttachManaged(ctx context.Context, store *dao.Store, auth *acc
 	}
 	var target dao.Database
 	for _, connection := range connections {
-		if connection.DBMS == "postgresql" && connection.Host == "127.0.0.1" && connection.Port == f.Cluster.Port && connection.DatabaseName == f.managedName {
+		if connection.DBMS == input.DBMS && connection.Host == input.Host && connection.Port == input.Port && connection.DatabaseName == input.DatabaseName {
 			target = connection
 			break
 		}
 	}
 	if target.ID == 0 {
-		target, err = databases.SaveConnection(ctx, actor, 0, f.Connection(f.managedName))
+		target, err = databases.SaveConnection(ctx, actor, 0, input)
 		if err != nil {
 			return err
 		}

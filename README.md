@@ -14,7 +14,7 @@ Petunjuk berikut ditujukan untuk Linux, terutama Ubuntu/Debian. Untuk Windows, g
 | Bash | Versi 4 atau lebih baru untuk menjalankan `run.sh`. | Paket `bash` pada distribusi Linux. |
 | Browser | Untuk membuka antarmuka website. | Browser yang tersedia di komputer Anda. |
 
-MariaDB Server bersifat **opsional**, jika ingin mengelola target MariaDB. Adapter mendukung MariaDB 10.6 atau lebih baru; pilih rilis yang masih didukung melalui [unduhan resmi MariaDB](https://mariadb.org/download/). Database mock dan integration test yang disediakan menggunakan PostgreSQL.
+MariaDB Server bersifat **opsional**, jika ingin mengelola target MariaDB atau menggunakan database mock MariaDB dari launcher. Adapter mendukung MariaDB 10.6 atau lebih baru; pilih rilis yang masih didukung melalui [unduhan resmi MariaDB](https://mariadb.org/download/). Mock MariaDB memerlukan `mariadbd` dan `mariadb-install-db`. Database internal website tetap menggunakan PostgreSQL.
 
 ### Instalasi di Ubuntu/Debian
 
@@ -24,6 +24,14 @@ Pasang PostgreSQL dan Bash:
 sudo apt update
 sudo apt install postgresql postgresql-client bash
 ```
+
+Jika ingin menggunakan mock MariaDB, pasang juga server MariaDB:
+
+```bash
+sudo apt install mariadb-server
+```
+
+Launcher menyiapkan instance MariaDB privat dengan direktori data dan port sendiri. Tidak perlu membuat database, akun MariaDB, atau menjalankan service MariaDB sistem secara manual. Inisialisasi menggunakan [`mariadb-install-db`](https://mariadb.com/docs/server/clients-and-utilities/deployment-tools/mariadb-install-db).
 
 Untuk Go, ikuti [petunjuk instalasi resmi](https://go.dev/doc/install), pilih paket Linux sesuai arsitektur komputer, dan pastikan perintah `go` tersedia pada `PATH`.
 
@@ -58,18 +66,19 @@ bash run.sh
 
 ### Pilihan saat launcher dijalankan
 
-Launcher menampilkan empat pertanyaan berikut:
+Launcher menampilkan lima pertanyaan berikut:
 
 | Pertanyaan | Jawaban `y` | Jawaban `n` | Bawaan saat menekan Enter |
 | --- | --- | --- | --- |
 | Menjalankan unit test? | Menjalankan pengujian dengan dependensi database yang di-stub. | Melewati unit test. | `y` |
-| Menjalankan integration test PostgreSQL? | Menjalankan IT-01 sampai IT-15 dengan database pengujian terisolasi. | Melewati integration test. | `y` |
+| Menjalankan integration test PostgreSQL? | Menjalankan integration test dengan database pengujian terisolasi; pengujian fixture MariaDB juga berjalan jika tools tersedia. | Melewati integration test. | `y` |
 | Mempertahankan database mock website? | Menggunakan database contoh untuk akun, grup, sesi, dan riwayat website. | Menggunakan database website normal atau koneksi yang dikonfigurasi. | `n` |
-| Mempertahankan database mock managed? | Menyediakan database target contoh berisi tabel `employees` dengan data Alice dan Bob. | Menjalankan website tanpa target mock tersebut. | `n` |
+| Mempertahankan database mock managed PostgreSQL? | Menyediakan target PostgreSQL contoh berisi tabel `employees` dengan data Alice dan Bob. | Menjalankan website tanpa target mock PostgreSQL tersebut. | `n` |
+| Mempertahankan database mock MariaDB? | Menyediakan target MariaDB contoh berisi tabel `employees` dengan data Alice dan Bob. | Menjalankan website tanpa target mock MariaDB tersebut. | `n` |
 
 Jika ada pengujian yang dipilih tetapi gagal, launcher menyimpan hasilnya dan menghentikan proses sebelum website dijalankan.
 
-Database mock website dan managed dapat dipilih secara terpisah:
+Database mock website, managed PostgreSQL, dan MariaDB dapat dipilih secara terpisah. Pilihan MariaDB dapat ditambahkan ke semua kombinasi berikut:
 
 | Mock website | Mock managed | Hasil |
 | --- | --- | --- |
@@ -107,7 +116,7 @@ Peran Platform Admin dan permission database dikelola terpisah. Akses database d
 
 ### Menghentikan dan menjalankan kembali
 
-Tekan **Ctrl+C** pada terminal launcher untuk menghentikan website dan instance PostgreSQL yang dimulainya.
+Tekan **Ctrl+C** pada terminal launcher untuk menghentikan website serta instance PostgreSQL dan MariaDB yang dimulainya. File database yang dipilih untuk dipertahankan tetap disimpan dan digunakan kembali pada run berikutnya.
 
 Data lokal, master key, dan database mock yang dipertahankan disimpan di `src/.schakker/`. Pertahankan folder ini agar data dan kunci tetap konsisten antar sesi. Folder tersebut dikecualikan dari Git.
 
@@ -131,10 +140,11 @@ Lokasi kode pengujian dan data contoh:
 ```text
 src/test/
 ├── unit/                 # Unit test dengan framework testing bawaan Go
-├── integration/          # IT-01 sampai IT-15 dengan PostgreSQL nyata
+├── integration/          # Pengujian dengan database nyata
 ├── data/
 │   ├── website/          # SQL data contoh akun, grup, dan keanggotaan
-│   └── managed/          # SQL tabel dan data target contoh
+│   ├── managed/          # SQL tabel dan data target PostgreSQL contoh
+│   └── mariadb/          # SQL tabel dan data target MariaDB contoh
 └── output/               # Laporan pengujian dari launcher
 ```
 
@@ -146,7 +156,7 @@ go test -count=1 ./test/unit/...
 go test -count=1 -timeout=5m ./test/integration/...
 ```
 
-Unit test dapat dijalankan tanpa server database. Integration test menyiapkan PostgreSQL privat dan database pengujian secara otomatis. Perintah `go test` langsung menampilkan hasil di terminal; gunakan launcher untuk menyimpan laporan secara otomatis ke `src/test/output/`.
+Unit test dapat dijalankan tanpa server database. Integration test menyiapkan PostgreSQL privat dan database pengujian secara otomatis. Pengujian fixture MariaDB dilewati jika tools MariaDB belum dipasang; jika tersedia, pengujian membuat instance privat dan memeriksa data contoh, permission, serta penggunaan ulang database. Perintah `go test` langsung menampilkan hasil di terminal; gunakan launcher untuk menyimpan laporan secara otomatis ke `src/test/output/`.
 
 ## 4. Konfigurasi opsional
 
@@ -163,6 +173,7 @@ Edit `src/.env`, kemudian jalankan kembali `./run.sh`. Launcher memuat file ini 
 | `PORT` | Port website; bawaan `3000`. |
 | `SCHAKKER_STATE_DIR` | Lokasi penyimpanan data lokal; bawaan `.schakker`, relatif terhadap `src/`. |
 | `SCHAKKER_POSTGRES_BIN` | Direktori berisi `postgres`, `initdb`, dan `pg_ctl` jika tidak terdeteksi otomatis. Contoh: `/usr/lib/postgresql/14/bin`. |
+| `SCHAKKER_MARIADB_BIN` | Direktori instalasi tools MariaDB jika tidak terdeteksi otomatis. Contoh: `/usr/sbin` atau `/opt/mariadb/bin`. Launcher juga mencari installer pada direktori `bin`, `sbin`, dan `scripts` di instalasi yang sama. |
 | `SCHAKKER_DATABASE_URL` | Koneksi PostgreSQL internal website yang sudah tersedia. Jika dikosongkan, aplikasi menyiapkan database lokal. Database dengan koneksi khusus harus sudah ada; skema dibuat otomatis jika kosong. |
 | `SCHAKKER_MASTER_KEY` | Kunci 32 byte dalam format hex atau Base64. Jika dikosongkan pada mode pengembangan, aplikasi membuat dan menyimpannya otomatis. |
 | `SCHAKKER_ADMIN_USERNAME` | Username admin pertama jika ingin melewati pertanyaan pembuatan akun. |

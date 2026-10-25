@@ -95,9 +95,11 @@ fi
 
 ask 'Keep and use the mock website database for the website run?' no
 export SCHAKKER_USE_MOCK_WEBSITE="$reply"
-ask 'Keep and use the mock managed database for the website run?' no
+ask 'Keep and use the mock PostgreSQL managed database for the website run?' no
 export SCHAKKER_USE_MOCK_MANAGED="$reply"
-if [[ "$SCHAKKER_USE_MOCK_WEBSITE" == yes || "$SCHAKKER_USE_MOCK_MANAGED" == yes ]]; then
+ask 'Keep and use the mock MariaDB database for the website run?' no
+export SCHAKKER_USE_MOCK_MARIADB="$reply"
+if [[ "$SCHAKKER_USE_MOCK_WEBSITE" == yes || "$SCHAKKER_USE_MOCK_MANAGED" == yes || "$SCHAKKER_USE_MOCK_MARIADB" == yes ]]; then
     if [[ -z "$fixture_state" && -f "$state_directory/kept-fixtures" ]]; then
         if IFS= read -r previous_fixtures < "$state_directory/kept-fixtures"; then
             case "$previous_fixtures" in
