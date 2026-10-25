@@ -28,9 +28,7 @@ Dependensi Go utama berikut diunduh otomatis saat build, atau melalui `go mod do
 
 Dependensi transitif mengikuti `src/go.mod` dan `src/go.sum` serta diunduh otomatis bersama modul di atas.
 
-## Build dan menjalankan di Linux
-
-### 1. Pasang dependensi
+## Instalasi dependensi di Linux
 
 Untuk Ubuntu/Debian:
 
@@ -56,30 +54,7 @@ sudo apt install mariadb-server
 
 Mock MariaDB memerlukan `mariadbd` dan `mariadb-install-db`.
 
-### 2. Build dan jalankan aplikasi
-
-Unduh atau clone repositori, lalu buka terminal di folder utama yang berisi `README.md` dan `run.sh`:
-
-```bash
-bash run.sh
-```
-
-Launcher akan membangun aplikasi, menyiapkan database PostgreSQL lokal, dan menjalankan server. Jalankan sebagai pengguna biasa.
-
-Jika hanya ingin melakukan build tanpa menjalankan server:
-
-```bash
-cd src
-go mod download
-go build -o schakker .
-cd ..
-```
-
-Perintah tersebut menghasilkan executable `src/schakker`. Gunakan `bash run.sh` untuk menjalankan aplikasi dengan penyiapan awal melalui launcher.
-
-## Build dan menjalankan di Windows
-
-### 1. Pasang dependensi
+## Instalasi dependensi di Windows
 
 1. Pasang Go menggunakan installer Windows dari [halaman instalasi Go](https://go.dev/doc/install).
 2. Pasang PostgreSQL Server dari [halaman unduhan PostgreSQL](https://www.postgresql.org/download/) dengan memilih Windows. Sertakan `postgres.exe`, `initdb.exe`, dan `pg_ctl.exe`. Direktori standar `C:\Program Files\PostgreSQL\<versi>\bin` dideteksi otomatis.
@@ -91,17 +66,44 @@ go version
 $PSVersionTable.PSVersion
 ```
 
-### 2. Build dan jalankan aplikasi
+## Perintah build dan menjalankan aplikasi
 
-Unduh atau clone repositori, lalu buka PowerShell di folder utama yang berisi `README.md` dan `run.bat`:
+Unduh atau clone repositori, lalu buka terminal di folder utama `Tubes1_WBD` yang berisi `README.md`, `run.sh`, dan `run.bat`. Jalankan perintah sesuai sistem operasi sebagai pengguna biasa.
+
+### Jika menggunakan Linux
+
+Untuk **build sekaligus menjalankan aplikasi**, gunakan Bash:
+
+```bash
+bash ./run.sh
+```
+
+Jika hanya ingin build tanpa menjalankan aplikasi:
+
+```bash
+cd src
+go mod download
+go build -o schakker .
+cd ..
+```
+
+Hasil build saja adalah `src/schakker`. Untuk menjalankan aplikasi beserta penyiapan admin, gunakan `bash ./run.sh`.
+
+### Jika menggunakan Windows
+
+Untuk **build sekaligus menjalankan aplikasi**, gunakan PowerShell:
 
 ```powershell
 .\run.bat
 ```
 
-Launcher akan membangun aplikasi, menyiapkan database PostgreSQL lokal, dan menjalankan server. Jalankan sebagai pengguna biasa. Database proyek dan service Windows tidak perlu dibuat secara manual.
+Jika menggunakan Command Prompt (CMD), perintahnya:
 
-Jika hanya ingin melakukan build tanpa menjalankan server:
+```bat
+run.bat
+```
+
+Jika hanya ingin build tanpa menjalankan aplikasi, gunakan PowerShell atau CMD:
 
 ```powershell
 cd src
@@ -110,7 +112,9 @@ go build -o schakker.exe .
 cd ..
 ```
 
-Perintah tersebut menghasilkan executable `src\schakker.exe`. Gunakan `.\run.bat` untuk menjalankan aplikasi dengan penyiapan awal melalui launcher.
+Hasil build saja adalah `src\schakker.exe`. Untuk menjalankan aplikasi beserta penyiapan admin, gunakan `.\run.bat` di PowerShell atau `run.bat` di CMD.
+
+Kedua launcher (`run.sh` dan `run.bat`) sudah mencakup build, penyiapan database PostgreSQL lokal, dan menjalankan server. Database proyek tidak perlu dibuat secara manual.
 
 ## Penyiapan saat menjalankan aplikasi
 
@@ -130,7 +134,48 @@ Pada startup pertama, jika belum ada pengguna, masukkan username admin (bawaan `
 
 Setelah terminal menampilkan alamat server, buka **http://localhost:3000** di browser dan masuk menggunakan akun admin tersebut. Tekan **Ctrl+C** di terminal untuk menghentikan aplikasi dan instance database yang dijalankannya.
 
-Jalankan kembali launcher yang sama untuk menggunakan aplikasi pada sesi berikutnya. Data lokal disimpan di `src/.schakker/` pada Linux, atau `%LOCALAPPDATA%\Schakker\<id-proyek>\` pada Windows. Lokasi yang digunakan ditampilkan saat launcher berjalan. Pertahankan folder data beserta key di dalamnya, dan gunakan folder data terpisah untuk Linux dan Windows.
+Untuk restart biasa, tekan **Ctrl+C**, lalu jalankan kembali `bash ./run.sh` (Linux), `.\run.bat` (Windows PowerShell), atau `run.bat` (Windows CMD). Akun dan data tetap tersimpan, sehingga penyiapan admin tidak diminta lagi.
+
+## Reset penuh agar penyiapan admin muncul kembali
+
+**Reset menghapus seluruh isi folder data lokal proyek**, termasuk akun admin, pengguna lain, sesi, pengaturan, database lokal, database mock yang disimpan, dan key. Database target pada server lain tidak ikut terhapus.
+
+1. Hentikan aplikasi dengan **Ctrl+C** dan tunggu sampai proses berhenti.
+2. Jika ada di `src/.env`, hapus baris `SCHAKKER_ADMIN_USERNAME`, `SCHAKKER_ADMIN_NAME`, dan `SCHAKKER_ADMIN_PASSWORD` agar akun admin tidak dibuat otomatis.
+3. Panduan ini menggunakan database lokal bawaan. Jika sebelumnya memakai database eksternal, kosongkan `SCHAKKER_DATABASE_URL` dan `DATABASE_URL` di `src/.env` serta environment terminal sebelum melanjutkan. Gunakan mode pengembangan (hapus `SCHAKKER_ENV=production` jika sebelumnya diatur).
+4. Jalankan perintah reset sesuai sistem operasi dari folder utama repositori.
+
+### Jika menggunakan Linux
+
+Untuk lokasi data bawaan (`src/.schakker/`):
+
+```bash
+unset SCHAKKER_ADMIN_USERNAME SCHAKKER_ADMIN_NAME SCHAKKER_ADMIN_PASSWORD
+rm -rf -- ./src/.schakker
+bash ./run.sh
+```
+
+Jika memakai `SCHAKKER_STATE_DIR`, ganti `./src/.schakker` pada perintah penghapusan dengan folder data yang dikonfigurasi. Path relatif pada variabel tersebut dihitung dari `src/`.
+
+Pada WSL2, jika repositori berada di `/mnt/<drive>/...` dan `SCHAKKER_STATE_DIR` tidak diatur, lokasi data bawaan berada di `${XDG_STATE_HOME:-$HOME/.local/state}/schakker/<id-proyek>/`. Gunakan path lengkap dari baris **`WSL detected; PostgreSQL state:`** yang ditampilkan launcher sebagai pengganti `./src/.schakker`.
+
+### Jika menggunakan Windows (PowerShell)
+
+Data bawaan disimpan di `%LOCALAPPDATA%\Schakker\<id-proyek>\`. Salin **path lengkap** dari baris **`Schakker state:`** yang ditampilkan saat menjalankan `run.bat`. Jika memakai `SCHAKKER_STATE_DIR`, baris tersebut menampilkan lokasi khusus yang digunakan.
+
+Jalankan perintah berikut melalui PowerShell. Saat diminta, tempel hanya path folder data proyek dari baris tersebut:
+
+```powershell
+$schakkerState = Read-Host 'Tempel path folder data dari baris Schakker state'
+if ([string]::IsNullOrWhiteSpace($schakkerState)) { throw 'Path folder data harus diisi.' }
+Remove-Item -LiteralPath $schakkerState -Recurse -Force -ErrorAction Stop
+$env:SCHAKKER_ADMIN_USERNAME = $null
+$env:SCHAKKER_ADMIN_NAME = $null
+$env:SCHAKKER_ADMIN_PASSWORD = $null
+.\run.bat
+```
+
+Setelah reset, jawab pilihan pengujian dan mock sesuai kebutuhan. Launcher akan meminta kembali **username admin, nama tampilan, password, dan konfirmasi password**. Untuk mulai dengan database kosong tanpa data contoh, jawab `n` pada ketiga pilihan mock.
 
 ## Konfigurasi opsional
 
