@@ -2,6 +2,7 @@ package setup
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
@@ -14,6 +15,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -30,13 +32,16 @@ type LocalCluster struct {
 	Socket    string
 	Port      int
 	control   string
+	password  string
+	tcp       bool
 	started   bool
 	once      sync.Once
 }
 type localSettings struct {
-	Socket  string
-	Port    int
-	TCPRole string
+	Socket   string
+	Port     int
+	TCPRole  string
+	Password string
 }
 
 func OpenLocal(ctx context.Context, directory string) (*sql.DB, func(), error) {
@@ -79,16 +84,23 @@ func StartLocalCluster(ctx context.Context, directory string, options LocalOptio
 	raw, err := os.ReadFile(settingsPath)
 	switch {
 	case err == nil:
-		if json.Unmarshal(raw, &settings) != nil || settings.Socket == "" || settings.Port < 1 || settings.Port > 65535 || settings.TCPRole != options.TCPRole {
+		if json.Unmarshal(raw, &settings) != nil || !validLocalSettings(settings, options) {
 			return nil, errors.New("local PostgreSQL configuration is invalid or uses a different connection mode")
 		}
 	case errors.Is(err, os.ErrNotExist):
 		settings = localSettings{Socket: filepath.Join(directory, "socket"), Port: 5432, TCPRole: options.TCPRole}
-		if len(settings.Socket) > 85 {
+		if runtime.GOOS == "windows" {
+			settings.Socket = "127.0.0.1"
+			password := make([]byte, 32)
+			if _, err := rand.Read(password); err != nil {
+				return nil, err
+			}
+			settings.Password = hex.EncodeToString(password)
+		} else if len(settings.Socket) > 85 {
 			hash := sha256.Sum256([]byte(directory))
-			settings.Socket = filepath.Join(os.TempDir(), "schakker-socket-"+strconv.Itoa(os.Getuid())+"-"+hex.EncodeToString(hash[:8]))
+			settings.Socket = filepath.Join(os.TempDir(), "schakker-socket-"+hex.EncodeToString(hash[:8]))
 		}
-		if options.TCPRole != "" {
+		if runtime.GOOS == "windows" || options.TCPRole != "" {
 			listener, err := net.Listen("tcp", "127.0.0.1:0")
 			if err != nil {
 				return nil, err
@@ -103,11 +115,13 @@ func StartLocalCluster(ctx context.Context, directory string, options LocalOptio
 	default:
 		return nil, err
 	}
-	if err := os.MkdirAll(settings.Socket, 0700); err != nil {
-		return nil, err
-	}
-	if err := os.Chmod(settings.Socket, 0700); err != nil {
-		return nil, err
+	if runtime.GOOS != "windows" {
+		if err := os.MkdirAll(settings.Socket, 0700); err != nil {
+			return nil, err
+		}
+		if err := os.Chmod(settings.Socket, 0700); err != nil {
+			return nil, err
+		}
 	}
 	data := filepath.Join(directory, "postgres")
 	if _, err := os.Stat(filepath.Join(data, "PG_VERSION")); err != nil {
@@ -122,7 +136,25 @@ func StartLocalCluster(ctx context.Context, directory string, options LocalOptio
 			return nil, err
 		}
 		defer os.RemoveAll(staging)
-		command := exec.CommandContext(ctx, filepath.Join(binaries, "initdb"), "-D", staging, "-U", "schakker", "--auth-local=trust", "--auth-host=reject", "--no-locale", "--encoding=UTF8")
+		arguments := []string{"-D", staging, "-U", "schakker", "--auth-local=trust", "--auth-host=reject", "--no-locale", "--encoding=UTF8"}
+		if runtime.GOOS == "windows" {
+			passwordFile, err := os.CreateTemp(directory, ".postgres-password-")
+			if err != nil {
+				return nil, err
+			}
+			passwordPath := passwordFile.Name()
+			defer os.Remove(passwordPath)
+			if _, err := passwordFile.WriteString(settings.Password + "\n"); err != nil {
+				passwordFile.Close()
+				return nil, err
+			}
+			if err := passwordFile.Close(); err != nil {
+				return nil, err
+			}
+			arguments[5] = "--auth-host=scram-sha-256"
+			arguments = append(arguments, "--pwfile="+passwordPath)
+		}
+		command := exec.CommandContext(ctx, postgresExecutable(binaries, "initdb"), arguments...)
 		if _, err := command.CombinedOutput(); err != nil {
 			return nil, errors.New("local PostgreSQL initialization failed; run as a regular user with PostgreSQL server tools installed")
 		}
@@ -130,20 +162,24 @@ func StartLocalCluster(ctx context.Context, directory string, options LocalOptio
 			return nil, err
 		}
 	}
-	cluster := &LocalCluster{Directory: directory, Socket: settings.Socket, Port: settings.Port, control: filepath.Join(binaries, "pg_ctl")}
+	cluster := &LocalCluster{Directory: directory, Socket: settings.Socket, Port: settings.Port, control: postgresExecutable(binaries, "pg_ctl"), password: settings.Password, tcp: runtime.GOOS == "windows"}
 	if exec.CommandContext(ctx, cluster.control, "-D", data, "status").Run() == nil {
 		return cluster, nil
 	}
-	escapedSocket := strings.ReplaceAll(strings.ReplaceAll(settings.Socket, `\`, `\\`), "'", "''")
 	listen := ""
-	if settings.TCPRole != "" {
+	if runtime.GOOS == "windows" || settings.TCPRole != "" {
 		listen = "127.0.0.1"
+	}
+	configText := fmt.Sprintf("\nlisten_addresses = '%s'\nport = %d\n", listen, settings.Port)
+	if runtime.GOOS != "windows" {
+		escapedSocket := strings.ReplaceAll(strings.ReplaceAll(settings.Socket, `\`, `\\`), "'", "''")
+		configText += fmt.Sprintf("unix_socket_directories = '%s'\nunix_socket_permissions = 0700\n", escapedSocket)
 	}
 	config, err := os.OpenFile(filepath.Join(data, "postgresql.conf"), os.O_WRONLY|os.O_APPEND, 0600)
 	if err != nil {
 		return nil, err
 	}
-	_, writeErr := fmt.Fprintf(config, "\nlisten_addresses = '%s'\nunix_socket_directories = '%s'\nunix_socket_permissions = 0700\nport = %d\n", listen, escapedSocket, settings.Port)
+	_, writeErr := config.WriteString(configText)
 	closeErr := config.Close()
 	if writeErr != nil {
 		return nil, writeErr
@@ -151,21 +187,37 @@ func StartLocalCluster(ctx context.Context, directory string, options LocalOptio
 	if closeErr != nil {
 		return nil, closeErr
 	}
-	if settings.TCPRole != "" {
-		hba := "local all all trust\nhost all " + settings.TCPRole + " 127.0.0.1/32 scram-sha-256\nhost all all 0.0.0.0/0 reject\nhost all all ::0/0 reject\n"
+	if runtime.GOOS == "windows" || settings.TCPRole != "" {
+		hba := "local all all trust\n"
+		if runtime.GOOS == "windows" {
+			hba += "host all schakker 127.0.0.1/32 scram-sha-256\n"
+		}
+		if settings.TCPRole != "" {
+			hba += "host all " + settings.TCPRole + " 127.0.0.1/32 scram-sha-256\n"
+		}
+		hba += "host all all 0.0.0.0/0 reject\nhost all all ::0/0 reject\n"
 		if err := os.WriteFile(filepath.Join(data, "pg_hba.conf"), []byte(hba), 0600); err != nil {
 			return nil, err
 		}
 	}
-	if _, err := exec.CommandContext(ctx, cluster.control, "-D", data, "-l", filepath.Join(directory, "postgres.log"), "-w", "-t", "15", "start").CombinedOutput(); err != nil {
+	if err := exec.CommandContext(ctx, cluster.control, "-D", data, "-l", filepath.Join(directory, "postgres.log"), "-w", "-t", "15", "start").Run(); err != nil {
 		return nil, fmt.Errorf("local PostgreSQL did not start; inspect %s", filepath.Join(directory, "postgres.log"))
 	}
 	cluster.started = true
 	return cluster, nil
 }
 func (c *LocalCluster) DSN(database string) string {
-	values := url.Values{"host": {c.Socket}, "port": {strconv.Itoa(c.Port)}, "sslmode": {"disable"}, "connect_timeout": {"5"}}
-	return (&url.URL{Scheme: "postgres", User: url.User("schakker"), Path: "/" + database, RawQuery: values.Encode()}).String()
+	values := url.Values{"sslmode": {"disable"}, "connect_timeout": {"5"}}
+	connection := &url.URL{Scheme: "postgres", User: url.User("schakker"), Path: "/" + database}
+	if c.tcp {
+		connection.User = url.UserPassword("schakker", c.password)
+		connection.Host = net.JoinHostPort(c.Socket, strconv.Itoa(c.Port))
+	} else {
+		values.Set("host", c.Socket)
+		values.Set("port", strconv.Itoa(c.Port))
+	}
+	connection.RawQuery = values.Encode()
+	return connection.String()
 }
 func (c *LocalCluster) Open(ctx context.Context, database string) (*sql.DB, error) {
 	return Open(ctx, c.DSN(database))
@@ -232,13 +284,19 @@ func postgresBinaries(ctx context.Context) (string, error) {
 		}
 	}
 	installed, _ := filepath.Glob("/usr/lib/postgresql/*/bin")
+	if runtime.GOOS == "windows" {
+		if programFiles := os.Getenv("ProgramFiles"); programFiles != "" {
+			windowsInstalls, _ := filepath.Glob(filepath.Join(programFiles, "PostgreSQL", "*", "bin"))
+			installed = append(installed, windowsInstalls...)
+		}
+	}
 	sort.Sort(sort.Reverse(sort.StringSlice(installed)))
 	directories = append(directories, installed...)
 	for _, directory := range directories {
 		valid := true
 		for _, binary := range []string{"initdb", "pg_ctl", "postgres"} {
-			info, err := os.Stat(filepath.Join(directory, binary))
-			if err != nil || info.IsDir() || info.Mode()&0111 == 0 {
+			info, err := os.Stat(postgresExecutable(directory, binary))
+			if err != nil || info.IsDir() || runtime.GOOS != "windows" && info.Mode()&0111 == 0 {
 				valid = false
 				break
 			}
@@ -248,4 +306,22 @@ func postgresBinaries(ctx context.Context) (string, error) {
 		}
 	}
 	return "", errors.New("install PostgreSQL server tools once, or set SCHAKKER_POSTGRES_BIN to their bin directory; an existing database can also be used with SCHAKKER_DATABASE_URL")
+}
+
+func validLocalSettings(settings localSettings, options LocalOptions) bool {
+	if settings.Socket == "" || settings.Port < 1 || settings.Port > 65535 || settings.TCPRole != options.TCPRole {
+		return false
+	}
+	if runtime.GOOS != "windows" {
+		return true
+	}
+	password, err := hex.DecodeString(settings.Password)
+	return settings.Socket == "127.0.0.1" && err == nil && len(password) == 32
+}
+
+func postgresExecutable(directory, name string) string {
+	if runtime.GOOS == "windows" {
+		name += ".exe"
+	}
+	return filepath.Join(directory, name)
 }
