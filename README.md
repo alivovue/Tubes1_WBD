@@ -201,3 +201,16 @@ Contoh `src/.env` di Windows; sesuaikan versi dan lokasi instalasi:
 PORT=3000
 SCHAKKER_POSTGRES_BIN="C:\Program Files\PostgreSQL\18\bin"
 ```
+
+## Kebijakan sesi
+
+| Pengaturan | Nilai | Perilaku |
+| --- | --- | --- |
+| Idle timeout | 30 menit | Sesi berakhir jika tidak ada akses ke fitur yang dilindungi selama 30 menit. Akses berikutnya memperbarui batas idle, maksimal sampai absolute expiration. |
+| Absolute expiration | 8 jam sejak login | Pengguna wajib login kembali setelah 8 jam, meskipun masih aktif menggunakan aplikasi. |
+| Interval rotasi identifier | 15 menit | Identifier sesi diperbarui pada request terautentikasi berikutnya setelah interval tercapai. Identifier juga diperbarui ketika privilege meningkat; setiap login berhasil menghasilkan sesi baru. |
+| Grace period | 30 detik | Setelah rotasi berkala atau peningkatan privilege, identifier lama tetap diterima selama 30 detik untuk menangani request bersamaan atau respons yang tidak diterima. Masa ini dibatasi oleh absolute expiration. |
+
+Rotasi identifier tidak memperpanjang absolute expiration. Logout, penonaktifan akun, perubahan password, dan pencabutan akses membatalkan sesi terkait di backend.
+
+Client menerima identifier sesi melalui cookie `schakker_session`; data sesi disimpan di backend. Cookie menggunakan `HttpOnly` dan `SameSite=Lax`, serta `Secure` pada HTTPS atau mode production. Request yang mengubah state dilindungi token CSRF.

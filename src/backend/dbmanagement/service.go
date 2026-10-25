@@ -8,6 +8,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"fmt"
 	"time"
 
 	"tubes1_wbd/backend/access"
@@ -18,13 +19,14 @@ import (
 )
 
 var (
-	ErrConnection  = adapters.ErrConnection
-	ErrQuery       = adapters.ErrQuery
-	ErrInvalid     = access.ErrInvalid
-	ErrForbidden   = access.ErrForbidden
-	ErrConflict    = access.ErrConflict
-	ErrNotFound    = access.ErrNotFound
-	ErrUnsupported = adapters.ErrUnsupported
+	ErrConnection          = adapters.ErrConnection
+	ErrQuery               = adapters.ErrQuery
+	ErrInvalid             = access.ErrInvalid
+	ErrForbidden           = access.ErrForbidden
+	ErrConflict            = access.ErrConflict
+	ErrNotFound            = access.ErrNotFound
+	ErrUnsupported         = adapters.ErrUnsupported
+	ErrDuplicateConnection = fmt.Errorf("%w: target database is already registered", ErrConflict)
 )
 
 type Config struct {

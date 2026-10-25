@@ -71,6 +71,9 @@ func (s *Service) SaveConnection(ctx context.Context, actor, id int64, input Con
 		if err != nil {
 			return err
 		}
+		if err := s.requireUniqueConnection(ctx, tx, id, in); err != nil {
+			return err
+		}
 		if id > 0 {
 			old, err := tx.DatabaseMetadata(ctx, id)
 			if err != nil {

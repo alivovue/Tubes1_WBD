@@ -362,6 +362,8 @@ func userError(err error) (string, int) {
 		return "The requested item was not found.", 404
 	case errors.Is(err, migration.ErrStale), errors.Is(err, dbmanagement.ErrStaleSnapshot):
 		return "The SQL, database or connection changed. Analyze the migration again.", 409
+	case errors.Is(err, dbmanagement.ErrDuplicateConnection):
+		return "This database is already registered. Edit or reactivate its existing connection.", 409
 	case errors.Is(err, access.ErrConflict):
 		return "This item changed or already exists. Reload and try again.", 409
 	case errors.Is(err, errUnsavedDraft):

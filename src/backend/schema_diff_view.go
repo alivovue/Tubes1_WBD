@@ -31,9 +31,6 @@ type schemaDiffOperation struct {
 	text string
 }
 
-// BuildSchemaDiffView turns two complete schema snapshots into aligned rows for
-// a single, side-by-side diff viewport. Unchanged rows keep their original line
-// numbers while additions and removals receive their usual +/- markers.
 func BuildSchemaDiffView(before, after any) SchemaDiffView {
 	return alignSchemaDiffLines(prettyJSONLines(before), prettyJSONLines(after))
 }
@@ -51,8 +48,6 @@ func alignSchemaDiffLines(before, after []string) SchemaDiffView {
 		return SchemaDiffView{}
 	}
 
-	// The regular path uses an LCS table so insertions and removals stay aligned.
-	// Avoid allocating an unbounded matrix for unusually large schemas.
 	if len(before) > 0 && len(after) > 0 && len(before) > maxSchemaDiffCells/len(after) {
 		return alignLargeSchemaDiff(before, after)
 	}
@@ -158,9 +153,6 @@ func rowsFromSchemaDiffOperations(operations []schemaDiffOperation) SchemaDiffVi
 	return view
 }
 
-// For very large snapshots, keep common prefix/suffix rows and align the
-// changed middle by position. This remains bounded while preserving one shared
-// viewport and correct red/green indicators.
 func alignLargeSchemaDiff(before, after []string) SchemaDiffView {
 	prefix := 0
 	for prefix < len(before) && prefix < len(after) && before[prefix] == after[prefix] {

@@ -41,13 +41,12 @@ type ReadQuerySpec struct {
 	Limit, Offset int
 }
 
-// ReadQuery never records a migration, changes a version, or commits a query.
 func (s *Service) ReadQuery(ctx context.Context, actor, database int64, query string) (ReadResult, error) {
 	started := time.Now()
 	result := ReadResult{Rows: [][]any{}}
 	ctx, cancel := context.WithTimeout(ctx, s.config.QueryTimeout)
 	defer cancel()
-	// Permission is checked before inspecting connection metadata or SQL.
+
 	dbms, err := s.DBMS(ctx, actor, database)
 	if err != nil {
 		return result, err
@@ -75,7 +74,7 @@ func (s *Service) ReadQuery(ctx context.Context, actor, database int64, query st
 			return result, err
 		}
 	}
-	// The outer limit also bounds server output for queries without a LIMIT.
+
 	bounded := fmt.Sprintf("SELECT * FROM (\n%s\n) AS schakker_viewer_result LIMIT %d", statement.SQL, ViewerRowLimit+1)
 	rows, err := tx.QueryContext(ctx, bounded)
 	if err != nil {
@@ -125,7 +124,6 @@ func (s *Service) ReadQuery(ctx context.Context, actor, database int64, query st
 	return result, nil
 }
 
-// BuildReadQuery validates names against live metadata before quoting them.
 func (s *Service) BuildReadQuery(ctx context.Context, actor, database int64, spec ReadQuerySpec) (string, error) {
 	var query string
 	err := s.read(ctx, actor, database, access.ViewOnly, func(ctx context.Context, q adapters.Querier, a adapters.Adapter) error {
@@ -139,7 +137,6 @@ func (s *Service) BuildReadQuery(ctx context.Context, actor, database int64, spe
 	return query, err
 }
 
-// BuildReadSQL builds SELECT only; it is shared by the visual viewer and tests.
 func BuildReadSQL(a adapters.Adapter, detail TableDetail, spec ReadQuerySpec) (string, error) {
 	if spec.Limit == 0 {
 		spec.Limit = 100
@@ -233,7 +230,7 @@ func readFilterLiteral(filter ReadFilter) (string, error) {
 		if !readNumber.MatchString(filter.Value) {
 			return "", ErrInvalid
 		}
-		// Preserve numeric precision instead of rounding via float64.
+
 		return filter.Value, nil
 	case "boolean":
 		if filter.Value == "true" {

@@ -7,9 +7,6 @@ import (
 
 var ErrReadOnly = errors.New("SQL Viewer accepts one read-only SELECT query and supported built-in functions")
 
-// ValidateReadQuery is deliberately conservative: a SELECT prefix alone cannot
-// exclude writable CTEs, output files, locking reads or side-effecting functions.
-// Execution must additionally use a database-enforced read-only transaction.
 func ValidateReadQuery(query, dbms string) (Statement, error) {
 	statements, err := ParseSQL(query, dbms)
 	if err != nil || len(statements) != 1 {
@@ -41,7 +38,7 @@ func ValidateReadQuery(query, dbms string) (Statement, error) {
 		if token.Quoted || i > 0 && IsWord(s.Tokens[i-1], ".") {
 			return Statement{}, ErrReadOnly
 		}
-		// SQL keywords followed by a parenthesized expression are not functions.
+
 		switch strings.ToUpper(token.Value) {
 		case "SELECT", "FROM", "WHERE", "AS", "IN", "NOT", "AND", "OR", "ON", "EXISTS", "OVER", "FILTER", "BY", "WHEN", "THEN", "ELSE", "DISTINCT", "ALL", "UNION", "INTERSECT", "EXCEPT", "LATERAL", "USING", "VALUES":
 			continue

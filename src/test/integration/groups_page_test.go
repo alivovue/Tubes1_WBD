@@ -177,7 +177,8 @@ func TestGroupsBatchAccessSaveIsAtomic(t *testing.T) {
 	group := f.group(t, "Batch access")
 	must(t, f.access.SetMembership(f.ctx, f.admin, employee.ID, group.ID, true))
 	first := f.register(t)
-	input := f.dbs.Connection()
+	other := newFixture(t, false)
+	input := other.dbs.Connection()
 	input.Name = "Second batch target"
 	second, err := f.databases.SaveConnection(f.ctx, f.admin, 0, input)
 	must(t, err)

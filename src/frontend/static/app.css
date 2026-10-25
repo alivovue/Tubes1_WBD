@@ -128,8 +128,6 @@ svg {
 .skip-link:focus {
   transform: translateY(0);
 }
-
-/* Shared controls */
 .button {
   display: inline-flex;
   min-height: 40px;
@@ -357,8 +355,6 @@ svg {
 .heading-line h2 {
   margin-bottom: 0;
 }
-
-/* Authentication */
 .auth-body {
   overflow-x: hidden;
 }
@@ -686,8 +682,6 @@ svg {
 
 .security-note svg { flex: 0 0 auto; color: var(--green); }
 .auth-help { margin: 25px 0 0; color: var(--text-muted); font-size: 12px; text-align: center; }
-
-/* Application shell */
 .app-shell {
   min-height: 100vh;
 }
@@ -893,8 +887,6 @@ svg {
 .page-heading h1 { margin-bottom: 7px; font-size: clamp(25px, 3vw, 34px); line-height: 1.16; letter-spacing: -0.035em; }
 .page-heading p:not(.eyebrow) { margin-bottom: 0; color: var(--text-muted); }
 .heading-actions { display: flex; gap: 10px; }
-
-/* Dashboard */
 .metrics-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1057,8 +1049,6 @@ svg {
 .quick-start h2 { margin-bottom: 2px; font-size: 17px; }
 .quick-start p:not(.eyebrow) { margin-bottom: 0; color: #a8b1bf; font-size: 11px; }
 .quick-start .button { position: relative; z-index: 1; flex: 0 0 auto; }
-
-/* Toolbar and database cards */
 .toolbar {
   display: flex;
   align-items: center;
@@ -1127,8 +1117,6 @@ svg {
 .database-meta dd { margin: 3px 0 0; color: #cbd2dd; font-size: 10px; }
 .database-card__footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 15px; }
 .empty-state { grid-column: 1 / -1; padding: 50px; border: 1px dashed var(--border); border-radius: var(--radius); color: var(--text-muted); text-align: center; }
-
-/* Database explorer */
 .explorer-shell {
   display: grid;
   min-height: 630px;
@@ -1189,8 +1177,6 @@ svg {
 
 .pagination { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 16px; border-top: 1px solid var(--border-soft); color: var(--text-muted); font-size: 10px; }
 .pagination div { display: flex; gap: 7px; }
-
-/* Migration editor */
 .stepper {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -1267,8 +1253,6 @@ svg {
 .modal__card > p { color: var(--text-muted); font-size: 12px; }
 .check-control--confirm { width: 100%; padding: 12px; margin-top: 15px; border: 1px solid var(--border); border-radius: 8px; }
 .modal__actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 22px; }
-
-/* History and administration */
 .history-panel td:nth-child(2) strong { color: #eef2f7; }
 .history-panel td:nth-child(2) small { margin-top: 2px; }
 .database-inline .db-mark, .access-db .db-mark { width: 27px; height: 27px; border-radius: 7px; font-size: 9px; }
@@ -1313,8 +1297,6 @@ svg {
 .permission-select option { background-color: #0c1119; color: var(--text); }
 .permission-select--view { border-color: rgba(139,124,246,.24); background-color: #1b1f33; color: #b2a8ff; }
 .permission-select--edit { border-color: rgba(36,170,253,.24); background-color: #132a40; color: #82d1ff; }
-
-/* Toasts */
 .toast-region { position: fixed; z-index: 150; right: 20px; bottom: 20px; display: grid; width: min(360px, calc(100vw - 40px)); gap: 8px; }
 .toast { display: flex; align-items: center; gap: 10px; padding: 13px 14px; border: 1px solid #344052; border-radius: 10px; background: #161d28; box-shadow: 0 15px 50px rgba(0,0,0,.35); color: #dce2eb; font-size: 11px; animation: toast-in 180ms ease-out; }
 .toast svg { color: var(--green); }
