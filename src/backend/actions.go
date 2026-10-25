@@ -198,6 +198,20 @@ func (app *application) adminAction(w http.ResponseWriter, r *http.Request, data
 				return false, e
 			}
 			err = app.services.Access.SetGrant(r.Context(), actor, id, db, access.Permission(form.Get("permission")))
+		case "set_grants":
+			databases, permissions := form["db"], form["permission"]
+			if len(databases) == 0 || len(databases) != len(permissions) {
+				return false, access.ErrInvalid
+			}
+			updates := make([]access.GrantUpdate, 0, len(databases))
+			for i, raw := range databases {
+				db, e := requestID(raw)
+				if e != nil {
+					return false, e
+				}
+				updates = append(updates, access.GrantUpdate{DatabaseID: db, Permission: access.Permission(permissions[i])})
+			}
+			err = app.services.Access.SetGrants(r.Context(), actor, id, updates)
 		default:
 			return false, access.ErrInvalid
 		}
@@ -239,7 +253,7 @@ func (app *application) adminAction(w http.ResponseWriter, r *http.Request, data
 		case form.Get("action") == "delete_group":
 			app.redirect(w, r, "/admin/groups", "Group deleted")
 		default:
-			app.redirect(w, r, "/admin/groups", "Changes saved", "group", id)
+			app.redirect(w, r, "/admin/groups", "Changes saved", "group", id, "editor", groupEditor(form.Get("action")))
 		}
 		return true, nil
 	}

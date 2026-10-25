@@ -44,23 +44,47 @@ func (s *Service) SetMembership(ctx context.Context, actor, user, group int64, m
 }
 
 func (s *Service) SetGrant(ctx context.Context, actor, group, database int64, permission Permission) error {
-	if group < 1 || database < 1 || (permission != NoAccess && permission != ViewOnly && permission != ViewEdit) {
+	return s.SetGrants(ctx, actor, group, []GrantUpdate{{DatabaseID: database, Permission: permission}})
+}
+
+type GrantUpdate struct {
+	DatabaseID int64
+	Permission Permission
+}
+
+func (s *Service) SetGrants(ctx context.Context, actor, group int64, updates []GrantUpdate) error {
+	if group < 1 || len(updates) == 0 {
 		return ErrInvalid
 	}
+	seen := make(map[int64]bool, len(updates))
+	for _, update := range updates {
+		if update.DatabaseID < 1 || seen[update.DatabaseID] || (update.Permission != NoAccess && update.Permission != ViewOnly && update.Permission != ViewEdit) {
+			return ErrInvalid
+		}
+		seen[update.DatabaseID] = true
+	}
 	return s.adminChange(ctx, actor, func(tx *dao.Store) error {
-		previous, err := tx.GroupPermission(ctx, group, database)
-		if err != nil {
-			return err
+		increased, reduced := false, false
+		for _, update := range updates {
+			previous, err := tx.GroupPermission(ctx, group, update.DatabaseID)
+			if err != nil {
+				return err
+			}
+			if err := tx.SetGrant(ctx, actor, group, update.DatabaseID, update.Permission); err != nil {
+				return err
+			}
+			if permissionIncreased(previous, update.Permission) {
+				increased = true
+			} else if previous != update.Permission {
+				reduced = true
+			}
 		}
-		if err := tx.SetGrant(ctx, actor, group, database, permission); err != nil {
-			return err
+		if reduced {
+			return tx.RevokeGroupSessions(ctx, group, s.config.Now())
 		}
-		if permissionIncreased(previous, permission) {
+		if increased {
 			return s.rotateGroupSessions(ctx, tx, group)
 		}
-		if previous == permission {
-			return nil
-		}
-		return tx.RevokeGroupSessions(ctx, group, s.config.Now())
+		return nil
 	})
 }

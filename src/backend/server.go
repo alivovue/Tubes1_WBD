@@ -61,9 +61,10 @@ type application struct {
 
 type groupView struct {
 	dao.Group
-	Members          []dao.User
-	Grants           []grantCell
-	FocusPermissions bool
+	Members []dao.User
+	Grants  []grantCell
+	Editor  string
+	Focus   bool
 }
 type grantCell struct {
 	Database   dao.Database

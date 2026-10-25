@@ -316,9 +316,76 @@ function setupWorkflowScroll() {
   else window.addEventListener("load", reveal, { once: true });
 }
 
-function setupForms() {
-  all("[data-confirm]").forEach((form) => form.addEventListener("submit", (event) => { if (!window.confirm(form.dataset.confirm)) event.preventDefault(); }));
-  all(".permission-select").forEach((select) => {
+function showGroupFeedback(message, failed = false) {
+  const region = one("[data-toast-region]");
+  if (!region) return;
+  const notice = document.createElement("div");
+  notice.className = failed ? "toast toast--error" : "toast";
+  notice.setAttribute("role", failed ? "alert" : "status");
+  notice.textContent = message;
+  region.replaceChildren(notice);
+  window.setTimeout(() => notice.remove(), 6000);
+}
+
+function setupGroupEditors(cards = all("[data-group-card]")) {
+  cards.forEach((card) => {
+    const triggers = all("[data-group-edit]", card);
+    const panels = all("[data-group-panel]", card);
+    const show = (name) => {
+      triggers.forEach((trigger) => trigger.setAttribute("aria-expanded", String(trigger.dataset.groupEdit === name)));
+      panels.forEach((panel) => { panel.hidden = panel.dataset.groupPanel !== name; });
+    };
+    triggers.forEach((trigger) => trigger.addEventListener("click", () => {
+      const name = trigger.getAttribute("aria-expanded") === "true" ? "" : trigger.dataset.groupEdit;
+      show(name);
+      if (name) one("h3", panels.find((panel) => panel.dataset.groupPanel === name))?.focus({ preventScroll: true });
+    }));
+    panels.forEach((panel) => one("[data-group-close]", panel).addEventListener("click", () => {
+      show("");
+      triggers.find((trigger) => trigger.dataset.groupEdit === panel.dataset.groupPanel)?.focus({ preventScroll: true });
+    }));
+    all("[data-group-save]", card).forEach((form) => form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      if (card.dataset.saving === "true") return;
+      const body = new URLSearchParams(new FormData(form));
+      const controls = all("button, input, select", card).filter((control) => !control.disabled);
+      const editor = form.closest("[data-group-panel]").dataset.groupPanel;
+      card.dataset.saving = "true";
+      controls.forEach((control) => { control.disabled = true; });
+      try {
+        const response = await fetch(form.getAttribute("action"), { method: "POST", body, credentials: "same-origin" });
+        if (new URL(response.url).pathname === "/login") {
+          window.location.assign(response.url);
+          return;
+        }
+        const page = new DOMParser().parseFromString(await response.text(), "text/html");
+        if (!response.ok) {
+          showGroupFeedback(one('[role="alert"]', page)?.textContent.trim() || "Changes could not be saved. Please try again.", true);
+          return;
+        }
+        const replacement = page.getElementById(card.id);
+        if (!replacement) throw new Error("Group response is unavailable.");
+        const position = { left: window.scrollX, top: window.scrollY, behavior: "instant" };
+        replacement.removeAttribute("data-auto-scroll");
+        card.replaceWith(replacement);
+        setupGroupEditors([replacement]);
+        setupForms(replacement);
+        one(`[data-group-panel="${editor}"] button[type="submit"]`, replacement)?.focus({ preventScroll: true });
+        window.scrollTo(position);
+        showGroupFeedback("Changes saved");
+      } catch {
+        showGroupFeedback("Could not confirm the save. Your input is still here; check the connection before trying again.", true);
+      } finally {
+        delete card.dataset.saving;
+        controls.forEach((control) => { control.disabled = false; });
+      }
+    }));
+  });
+}
+
+function setupForms(root = document) {
+  all("[data-confirm]", root).forEach((form) => form.addEventListener("submit", (event) => { if (!window.confirm(form.dataset.confirm)) event.preventDefault(); }));
+  all(".permission-select", root).forEach((select) => {
     const update = () => {
       select.classList.toggle("permission-select--view", select.value === "view_only");
       select.classList.toggle("permission-select--edit", select.value === "view_edit");
@@ -334,5 +401,6 @@ setupTabs();
 setupMigration();
 setupVisualBuilder();
 setupSQLViewer();
+setupGroupEditors();
 setupForms();
 setupWorkflowScroll();

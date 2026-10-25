@@ -44,6 +44,9 @@ func TestAdminChangesRejectOrdinaryEmployee(t *testing.T) {
 		{"delete group", func() error { return service.DeleteGroup(context.Background(), 7, 2) }},
 		{"membership", func() error { return service.SetMembership(context.Background(), 7, 8, 2, true) }},
 		{"grant", func() error { return service.SetGrant(context.Background(), 7, 2, 3, access.ViewEdit) }},
+		{"batch grants", func() error {
+			return service.SetGrants(context.Background(), 7, 2, []access.GrantUpdate{{DatabaseID: 3, Permission: access.ViewEdit}})
+		}},
 	}
 	for _, tc := range calls {
 		t.Run(tc.name, func(t *testing.T) {
@@ -67,6 +70,14 @@ func TestAdminInputValidationRunsBeforeStorage(t *testing.T) {
 	wantError(t, service.DeleteGroup(context.Background(), 7, 0), access.ErrInvalid)
 	wantError(t, service.SetMembership(context.Background(), 7, 0, 2, true), access.ErrInvalid)
 	wantError(t, service.SetGrant(context.Background(), 7, 2, 3, access.Permission("administrator")), access.ErrInvalid)
+	for _, updates := range [][]access.GrantUpdate{
+		nil,
+		{{DatabaseID: 0, Permission: access.ViewOnly}},
+		{{DatabaseID: 3, Permission: access.Permission("administrator")}},
+		{{DatabaseID: 3, Permission: access.ViewOnly}, {DatabaseID: 3, Permission: access.ViewEdit}},
+	} {
+		wantError(t, service.SetGrants(context.Background(), 7, 2, updates), access.ErrInvalid)
+	}
 }
 func TestLastActiveAdminCannotBeDemotedOrDisabled(t *testing.T) {
 	for _, tc := range []struct {
