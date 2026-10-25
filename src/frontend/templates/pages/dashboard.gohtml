@@ -1,5 +1,5 @@
 {{define "content"}}
-<section class="page-heading"><div><p class="eyebrow">{{stamp .Now}}</p><h1>Welcome, {{.User.DisplayName}}.</h1><p>Ringkasan database dan perubahan yang dapat Anda akses.</p></div><a class="button button--primary" href="/databases">Open database</a></section>
+<section class="page-heading"><div><p class="eyebrow">{{stamp .Now}}</p><h1>Welcome, {{.User.DisplayName}}.</h1><p>Ringkasan database dan perubahan yang dapat Anda akses.</p></div></section>
 <section class="metrics-grid" aria-label="Ringkasan">
  <article class="metric-card"><div><span>Accessible databases</span><strong>{{len .Databases}}</strong><small>Based on group permissions</small></div></article>
  <article class="metric-card"><div><span>Editable databases</span><strong>{{.EditableCount}}</strong><small>View + Edit</small></div></article>

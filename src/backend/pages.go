@@ -3,6 +3,7 @@ package backend
 import (
 	"net/http"
 	"sort"
+	"strconv"
 	"time"
 
 	"tubes1_wbd/backend/access"
@@ -107,6 +108,7 @@ func (app *application) loadAdministration(r *http.Request, data *pageData) erro
 	data.DBMS = app.services.Databases.SupportedDBMS()
 	for _, group := range data.Admin.Groups {
 		view := groupView{Group: group}
+		view.FocusPermissions = data.Error == "" && (r.URL.Query().Get("group") == strconv.FormatInt(group.ID, 10) || r.URL.Query().Get("created") == group.Name)
 		for _, membership := range data.Admin.Memberships {
 			if membership.GroupID == group.ID {
 				for _, user := range data.Admin.Users {
@@ -117,8 +119,6 @@ func (app *application) loadAdministration(r *http.Request, data *pageData) erro
 				}
 			}
 		}
-		data.Groups = append(data.Groups, view)
-		row := grantRow{Group: group}
 		for _, db := range data.Admin.Databases {
 			cell := grantCell{Database: db}
 			for _, grant := range data.Admin.Grants {
@@ -127,9 +127,9 @@ func (app *application) loadAdministration(r *http.Request, data *pageData) erro
 					break
 				}
 			}
-			row.Cells = append(row.Cells, cell)
+			view.Grants = append(view.Grants, cell)
 		}
-		data.GrantRows = append(data.GrantRows, row)
+		data.Groups = append(data.Groups, view)
 	}
 	return nil
 }

@@ -84,6 +84,7 @@ func (app *application) sqlViewerAction(r *http.Request, data *pageData) error {
 		}
 		data.SQL = query
 		data.Message = "SELECT generated. Review or edit the SQL, then run the read query."
+		data.ScrollTarget = "viewer-sql-editor"
 		return nil
 	case "run_query":
 		result, err := app.services.Databases.ReadQuery(r.Context(), data.User.ID, data.Database.ID, data.SQL)
@@ -91,6 +92,7 @@ func (app *application) sqlViewerAction(r *http.Request, data *pageData) error {
 			return err
 		}
 		data.ViewerResult = &result
+		data.ScrollTarget = "viewer-results"
 		return nil
 	default:
 		return access.ErrInvalid

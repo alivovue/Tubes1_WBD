@@ -37,7 +37,7 @@ var pages = map[string]page{
 	"/admin/users":       {"admin_users.gohtml", "app_layout", "Employees", "admin-users", "Administration"},
 	"/admin/groups":      {"admin_groups.gohtml", "app_layout", "Groups", "admin-groups", "Administration"},
 	"/admin/connections": {"admin_connections.gohtml", "app_layout", "Database Connections", "admin-connections", "Administration"},
-	"/admin/access":      {"admin_access.gohtml", "app_layout", "Access Control", "admin-access", "Administration"},
+	"/admin/access":      {"admin_groups.gohtml", "app_layout", "Groups", "admin-groups", "Administration"},
 }
 
 var legacyRoutes = map[string]string{
@@ -61,15 +61,13 @@ type application struct {
 
 type groupView struct {
 	dao.Group
-	Members []dao.User
+	Members          []dao.User
+	Grants           []grantCell
+	FocusPermissions bool
 }
 type grantCell struct {
 	Database   dao.Database
 	Permission dao.Permission
-}
-type grantRow struct {
-	Group dao.Group
-	Cells []grantCell
 }
 type recentExecution struct {
 	dao.MigrationExecution
@@ -89,7 +87,6 @@ type pageData struct {
 	Recent                                         []recentExecution
 	Admin                                          dao.AdminData
 	Groups                                         []groupView
-	GrantRows                                      []grantRow
 	DBMS                                           []string
 	Schemas                                        []dbmanagement.Schema
 	Tables                                         []dbmanagement.Table
@@ -107,6 +104,7 @@ type pageData struct {
 	ReviewJSON                                     string
 	ViewerResult                                   *dbmanagement.ReadResult
 	ViewerSpec                                     dbmanagement.ReadQuerySpec
+	ScrollTarget                                   string
 }
 
 func NewHandler(root string) (http.Handler, error) {
@@ -310,6 +308,10 @@ func (app *application) serveHTTP(w http.ResponseWriter, r *http.Request) {
 			app.fail(w, r, data, err)
 			return
 		}
+	}
+	if r.URL.Path == "/admin/access" && r.Method != http.MethodPost {
+		app.redirect(w, r, "/admin/groups", "")
+		return
 	}
 	if r.Method == http.MethodPost {
 		handled, err := app.action(w, r, &data)

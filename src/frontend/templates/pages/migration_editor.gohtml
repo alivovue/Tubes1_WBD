@@ -2,8 +2,9 @@
 <section class="page-heading page-heading--compact"><div><p class="eyebrow">Migration workflow</p><h1>Create migration</h1><p>Compose → Analyze → Review → Execute. Only Execute applies changes.</p></div>{{if .Database.ID}}<a class="button button--secondary" href="{{link "/migrations" "db" .Database.ID}}">Changelog</a>{{end}}</section>
 <form class="toolbar" method="get" action="/migrations/new"><label class="field"><span>Target database · View + Edit</span><select name="db">{{range .Databases}}<option value="{{.ID}}" {{if eq .ID $.Database.ID}}selected{{end}}>{{.Name}} · {{.DBMS}}</option>{{end}}</select></label><button class="button button--secondary" type="submit">Select database</button></form>
 {{if .Database.ID}}
-<div class="migration-layout">
-<section class="panel editor-panel"><header class="panel__header"><div><h2>{{if .Review}}Review SQL{{else}}SQL editor{{end}}</h2><p>{{.Database.Name}} · {{.Database.DBMS}}</p></div><span class="badge badge--edit">View + Edit</span></header>
+{{template "migration_visual_builder" .}}
+<div class="migration-layout workflow-editor">
+<section class="panel editor-panel workflow-scroll-target" id="migration-sql-editor" tabindex="-1"{{if eq .ScrollTarget "migration-sql-editor"}} data-auto-scroll{{end}}><header class="panel__header"><div><h2>{{if .Review}}Review SQL{{else}}SQL editor{{end}}</h2><p>{{.Database.Name}} · {{.Database.DBMS}}</p></div><span class="badge badge--edit">View + Edit</span></header>
 <form method="post" action="/migrations/new" data-migration-form>
  <input type="hidden" name="csrf" value="{{.CSRF}}" /><input type="hidden" name="db" value="{{.Database.ID}}" /><input type="hidden" name="draft" value="{{if .DraftID}}{{.DraftID}}{{end}}" /><input type="hidden" name="draft_updated" value="{{.DraftUpdated}}" />
  {{if .Review}}<input type="hidden" name="review" value="{{.ReviewJSON}}" data-review />{{end}}
@@ -24,7 +25,7 @@
 </div></aside>
 </div>
 {{if .Review}}
-<section class="panel analysis-panel" data-analysis><header class="panel__header"><div><h2>Migration analysis</h2><p>Informational preview of the current SQL. Execution rechecks permission, version and schema.</p></div></header><div class="analysis-grid"><article><span>Statements</span><strong>{{len .Review.Plans}}</strong></article><article><span>Base version</span><strong>{{.Review.BaseVersion}}</strong></article><article><span>Execution mode</span><strong>{{.Review.Mode}}</strong></article></div>
+<section class="panel analysis-panel workflow-scroll-target" id="migration-analysis" tabindex="-1" data-analysis{{if eq .ScrollTarget "migration-analysis"}} data-auto-scroll{{end}}><header class="panel__header"><div><h2>Migration analysis</h2><p>Informational preview of the current SQL. Execution rechecks permission, version and schema.</p></div></header><div class="analysis-grid"><article><span>Statements</span><strong>{{len .Review.Plans}}</strong></article><article><span>Base version</span><strong>{{.Review.BaseVersion}}</strong></article><article><span>Execution mode</span><strong>{{.Review.Mode}}</strong></article></div>
  {{range .Review.Warnings}}<div class="notice notice--warning"><div>{{.}}</div></div>{{end}}
  <div class="integration-form"><h3>Schema diff</h3>{{if .Review.SchemaDiffAvailable}}{{with .Review.SchemaDiff}}
  {{if .Destructive}}<div class="notice notice--warning"><div>The candidate includes destructive schema changes. Review the generated SQL carefully.</div></div>{{end}}
@@ -34,6 +35,9 @@
 Filter: {{pretty .Where}}</pre></li>{{else}}<li>No structured row changes.</li>{{end}}</ul>{{end}}{{else}}<p>{{.Review.SchemaDiffMessage}}</p>{{end}}
  <h3>Query execution plans</h3>{{range .Review.Plans}}<article class="plan-entry"><pre>{{.Statement}}</pre>{{if .Available}}{{range .Nodes}}{{template "plan_node" .}}{{end}}<details><summary>Native EXPLAIN JSON</summary><pre>{{pretty .JSON}}</pre></details>{{else}}<p>{{.Message}}</p>{{end}}</article>{{end}}
  </div></section>{{end}}
+{{else}}<p class="empty-state">You need View + Edit access to a database to compose migrations. View Only users can inspect the changelog.</p><a class="button button--secondary" href="/migrations">View changelog</a>{{end}}
+{{end}}
+{{define "migration_visual_builder"}}
 <section class="panel" data-visual-builder><header class="panel__header"><div><h2>Visual change set</h2><p>Accumulate and reorder operations. Analyze generates editable SQL, compares schema states and previews row changes.</p></div></header>
 <form class="form-stack integration-form" method="post" action="/migrations/new" data-visual-form>
  <input type="hidden" name="csrf" value="{{.CSRF}}" /><input type="hidden" name="db" value="{{.Database.ID}}" /><input type="hidden" name="action" value="analyze_visual" /><input type="hidden" name="operations" value="{{.OperationsJSON}}" data-operations />
@@ -49,7 +53,6 @@ Filter: {{pretty .Where}}</pre></li>{{else}}<li>No structured row changes.</li>{
  <ol class="operation-list" data-operation-list></ol>
  <div class="editor-actions"><button class="button button--primary" type="submit">Analyze change set</button></div>
 </form></section>
-{{else}}<p class="empty-state">You need View + Edit access to a database to compose migrations. View Only users can inspect the changelog.</p><a class="button button--secondary" href="/migrations">View changelog</a>{{end}}
 {{end}}
 {{define "plan_node"}}
 <div class="plan-node"><strong>{{.Operation}}</strong>{{if .Relation}} · {{.Relation}}{{end}}{{if .Index}} · index {{.Index}}{{end}}{{if .JoinType}} · {{.JoinType}}{{end}}{{if .EstimatedRows}} · estimated rows {{cell .EstimatedRows}}{{end}}{{if .TotalCost}} · cost {{cell .TotalCost}}{{end}}{{range .Children}}{{template "plan_node" .}}{{end}}</div>

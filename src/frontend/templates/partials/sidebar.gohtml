@@ -2,7 +2,7 @@
 <aside class="sidebar" data-sidebar aria-label="Navigasi aplikasi">
   <div class="sidebar__header">
     <a class="brand" href="/dashboard" aria-label="Schakker Data Platform">
-      <span class="brand__mark" aria-hidden="true"><span></span><span></span></span>
+      <img class="brand__mark" src="/public/sc%20logo.png" width="34" height="34" alt="" aria-hidden="true" />
       <span><strong>Schakker.</strong><small>Data Platform</small></span>
     </a>
     <button class="icon-button sidebar__close" type="button" data-sidebar-close aria-label="Tutup navigasi">
@@ -39,9 +39,6 @@
     </a>
     <a class="nav-item{{if eq .Active "admin-connections"}} is-active{{end}}" href="/admin/connections"{{if eq .Active "admin-connections"}} aria-current="page"{{end}}>
       <svg><use href="#icon-server"></use></svg><span>DB Connections</span>
-    </a>
-    <a class="nav-item{{if eq .Active "admin-access"}} is-active{{end}}" href="/admin/access"{{if eq .Active "admin-access"}} aria-current="page"{{end}}>
-      <svg><use href="#icon-shield"></use></svg><span>Access Control</span>
     </a>
     {{end}}
   </nav>

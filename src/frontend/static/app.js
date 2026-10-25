@@ -302,6 +302,20 @@ function setupSQLViewer() {
   one("[data-read-filter-add]", form)?.addEventListener("click", () => addFilter());
 }
 
+function setupWorkflowScroll() {
+  const target = one("[data-auto-scroll]");
+  if (!target) return;
+  const reveal = () => window.requestAnimationFrame(() => {
+    target.focus({ preventScroll: true });
+    target.scrollIntoView({
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth",
+      block: "start",
+    });
+  });
+  if (document.readyState === "complete") reveal();
+  else window.addEventListener("load", reveal, { once: true });
+}
+
 function setupForms() {
   all("[data-confirm]").forEach((form) => form.addEventListener("submit", (event) => { if (!window.confirm(form.dataset.confirm)) event.preventDefault(); }));
   all(".permission-select").forEach((select) => {
@@ -321,3 +335,4 @@ setupMigration();
 setupVisualBuilder();
 setupSQLViewer();
 setupForms();
+setupWorkflowScroll();

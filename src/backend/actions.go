@@ -83,6 +83,10 @@ func (app *application) action(w http.ResponseWriter, r *http.Request, data *pag
 			return false, err
 		}
 		data.ReviewJSON = string(raw)
+		data.ScrollTarget = "migration-analysis"
+		if form.Get("action") != "analyze" {
+			data.ScrollTarget = "migration-sql-editor"
+		}
 		return false, nil
 	case "save_draft":
 		if r.URL.Path != "/migrations/new" {
@@ -169,7 +173,10 @@ func (app *application) adminAction(w http.ResponseWriter, r *http.Request, data
 		default:
 			return false, access.ErrInvalid
 		}
-	case "/admin/groups":
+	case "/admin/groups", "/admin/access":
+		if r.URL.Path == "/admin/access" && form.Get("action") != "set_grant" {
+			return false, access.ErrInvalid
+		}
 		switch form.Get("action") {
 		case "save_group":
 			err = app.services.Access.SaveGroup(r.Context(), actor, id, form.Get("name"), form.Get("description"))
@@ -185,18 +192,15 @@ func (app *application) adminAction(w http.ResponseWriter, r *http.Request, data
 				return false, access.ErrInvalid
 			}
 			err = app.services.Access.SetMembership(r.Context(), actor, user, id, member == "yes")
+		case "set_grant":
+			db, e := requestID(form.Get("db"))
+			if e != nil {
+				return false, e
+			}
+			err = app.services.Access.SetGrant(r.Context(), actor, id, db, access.Permission(form.Get("permission")))
 		default:
 			return false, access.ErrInvalid
 		}
-	case "/admin/access":
-		if form.Get("action") != "set_grant" {
-			return false, access.ErrInvalid
-		}
-		db, e := requestID(form.Get("db"))
-		if e != nil {
-			return false, e
-		}
-		err = app.services.Access.SetGrant(r.Context(), actor, id, db, access.Permission(form.Get("permission")))
 	case "/admin/connections":
 		if form.Get("action") == "disable_connection" {
 			err = app.services.Databases.DisableConnection(r.Context(), actor, id)
@@ -227,6 +231,17 @@ func (app *application) adminAction(w http.ResponseWriter, r *http.Request, data
 	}
 	if err != nil {
 		return false, err
+	}
+	if r.URL.Path == "/admin/groups" || r.URL.Path == "/admin/access" {
+		switch {
+		case form.Get("action") == "save_group" && id == 0:
+			app.redirect(w, r, "/admin/groups", "Group created. Assign database permissions below.", "created", strings.TrimSpace(form.Get("name")))
+		case form.Get("action") == "delete_group":
+			app.redirect(w, r, "/admin/groups", "Group deleted")
+		default:
+			app.redirect(w, r, "/admin/groups", "Changes saved", "group", id)
+		}
+		return true, nil
 	}
 	app.redirect(w, r, r.URL.Path, "Changes saved")
 	return true, nil
