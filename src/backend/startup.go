@@ -20,7 +20,7 @@ import (
 	fixtures "tubes1_wbd/test/data"
 )
 
-var ErrAdminSetupRequired = errors.New("initial admin setup is required; start with ./run.sh from the repository root")
+var ErrAdminSetupRequired = errors.New("initial admin setup is required; start with run.sh on Linux or run.bat on Windows from the repository root")
 
 func servicesFromEnvironment(root string) (Services, func(), error) {
 	production := os.Getenv("SCHAKKER_ENV") == "production"

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"testing"
@@ -23,20 +22,8 @@ func requireMariaDBTools(t *testing.T) {
 	if os.Getenv("SCHAKKER_MARIADB_BIN") != "" {
 		return
 	}
-	for _, name := range []string{"mariadbd", "mariadb-install-db"} {
-		if _, err := exec.LookPath(name); err == nil {
-			continue
-		}
-		found := false
-		for _, directory := range []string{"/usr/bin/", "/usr/sbin/", "/usr/local/bin/", "/usr/local/sbin/"} {
-			if info, err := os.Stat(directory + name); err == nil && info.Mode()&0111 != 0 {
-				found = true
-				break
-			}
-		}
-		if !found {
-			t.Skip("optional MariaDB fixture test requires mariadbd and mariadb-install-db")
-		}
+	if !fixtures.MariaDBAvailable() {
+		t.Skip("optional MariaDB fixture test requires MariaDB server tools")
 	}
 }
 
