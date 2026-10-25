@@ -38,7 +38,13 @@ run_unit_tests="$reply"
 ask 'Run PostgreSQL integration tests before launching the website?' yes
 run_integration_tests="$reply"
 
-state_directory="${SCHAKKER_STATE_DIR:-.schakker}"
+default_state_directory='.schakker'
+if [[ -r /proc/sys/kernel/osrelease ]] && grep -qi microsoft /proc/sys/kernel/osrelease && [[ "$project_directory" =~ ^/mnt/[[:alpha:]]/ ]]; then
+    project_key="$(printf '%s' "$project_directory" | sha256sum | cut -c1-16)"
+    default_state_directory="${XDG_STATE_HOME:-$HOME/.local/state}/schakker/$project_key"
+    printf 'WSL detected; PostgreSQL state: %s\n' "$default_state_directory"
+fi
+state_directory="${SCHAKKER_STATE_DIR:-$default_state_directory}"
 mkdir -p "$state_directory"
 chmod 700 "$state_directory"
 state_directory="$(cd "$state_directory" && pwd)"
