@@ -4,17 +4,17 @@ Schakker adalah aplikasi pengelolaan database dengan autentikasi pengguna, akses
 
 ## 1. Dependensi yang perlu dipasang
 
-Petunjuk berikut ditujukan untuk Linux, terutama Ubuntu/Debian. Untuk Windows, gunakan Ubuntu melalui WSL2 dan pasang dependensi di lingkungan Ubuntu tersebut.
+Proyek dapat dijalankan langsung di Linux atau Windows 10/11. Linux menggunakan `run.sh`; Windows menggunakan `run.bat` yang menjalankan `run.ps1`. WSL2 tetap dapat menggunakan launcher Linux.
 
 | Dependensi | Kebutuhan | Sumber unduhan |
 | --- | --- | --- |
 | Go | Versi 1.26 atau lebih baru. Proyek mencantumkan toolchain `go1.26.10` di `src/go.mod`. | [Instalasi Go resmi](https://go.dev/doc/install) |
 | PostgreSQL | Versi 14 atau lebih baru, termasuk program server `postgres`, `initdb`, dan `pg_ctl`. Diperlukan untuk database lokal dan integration test. | [Unduhan PostgreSQL](https://www.postgresql.org/download/) |
 | PostgreSQL client | Menyediakan `psql` untuk pemeriksaan database bila diperlukan. | [Paket PostgreSQL Ubuntu](https://www.postgresql.org/download/linux/ubuntu/) |
-| Bash | Versi 4 atau lebih baru untuk menjalankan `run.sh`. | Paket `bash` pada distribusi Linux. |
+| Bash / PowerShell | Linux: Bash 4+. Windows: Windows PowerShell 5.1 atau lebih baru, yang sudah tersedia pada Windows 10/11. | Paket `bash` pada Linux atau Windows PowerShell bawaan. |
 | Browser | Untuk membuka antarmuka website. | Browser yang tersedia di komputer Anda. |
 
-MariaDB Server bersifat **opsional**, jika ingin mengelola target MariaDB atau menggunakan database mock MariaDB dari launcher. Adapter mendukung MariaDB 10.6 atau lebih baru; pilih rilis yang masih didukung melalui [unduhan resmi MariaDB](https://mariadb.org/download/). Mock MariaDB memerlukan `mariadbd` dan `mariadb-install-db`. Database internal website tetap menggunakan PostgreSQL.
+MariaDB Server bersifat **opsional**, jika ingin mengelola target MariaDB atau menggunakan database mock MariaDB dari launcher. Adapter mendukung MariaDB 10.6 atau lebih baru; pilih rilis yang masih didukung melalui [unduhan resmi MariaDB](https://mariadb.org/download/). Mock MariaDB memerlukan `mariadbd` dan `mariadb-install-db`, dengan ekstensi `.exe` pada Windows. Database internal website tetap menggunakan PostgreSQL.
 
 ### Instalasi di Ubuntu/Debian
 
@@ -48,6 +48,22 @@ Pada instalasi PostgreSQL di luar lokasi standar, atur `SCHAKKER_POSTGRES_BIN` s
 
 Dependensi Go pada `src/go.mod` diunduh otomatis ketika proyek dibangun. Siapkan koneksi internet pada penggunaan pertama jika dependensi atau toolchain belum tersedia di cache.
 
+### Instalasi di Windows
+
+1. Pasang [Go untuk Windows](https://go.dev/doc/install), lalu buka kembali terminal agar `go` tersedia pada `PATH`.
+2. Pasang [PostgreSQL untuk Windows](https://www.postgresql.org/download/windows/), termasuk server tools `postgres.exe`, `initdb.exe`, dan `pg_ctl.exe`. Lokasi standar di `C:\Program Files\PostgreSQL\<versi>\bin` dideteksi otomatis.
+3. Jika ingin memakai mock MariaDB, pasang MariaDB Server atau ekstrak [paket ZIP Windows resmi](https://mariadb.com/docs/server/server-management/install-and-upgrade-mariadb/installing-mariadb/binary-packages/installing-mariadb-windows-zip-packages). Pastikan `mariadbd.exe` dan `mariadb-install-db.exe` tersedia di folder `bin`; nama lama `mysqld.exe` dan `mysql_install_db.exe` juga didukung.
+
+Tidak perlu membuat database proyek atau mendaftarkan service Windows. Launcher memakai instance privat di port lokal tersendiri. Jalankan launcher sebagai pengguna biasa. Jika tools dipasang di lokasi lain, tentukan `SCHAKKER_POSTGRES_BIN` atau `SCHAKKER_MARIADB_BIN`.
+
+Contoh konfigurasi melalui PowerShell; sesuaikan versi dengan instalasi Anda:
+
+```powershell
+$env:SCHAKKER_POSTGRES_BIN = 'C:\Program Files\PostgreSQL\18\bin'
+$env:SCHAKKER_MARIADB_BIN = 'C:\Program Files\MariaDB 11.4\bin'
+.\run.bat
+```
+
 ## 2. Menjalankan website
 
 Buka terminal di root repositori, yaitu folder yang berisi `README.md` dan `run.sh`, lalu jalankan:
@@ -55,6 +71,14 @@ Buka terminal di root repositori, yaitu folder yang berisi `README.md` dan `run.
 ```bash
 ./run.sh
 ```
+
+Pada Windows, klik dua kali `run.bat` atau jalankan dari PowerShell/Command Prompt:
+
+```powershell
+.\run.bat
+```
+
+Pengguna PowerShell juga dapat menjalankan `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\run.ps1`. Kedua launcher menawarkan pilihan pengujian, mock database, dan pembuatan admin yang sama.
 
 Jalankan sebagai pengguna biasa. Launcher akan membangun aplikasi, menyiapkan database PostgreSQL privat untuk proyek, membuat tabel yang diperlukan, dan membuat serta menyimpan master key secara otomatis. Pengaturan bawaan dapat digunakan tanpa membuat file `.env`.
 
@@ -118,9 +142,11 @@ Peran Platform Admin dan permission database dikelola terpisah. Akses database d
 
 Tekan **Ctrl+C** pada terminal launcher untuk menghentikan website serta instance PostgreSQL dan MariaDB yang dimulainya. File database yang dipilih untuk dipertahankan tetap disimpan dan digunakan kembali pada run berikutnya.
 
-Data lokal, master key, dan database mock yang dipertahankan disimpan di `src/.schakker/`. Pertahankan folder ini agar data dan kunci tetap konsisten antar sesi. Folder tersebut dikecualikan dari Git.
+Pada Linux, data lokal, master key, dan database mock yang dipertahankan disimpan di `src/.schakker/`. Pada Windows, lokasi bawaannya `%LOCALAPPDATA%\Schakker\<id-proyek>\`, terpisah untuk setiap pengguna dan lokasi proyek. Lokasi yang dipakai ditampilkan saat launcher berjalan. `SCHAKKER_STATE_DIR` dapat mengganti lokasi tersebut.
 
-Untuk menggunakan kembali database mock yang sebelumnya dipertahankan, jalankan `./run.sh`, lewati integration test, lalu pilih `y` untuk database mock yang ingin digunakan kembali. Jika menjalankan integration test lagi dan memilih mempertahankan mock, launcher menggunakan kumpulan fixture baru dari pengujian tersebut.
+Pertahankan folder state beserta semua key agar data dan kredensial tetap konsisten antar sesi. Gunakan direktori state terpisah untuk Linux dan Windows; direktori data PostgreSQL/MariaDB tidak dipakai bersama antar sistem operasi.
+
+Untuk menggunakan kembali database mock yang sebelumnya dipertahankan, jalankan launcher sesuai sistem operasi, lewati integration test, lalu pilih `y` untuk database mock yang ingin digunakan kembali. Jika menjalankan integration test lagi dan memilih mempertahankan mock, launcher menggunakan kumpulan fixture baru dari pengujian tersebut.
 
 ## 3. Pengujian dan hasilnya
 
@@ -160,19 +186,13 @@ Unit test dapat dijalankan tanpa server database. Integration test menyiapkan Po
 
 ## 4. Konfigurasi opsional
 
-Untuk mengubah pengaturan bawaan, salin contoh konfigurasi dari root repositori:
-
-```bash
-cp src/.env.example src/.env
-```
-
-Edit `src/.env`, kemudian jalankan kembali `./run.sh`. Launcher memuat file ini secara otomatis.
+Untuk mengubah pengaturan bawaan, buat file `src/.env`, lalu jalankan kembali launcher. Kedua launcher memuat file ini secara otomatis. Gunakan satu penugasan `NAMA=nilai` per baris, misalnya `PORT=3001`. Nilai boleh dibungkus tanda kutip tunggal atau ganda; launcher Windows membaca nilai secara literal dan tidak menjalankan ekspresi shell.
 
 | Variabel | Kegunaan |
 | --- | --- |
 | `PORT` | Port website; bawaan `3000`. |
-| `SCHAKKER_STATE_DIR` | Lokasi penyimpanan data lokal; bawaan `.schakker`, relatif terhadap `src/`. |
-| `SCHAKKER_POSTGRES_BIN` | Direktori berisi `postgres`, `initdb`, dan `pg_ctl` jika tidak terdeteksi otomatis. Contoh: `/usr/lib/postgresql/14/bin`. |
+| `SCHAKKER_STATE_DIR` | Lokasi penyimpanan data lokal; path relatif dihitung dari `src/`. Bawaan Linux `.schakker`; bawaan Windows `%LOCALAPPDATA%\Schakker\<id-proyek>`. |
+| `SCHAKKER_POSTGRES_BIN` | Direktori berisi `postgres`, `initdb`, dan `pg_ctl` (`.exe` pada Windows) jika tidak terdeteksi otomatis. Contoh: `/usr/lib/postgresql/14/bin` atau `C:\Program Files\PostgreSQL\18\bin`. |
 | `SCHAKKER_MARIADB_BIN` | Direktori instalasi tools MariaDB jika tidak terdeteksi otomatis. Contoh: `/usr/sbin` atau `/opt/mariadb/bin`. Launcher juga mencari installer pada direktori `bin`, `sbin`, dan `scripts` di instalasi yang sama. |
 | `SCHAKKER_DATABASE_URL` | Koneksi PostgreSQL internal website yang sudah tersedia. Jika dikosongkan, aplikasi menyiapkan database lokal. Database dengan koneksi khusus harus sudah ada; skema dibuat otomatis jika kosong. |
 | `SCHAKKER_MASTER_KEY` | Kunci 32 byte dalam format hex atau Base64. Jika dikosongkan pada mode pengembangan, aplikasi membuat dan menyimpannya otomatis. |

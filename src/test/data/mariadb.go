@@ -3,7 +3,6 @@ package data
 import (
 	"context"
 	"crypto/rand"
-	"crypto/sha256"
 	"database/sql"
 	_ "embed"
 	"encoding/hex"
@@ -13,15 +12,11 @@ import (
 	"net"
 	"os"
 	"os/exec"
-	"os/user"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
-	"github.com/go-sql-driver/mysql"
 	"tubes1_wbd/backend/access"
 	"tubes1_wbd/backend/dbmanagement"
 	"tubes1_wbd/database/dao"
@@ -36,99 +31,23 @@ type MariaDB struct {
 	Directory, Socket, DatabaseName string
 	Port                            int
 	password, admin, id             string
+	adminPassword                   string
 	command                         *exec.Cmd
 	stopped                         chan struct{}
 	once                            sync.Once
 }
 
-func openMariaDB(ctx context.Context, directory string) (*MariaDB, error) {
-	server, installer, err := mariaDBBinaries()
-	if err != nil {
-		return nil, err
-	}
-	owner, err := user.Current()
-	if err != nil {
-		return nil, err
-	}
-	directory, err = filepath.Abs(directory)
-	if err != nil {
-		return nil, err
-	}
-	if err := os.MkdirAll(directory, 0700); err != nil {
-		return nil, err
-	}
-	if err := os.Chmod(directory, 0700); err != nil {
-		return nil, err
-	}
-	sum := sha256.Sum256([]byte(directory))
-	id := hex.EncodeToString(sum[:6])
-	socketDirectory := filepath.Join(directory, "socket")
-	if len(socketDirectory) > 80 {
-		socketDirectory = filepath.Join(os.TempDir(), "schakker-maria-"+strconv.Itoa(os.Getuid())+"-"+id)
-	}
-	if err := os.MkdirAll(socketDirectory, 0700); err != nil {
-		return nil, err
-	}
-	if err := os.Chmod(socketDirectory, 0700); err != nil {
-		return nil, err
-	}
-	m := &MariaDB{Directory: directory, Socket: filepath.Join(socketDirectory, "server.sock"), DatabaseName: MariaDBName + "_" + id, admin: owner.Username, id: id}
-	m.Port, err = mariaDBPort(directory)
-	if err != nil {
-		return nil, err
-	}
-	dataDirectory := filepath.Join(directory, "data")
-	m.password, err = mariaDBPassword(directory, dataDirectory)
-	if err != nil {
-		return nil, err
-	}
-	basedir := filepath.Dir(filepath.Dir(server))
-	if _, err := os.Stat(filepath.Join(dataDirectory, "mysql")); errors.Is(err, os.ErrNotExist) {
-		if _, err := os.Stat(dataDirectory); !errors.Is(err, os.ErrNotExist) {
-			return nil, errors.New("mock MariaDB data directory is incomplete; inspect it before starting")
-		}
-		staging, err := os.MkdirTemp(directory, "init-")
-		if err != nil {
-			return nil, err
-		}
-		defer os.RemoveAll(staging)
-		command := exec.CommandContext(ctx, installer, "--no-defaults", "--basedir="+basedir, "--datadir="+staging, "--auth-root-authentication-method=socket", "--auth-root-socket-user="+owner.Username, "--skip-test-db", "--skip-name-resolve", "--innodb-buffer-pool-size=32M", "--innodb-log-file-size=8M")
-		output, err := command.CombinedOutput()
-		log := filepath.Join(directory, "init.log")
-		if writeErr := os.WriteFile(log, output, 0600); writeErr != nil {
-			return nil, writeErr
-		}
-		if err != nil {
-			return nil, fmt.Errorf("mock MariaDB initialization failed; inspect %s", log)
-		}
-		if err := os.Rename(staging, dataDirectory); err != nil {
-			return nil, err
-		}
-	} else if err != nil {
-		return nil, err
-	}
-	admin, err := m.openAdmin()
-	if err != nil {
-		return nil, err
-	}
-	defer admin.Close()
-	if err := admin.PingContext(ctx); err != nil {
-		if err := m.start(ctx, server, basedir, dataDirectory, admin); err != nil {
-			m.Close()
-			return nil, err
-		}
-	}
-	fail := func(err error) (*MariaDB, error) { m.Close(); return nil, err }
+func (m *MariaDB) prepare(ctx context.Context, admin *sql.DB, dataDirectory string) error {
 	var actualDirectory, version string
 	if err := admin.QueryRowContext(ctx, `SELECT @@datadir,VERSION()`).Scan(&actualDirectory, &version); err != nil {
-		return fail(err)
+		return err
 	}
-	if filepath.Clean(actualDirectory) != dataDirectory || !strings.Contains(strings.ToLower(version), "mariadb") {
-		return fail(errors.New("mock MariaDB socket belongs to a different database instance"))
+	if !sameMariaDBDirectory(actualDirectory, dataDirectory) || !strings.Contains(strings.ToLower(version), "mariadb") {
+		return errors.New("mock MariaDB connection belongs to a different database instance")
 	}
 	connection, err := admin.Conn(ctx)
 	if err != nil {
-		return fail(err)
+		return err
 	}
 	defer connection.Close()
 	queries := []string{
@@ -139,35 +58,21 @@ func openMariaDB(ctx context.Context, directory string) (*MariaDB, error) {
 	}
 	for _, query := range queries {
 		if _, err := connection.ExecContext(ctx, query); err != nil {
-			return fail(errors.New("mock MariaDB database or managed account could not be prepared"))
+			return errors.New("mock MariaDB database or managed account could not be prepared")
 		}
 	}
-	seeded := filepath.Join(directory, ".seeded")
+	seeded := filepath.Join(m.Directory, ".seeded")
 	if _, err := os.Stat(seeded); errors.Is(err, os.ErrNotExist) {
 		if _, err := connection.ExecContext(ctx, mariaDBSQL); err != nil {
-			return fail(err)
+			return err
 		}
 		if err := os.WriteFile(seeded, []byte("schakker-mariadb-fixture-v1\n"), 0600); err != nil {
-			return fail(err)
+			return err
 		}
 	} else if err != nil {
-		return fail(err)
+		return err
 	}
-	return m, nil
-}
-
-func (m *MariaDB) openAdmin() (*sql.DB, error) {
-	config := mysql.NewConfig()
-	config.Net, config.Addr, config.User = "unix", m.Socket, m.admin
-	config.Timeout, config.ReadTimeout, config.WriteTimeout = time.Second, 5*time.Second, 5*time.Second
-	config.MultiStatements = true
-	connector, err := mysql.NewConnector(config)
-	if err != nil {
-		return nil, err
-	}
-	db := sql.OpenDB(connector)
-	db.SetMaxOpenConns(1)
-	return db, nil
+	return nil
 }
 
 func (m *MariaDB) start(ctx context.Context, server, basedir, dataDirectory string, admin *sql.DB) error {
@@ -176,9 +81,8 @@ func (m *MariaDB) start(ctx context.Context, server, basedir, dataDirectory stri
 	if err != nil {
 		return err
 	}
-	command := exec.Command(server, "--no-defaults", "--basedir="+basedir, "--datadir="+dataDirectory, "--socket="+m.Socket, "--pid-file="+filepath.Join(m.Directory, "server.pid"), "--port="+strconv.Itoa(m.Port), "--bind-address=127.0.0.1", "--skip-name-resolve", "--max-connections=20", "--innodb-buffer-pool-size=32M", "--innodb-log-file-size=8M", "--performance-schema=OFF", "--log-error="+logPath)
+	command := m.serverCommand(server, basedir, dataDirectory, logPath)
 	command.Stdout, command.Stderr = log, log
-	command.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	if err := command.Start(); err != nil {
 		log.Close()
 		return err
@@ -208,7 +112,7 @@ func (m *MariaDB) Close() {
 		if m.command == nil {
 			return
 		}
-		_ = m.command.Process.Signal(syscall.SIGTERM)
+		m.stopProcess()
 		select {
 		case <-m.stopped:
 		case <-time.After(20 * time.Second):
@@ -227,11 +131,15 @@ func (m *MariaDB) AttachManaged(ctx context.Context, store *dao.Store, auth *acc
 }
 
 func mariaDBPassword(directory, dataDirectory string) (string, error) {
-	filename := filepath.Join(directory, "managed.key")
+	return mariaDBSecret(directory, dataDirectory, "managed.key")
+}
+
+func mariaDBSecret(directory, dataDirectory, name string) (string, error) {
+	filename := filepath.Join(directory, name)
 	password, err := os.ReadFile(filename)
 	if errors.Is(err, os.ErrNotExist) {
 		if _, err := os.Stat(dataDirectory); !errors.Is(err, os.ErrNotExist) {
-			return "", errors.New("mock MariaDB credentials are missing; restore mariadb/managed.key")
+			return "", fmt.Errorf("mock MariaDB credentials are missing; restore mariadb/%s", name)
 		}
 		generated := make([]byte, 32)
 		if _, err := rand.Read(generated); err != nil {
@@ -275,31 +183,7 @@ func mariaDBPort(directory string) (int, error) {
 	return settings.Port, nil
 }
 
-func mariaDBBinaries() (string, string, error) {
-	directories := []string{"/usr/sbin", "/usr/bin", "/usr/local/sbin", "/usr/local/bin"}
-	if configured := os.Getenv("SCHAKKER_MARIADB_BIN"); configured != "" {
-		directories = []string{configured, filepath.Join(configured, "..", "bin"), filepath.Join(configured, "..", "sbin"), filepath.Join(configured, "..", "scripts")}
-	} else {
-		directories = append(filepath.SplitList(os.Getenv("PATH")), directories...)
-	}
-	find := func(names ...string) string {
-		for _, directory := range directories {
-			for _, name := range names {
-				path := filepath.Join(directory, name)
-				info, err := os.Stat(path)
-				if err == nil && !info.IsDir() && info.Mode()&0111 != 0 {
-					resolved, err := filepath.EvalSymlinks(path)
-					if err == nil {
-						return resolved
-					}
-				}
-			}
-		}
-		return ""
-	}
-	server, installer := find("mariadbd"), find("mariadb-install-db", "mysql_install_db")
-	if server == "" || installer == "" {
-		return "", "", errors.New("install MariaDB server tools (mariadbd and mariadb-install-db), or set SCHAKKER_MARIADB_BIN to their bin directory to use the mock MariaDB database")
-	}
-	return server, installer, nil
+func MariaDBAvailable() bool {
+	_, _, err := mariaDBBinaries()
+	return err == nil
 }
