@@ -46,6 +46,8 @@ func (app *application) loadPage(r *http.Request, data *pageData) error {
 		return nil
 	case "/explorer":
 		return app.loadExplorer(r, data)
+	case "/sql-viewer":
+		return app.loadSQLViewer(r, data)
 	case "/migrations", "/migrations/new":
 		return app.loadMigrations(r, data)
 	}

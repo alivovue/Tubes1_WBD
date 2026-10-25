@@ -21,6 +21,9 @@ func (app *application) action(w http.ResponseWriter, r *http.Request, data *pag
 	if strings.HasPrefix(r.URL.Path, "/admin/") {
 		return app.adminAction(w, r, data)
 	}
+	if r.URL.Path == "/sql-viewer" {
+		return false, app.sqlViewerAction(r, data)
+	}
 	if r.URL.Path != "/migrations/new" && r.URL.Path != "/migrations" {
 		return false, access.ErrInvalid
 	}

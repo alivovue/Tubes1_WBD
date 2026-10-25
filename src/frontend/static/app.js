@@ -252,6 +252,56 @@ function setupVisualBuilder() {
   addColumn(); addPair("values"); addPair("where"); refreshFields(); render();
 }
 
+function setupSQLViewer() {
+  const form = one("[data-viewer-form]");
+  if (!form) return;
+  const sql = one("[data-viewer-sql]", form);
+  const results = one("[data-viewer-results]");
+  sql.addEventListener("input", () => {
+    const notice = one("[data-viewer-result-stale]", results || document);
+    if (notice) notice.hidden = false;
+  });
+  sql.addEventListener("keydown", (event) => {
+    if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+      event.preventDefault();
+      form.requestSubmit(one("[data-viewer-run]", form));
+    }
+  });
+  const filters = one("[data-read-filters]", form);
+  if (!filters) return;
+  const columns = JSON.parse(filters.dataset.columns || "[]");
+  const makeSelect = (name, label, options, value) => {
+    const field = document.createElement("label"); field.className = "field";
+    const caption = document.createElement("span"); caption.textContent = label;
+    const select = document.createElement("select"); select.name = name;
+    options.forEach(([key, text]) => { const option = document.createElement("option"); option.value = key; option.textContent = text; select.append(option); });
+    select.value = value; field.append(caption, select);
+    return { field, select };
+  };
+  const addFilter = (initial = {}) => {
+    if (filters.children.length >= 20) return;
+    const row = document.createElement("div"); row.className = "viewer-filter-row";
+    const column = makeSelect("filter_column", "Column", [["", "Choose column"], ...columns.map((c) => [c.Name, c.Name])], initial.Column || "");
+    const operator = makeSelect("filter_operator", "Operator", ["=", "!=", "<", "<=", ">", ">=", "LIKE", "NOT LIKE", "IS NULL", "IS NOT NULL"].map((op) => [op, op]), initial.Operator || "=");
+    const type = makeSelect("filter_type", "Value type", [["text", "Text"], ["number", "Number"], ["boolean", "Boolean (true/false)"]], initial.Type || "text");
+    const valueField = document.createElement("label"); valueField.className = "field";
+    const caption = document.createElement("span"); caption.textContent = "Value";
+    const input = document.createElement("input"); input.name = "filter_value"; input.value = initial.Value || ""; input.maxLength = 8192;
+    valueField.append(caption, input);
+    const remove = document.createElement("button"); remove.type = "button"; remove.className = "button button--secondary button--small"; remove.textContent = "Remove";
+    remove.addEventListener("click", () => row.remove());
+    const update = () => {
+      const nullCheck = operator.select.value === "IS NULL" || operator.select.value === "IS NOT NULL";
+      input.readOnly = nullCheck; type.select.setAttribute("aria-disabled", String(nullCheck));
+      input.placeholder = nullCheck ? "No value needed" : type.select.value === "boolean" ? "true or false" : "Filter value";
+    };
+    operator.select.addEventListener("change", update); type.select.addEventListener("change", update);
+    row.append(column.field, operator.field, type.field, valueField, remove); filters.append(row); update();
+  };
+  (JSON.parse(filters.dataset.filters || "null") || []).forEach(addFilter);
+  one("[data-read-filter-add]", form)?.addEventListener("click", () => addFilter());
+}
+
 function setupForms() {
   all("[data-confirm]").forEach((form) => form.addEventListener("submit", (event) => { if (!window.confirm(form.dataset.confirm)) event.preventDefault(); }));
   all(".permission-select").forEach((select) => {
@@ -269,4 +319,5 @@ setupSearch();
 setupTabs();
 setupMigration();
 setupVisualBuilder();
+setupSQLViewer();
 setupForms();

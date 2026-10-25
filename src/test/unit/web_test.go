@@ -26,7 +26,7 @@ func newWebHandler(t *testing.T, production bool) http.Handler {
 }
 func TestWebRequiresSessionForProtectedPages(t *testing.T) {
 	handler := newWebHandler(t, false)
-	for _, route := range []string{"/dashboard", "/databases", "/explorer", "/migrations", "/migrations/new", "/admin/users", "/admin/groups", "/admin/access", "/admin/connections"} {
+	for _, route := range []string{"/dashboard", "/databases", "/explorer", "/sql-viewer", "/migrations", "/migrations/new", "/admin/users", "/admin/groups", "/admin/access", "/admin/connections"} {
 		response := httptest.NewRecorder()
 		handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, route, nil))
 		if response.Code != http.StatusSeeOther || response.Header().Get("Location") != "/login" {

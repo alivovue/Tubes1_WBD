@@ -20,6 +20,9 @@
     <a class="nav-item{{if eq .Active "databases"}} is-active{{end}}" href="/databases"{{if eq .Active "databases"}} aria-current="page"{{end}}>
       <svg><use href="#icon-database"></use></svg><span>My Databases</span>
     </a>
+    <a class="nav-item{{if eq .Active "sql-viewer"}} is-active{{end}}" href="/sql-viewer"{{if eq .Active "sql-viewer"}} aria-current="page"{{end}}>
+      <svg><use href="#icon-code"></use></svg><span>SQL Viewer</span>
+    </a>
     <a class="nav-item{{if eq .Active "migration-editor"}} is-active{{end}}" href="/migrations/new"{{if eq .Active "migration-editor"}} aria-current="page"{{end}}>
       <svg><use href="#icon-code"></use></svg><span>SQL Migration</span>
     </a>

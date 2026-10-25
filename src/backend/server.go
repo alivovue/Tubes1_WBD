@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -30,6 +31,7 @@ var pages = map[string]page{
 	"/dashboard":         {"dashboard.gohtml", "app_layout", "Dashboard", "dashboard", "Overview"},
 	"/databases":         {"databases.gohtml", "app_layout", "My Databases", "databases", "Workspace"},
 	"/explorer":          {"explorer.gohtml", "app_layout", "Database Explorer", "databases", "Workspace"},
+	"/sql-viewer":        {"sql_viewer.gohtml", "app_layout", "SQL Viewer", "sql-viewer", "Workspace"},
 	"/migrations/new":    {"migration_editor.gohtml", "app_layout", "SQL Migration", "migration-editor", "Workspace"},
 	"/migrations":        {"migration_history.gohtml", "app_layout", "Changelog", "migration-history", "Workspace"},
 	"/admin/users":       {"admin_users.gohtml", "app_layout", "Employees", "admin-users", "Administration"},
@@ -103,6 +105,8 @@ type pageData struct {
 	DraftUpdated, Description, SQL, OperationsJSON string
 	Review                                         *migration.Analysis
 	ReviewJSON                                     string
+	ViewerResult                                   *dbmanagement.ReadResult
+	ViewerSpec                                     dbmanagement.ReadQuerySpec
 }
 
 func NewHandler(root string) (http.Handler, error) {
@@ -171,11 +175,12 @@ func loadTemplates(root string) (map[string]*template.Template, error) {
 			}
 			return string(s)
 		},
-		"stamp":  func(t time.Time) string { return t.Format("02 Jan 2006 15:04 MST") },
-		"rfc":    func(t time.Time) string { return t.Format(time.RFC3339Nano) },
-		"json":   func(v any) string { b, _ := json.Marshal(v); return string(b) },
-		"pretty": func(v any) string { b, _ := json.MarshalIndent(v, "", "  "); return string(b) },
+		"stamp":          func(t time.Time) string { return t.Format("02 Jan 2006 15:04 MST") },
+		"rfc":            func(t time.Time) string { return t.Format(time.RFC3339Nano) },
+		"json":           func(v any) string { b, _ := json.Marshal(v); return string(b) },
+		"pretty":         func(v any) string { b, _ := json.MarshalIndent(v, "", "  "); return string(b) },
 		"schemaDiffView": BuildSchemaDiffView,
+		"hasString":      slices.Contains[[]string, string],
 		"cell": func(v any) string {
 			if v == nil {
 				return "NULL"
@@ -366,10 +371,16 @@ func userError(err error) (string, int) {
 		return "Migration failed. Check its changelog entry for the outcome and completed statements.", 400
 	case errors.Is(err, diff.ErrNoChanges):
 		return "The change set has no schema or data changes.", 400
+	case errors.Is(err, dbmanagement.ErrReadOnly):
+		return "SQL Viewer accepts one read-only SELECT query, including read-only CTEs and supported built-in functions. Writes, locking reads, output files and custom functions are not allowed.", 400
+	case errors.Is(err, dbmanagement.ErrViewerResultSize):
+		return "The result is too large. Select fewer columns, add a filter, or lower the LIMIT.", 400
+	case errors.Is(err, dbmanagement.ErrViewerQuery):
+		return "The read query failed. Check SQL syntax, table and column names, and database permissions, or simplify the query if it timed out.", 400
 	case errors.Is(err, dbmanagement.ErrUnsupported):
 		return "This operation is not supported for the selected database or schema.", 400
 	case errors.Is(err, access.ErrInvalid):
-		return "Check the supplied values and required fields. SQL must contain supported migration statements.", 400
+		return "Check the supplied values and required fields.", 400
 	case errors.Is(err, dbmanagement.ErrConnection):
 		return "Cannot connect to the target database. Check its settings and availability.", 502
 	case errors.Is(err, dbmanagement.ErrQuery):

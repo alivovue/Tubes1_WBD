@@ -1485,3 +1485,18 @@ summary { cursor: pointer; color: var(--text-muted, #a4aec0); padding: 10px 0; }
 
 .tabs { overflow-y: hidden; }
 .editor-fields { grid-template-columns: 1fr; }
+
+.viewer-object-picker { flex-wrap: wrap; }
+.viewer-object-picker form { display: flex; align-items: end; gap: 12px; flex: 1; min-width: 260px; }
+.viewer-object-picker .field { flex: 1; }
+.viewer-guide p { margin: 0 0 16px; }
+.viewer-builder, .viewer-results { margin-top: 24px; }
+.viewer-columns { margin: 0; padding: 16px; border: 1px solid var(--border, #283146); border-radius: 10px; }
+.viewer-columns legend { padding: 0 6px; color: var(--text-muted); font-size: 12px; }
+.viewer-columns > div { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+.viewer-filter-row { display: grid; grid-template-columns: minmax(120px, 1fr) 110px minmax(110px, 1fr) minmax(140px, 1.5fr) auto; align-items: end; gap: 12px; margin-bottom: 14px; }
+.viewer-result-type { display: block; margin-top: 4px; color: var(--text-muted); font-size: 10px; font-weight: 400; }
+.viewer-results .table-wrap { max-height: 560px; overflow: auto; }
+.viewer-results .notice { margin: 16px; }
+@media (max-width: 1000px) { .viewer-filter-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 600px) { .viewer-object-picker form { flex-wrap: wrap; min-width: 0; } .viewer-filter-row { grid-template-columns: 1fr; } }
