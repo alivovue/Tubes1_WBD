@@ -253,6 +253,10 @@ func Compare(current, desired Snapshot) (Result, error) {
 	if copyErr != nil {
 		return Result{}, copyErr
 	}
+	currentState, copyErr := clone(current)
+	if copyErr != nil {
+		return Result{}, copyErr
+	}
 	if dbms == "mariadb" {
 		for i := range desired.Tables {
 			for j := range desired.Tables[i].Constraints {
@@ -296,7 +300,7 @@ func Compare(current, desired Snapshot) (Result, error) {
 	if err := validate(desired, after); err != nil {
 		return Result{}, err
 	}
-	result := Result{DBMS: dbms, Changes: []Change{}, Statements: []string{}, DataChanges: []DataChange{}, Desired: desired}
+	result := Result{DBMS: dbms, Changes: []Change{}, Statements: []string{}, DataChanges: []DataChange{}, Current: currentState, Desired: desired}
 	phases := make([][]string, 11)
 	add := func(phase int, sql string) { phases[phase] = append(phases[phase], sql) }
 	change := func(kind string, t adapters.Table, name string, old, new any, destructive bool) {

@@ -35,6 +35,7 @@ type Result struct {
 	Statements  []string
 	DataChanges []DataChange
 	Destructive bool
+	Current     Snapshot `json:"-"`
 	Desired     Snapshot
 }
 type Operation struct {

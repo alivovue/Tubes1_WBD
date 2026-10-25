@@ -175,6 +175,7 @@ func loadTemplates(root string) (map[string]*template.Template, error) {
 		"rfc":    func(t time.Time) string { return t.Format(time.RFC3339Nano) },
 		"json":   func(v any) string { b, _ := json.Marshal(v); return string(b) },
 		"pretty": func(v any) string { b, _ := json.MarshalIndent(v, "", "  "); return string(b) },
+		"schemaDiffView": BuildSchemaDiffView,
 		"cell": func(v any) string {
 			if v == nil {
 				return "NULL"

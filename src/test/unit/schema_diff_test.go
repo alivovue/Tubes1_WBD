@@ -72,6 +72,9 @@ func TestSchemaDiffComparesActualStatesWithoutMutatingInputs(t *testing.T) {
 			if !hasChange(result, "add_column") || !strings.Contains(result.SQL, "ADD COLUMN") || len(result.DataChanges) != 0 {
 				t.Fatalf("real column difference missing: %#v", result)
 			}
+			if !reflect.DeepEqual(result.Current, before) || len(result.Desired.Tables) != len(desiredBefore.Tables) {
+				t.Fatal("comparison result does not retain the complete before and after schema states")
+			}
 			if !reflect.DeepEqual(current, before) || !reflect.DeepEqual(desired, desiredBefore) {
 				t.Fatal("comparison mutated caller schema states")
 			}

@@ -8,3 +8,5 @@ node_modules/
 /src/.schakker/
 /src/test/output/*
 !/src/test/output/.gitkeep
+/src/frontend/public/
+/.gitattributes
