@@ -101,16 +101,12 @@ func (s *Service) Authenticate(ctx context.Context, raw string) (Identity, strin
 			return ErrUnauthenticated
 		}
 		if token.ReplacedAt == nil && !now.Before(token.IssuedAt.Add(s.config.RotationInterval)) {
-			replacement, err = randomToken()
-			if err != nil {
-				return err
-			}
-			if err := tx.ReplaceSessionToken(ctx, tokenHash(raw), now, minTime(now.Add(s.config.GracePeriod), session.AbsoluteExpires)); err != nil {
-				return err
-			}
-			if err := tx.InsertSessionToken(ctx, session.ID, tokenHash(replacement), now); err != nil {
-				return err
-			}
+			replacement, err = s.rotateSession(ctx, tx, session, tokenHash(raw), now)
+		} else if token.ReplacedAt != nil {
+			replacement, err = s.replacementForGraceToken(ctx, tx, session.ID, tokenHash(raw), now)
+		}
+		if err != nil {
+			return err
 		}
 		if err := tx.TouchSession(ctx, session.ID, now, minTime(now.Add(s.config.IdleTimeout), session.AbsoluteExpires)); err != nil {
 			return err

@@ -36,6 +36,9 @@ func (s *Service) SetMembership(ctx context.Context, actor, user, group int64, m
 		if err := tx.SetMembership(ctx, user, group, member); err != nil {
 			return err
 		}
+		if member {
+			return s.rotateUserSessions(ctx, tx, user)
+		}
 		return tx.RevokeUserSessions(ctx, user, s.config.Now())
 	})
 }
@@ -45,8 +48,18 @@ func (s *Service) SetGrant(ctx context.Context, actor, group, database int64, pe
 		return ErrInvalid
 	}
 	return s.adminChange(ctx, actor, func(tx *dao.Store) error {
+		previous, err := tx.GroupPermission(ctx, group, database)
+		if err != nil {
+			return err
+		}
 		if err := tx.SetGrant(ctx, actor, group, database, permission); err != nil {
 			return err
+		}
+		if permissionIncreased(previous, permission) {
+			return s.rotateGroupSessions(ctx, tx, group)
+		}
+		if previous == permission {
+			return nil
 		}
 		return tx.RevokeGroupSessions(ctx, group, s.config.Now())
 	})

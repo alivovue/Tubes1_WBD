@@ -31,8 +31,48 @@ func (d *Store) SessionToken(ctx context.Context, hash []byte) (SessionToken, er
 	return token, classify(err)
 }
 
+func (d *Store) SessionTokenForSession(ctx context.Context, sessionID string, hash []byte) (SessionToken, error) {
+	var token SessionToken
+	err := d.q.QueryRowContext(ctx, `SELECT issued_at,replaced_at,grace_expires_at FROM session_tokens WHERE session_id=$1 AND token_hash=$2`, sessionID, hash).Scan(&token.IssuedAt, &token.ReplacedAt, &token.GraceExpiresAt)
+	return token, classify(err)
+}
+
+func (d *Store) CurrentSessionTokenHash(ctx context.Context, sessionID string) ([]byte, error) {
+	var hash []byte
+	err := d.q.QueryRowContext(ctx, `SELECT token_hash FROM session_tokens WHERE session_id=$1 AND replaced_at IS NULL`, sessionID).Scan(&hash)
+	return hash, classify(err)
+}
+
+func (d *Store) LockUserSessions(ctx context.Context, user int64, now time.Time) ([]Session, error) {
+	return d.lockActiveSessions(ctx, `user_id=$1`, user, now)
+}
+
+func (d *Store) LockGroupSessions(ctx context.Context, group int64, now time.Time) ([]Session, error) {
+	return d.lockActiveSessions(ctx, `user_id IN (SELECT user_id FROM user_groups WHERE group_id=$1)`, group, now)
+}
+
+func (d *Store) lockActiveSessions(ctx context.Context, predicate string, id int64, now time.Time) ([]Session, error) {
+	if !d.inTx {
+		return nil, ErrInvalid
+	}
+	rows, err := d.q.QueryContext(ctx, `SELECT id,user_id,idle_expires_at,absolute_expires_at,revoked_at IS NOT NULL FROM sessions WHERE revoked_at IS NULL AND idle_expires_at>$2 AND absolute_expires_at>$2 AND `+predicate+` ORDER BY id FOR UPDATE`, id, now)
+	if err != nil {
+		return nil, classify(err)
+	}
+	defer rows.Close()
+	sessions := make([]Session, 0)
+	for rows.Next() {
+		var session Session
+		if err := rows.Scan(&session.ID, &session.UserID, &session.IdleExpires, &session.AbsoluteExpires, &session.Revoked); err != nil {
+			return nil, classify(err)
+		}
+		sessions = append(sessions, session)
+	}
+	return sessions, classify(rows.Err())
+}
+
 func (d *Store) ReplaceSessionToken(ctx context.Context, hash []byte, now, grace time.Time) error {
-	return affected(d.q.ExecContext(ctx, `UPDATE session_tokens SET replaced_at=$2,grace_expires_at=$3 WHERE token_hash=$1`, hash, now, grace))
+	return affected(d.q.ExecContext(ctx, `UPDATE session_tokens SET replaced_at=$2,grace_expires_at=$3 WHERE token_hash=$1 AND replaced_at IS NULL`, hash, now, grace))
 }
 
 func (d *Store) TouchSession(ctx context.Context, id string, now, idle time.Time) error {

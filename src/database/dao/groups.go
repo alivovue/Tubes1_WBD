@@ -2,6 +2,12 @@ package dao
 
 import "context"
 
+func (d *Store) GroupPermission(ctx context.Context, group, database int64) (Permission, error) {
+	var permission Permission
+	err := d.q.QueryRowContext(ctx, `SELECT COALESCE((SELECT access_level FROM group_database_permissions WHERE group_id=$1 AND database_id=$2),'')`, group, database).Scan(&permission)
+	return permission, classify(err)
+}
+
 func (d *Store) SaveGroup(ctx context.Context, id int64, name, description string) error {
 	if id == 0 {
 		_, err := d.q.ExecContext(ctx, `INSERT INTO access_groups(name,description) VALUES($1,$2)`, name, description)

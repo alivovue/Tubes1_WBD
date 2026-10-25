@@ -1,6 +1,6 @@
 {{define "content"}}
 <section class="page-heading"><div><p class="eyebrow">Administration</p><h1>Employees</h1><p>Kelola akun, peran platform, dan status karyawan.</p></div><a class="button button--secondary" href="/admin/groups">Manage memberships</a></section>
-<section class="panel"><header class="panel__header"><div><h2>Add employee</h2><p>Passwords must contain 12–72 bytes. Changing passwords, roles or active status revokes sessions.</p></div></header>
+<section class="panel"><header class="panel__header"><div><h2>Add employee</h2><p>Passwords must contain 12–72 bytes. Promotions rotate session tokens. Password changes, demotions and deactivation revoke sessions.</p></div></header>
 <form class="form-stack integration-form" method="post" action="/admin/users">
  <input type="hidden" name="csrf" value="{{.CSRF}}" /><input type="hidden" name="action" value="create_user" />
  <div class="form-grid"><label class="field"><span>Username</span><input name="username" required minlength="3" maxlength="100" autocomplete="off" /></label><label class="field"><span>Display name</span><input name="display" required maxlength="150" /></label><label class="field"><span>Initial password</span><input type="password" name="password" required minlength="12" maxlength="72" autocomplete="new-password" /></label></div>

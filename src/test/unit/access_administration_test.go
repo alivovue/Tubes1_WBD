@@ -81,14 +81,14 @@ func TestLastActiveAdminCannotBeDemotedOrDisabled(t *testing.T) {
 		})
 	}
 }
-func TestUserSecurityChangesRevokeSessions(t *testing.T) {
+func TestUserSecurityChangesRotateOrRevokeSessions(t *testing.T) {
 	for _, tc := range []struct {
 		name          string
 		admin, active bool
 		password      string
 		revoke        bool
 	}{
-		{"display change only", false, true, "", false}, {"role increase", true, true, "", true}, {"account disable", false, false, "", true}, {"password change", false, true, testPassword, true},
+		{"display change only", false, true, "", false}, {"role increase", true, true, "", false}, {"account disable", false, false, "", true}, {"password change", false, true, testPassword, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			update := execStep("UPDATE users SET display_name=")
@@ -106,6 +106,8 @@ func TestUserSecurityChangesRevokeSessions(t *testing.T) {
 			steps := append(transactionSteps(true), userStep(false, true), update)
 			if tc.revoke {
 				steps = append(steps, execStep("UPDATE sessions SET revoked_at="))
+			} else if tc.admin {
+				steps = append(steps, queryStep("FROM sessions WHERE", []string{"id", "user", "idle", "absolute", "revoked"}))
 			}
 			steps = append(steps, sqlStep{kind: "commit"})
 			_, store, _ := newSQLStub(t, steps...)
@@ -116,14 +118,20 @@ func TestUserSecurityChangesRevokeSessions(t *testing.T) {
 		})
 	}
 }
-func TestMembershipChangesRevokeAffectedSessions(t *testing.T) {
+func TestMembershipChangesRotateOrRevokeAffectedSessions(t *testing.T) {
 	for _, member := range []bool{true, false} {
 		t.Run(debugBool(member), func(t *testing.T) {
 			mutation := execStep("DELETE FROM user_groups")
 			if member {
 				mutation = execStep("INSERT INTO user_groups")
 			}
-			steps := append(transactionSteps(true), scalarStep("CROSS JOIN access_groups", true), mutation, execStep("user_id=$1"), sqlStep{kind: "commit"})
+			steps := append(transactionSteps(true), scalarStep("CROSS JOIN access_groups", true), mutation)
+			if member {
+				steps = append(steps, queryStep("FROM sessions WHERE", []string{"id", "user", "idle", "absolute", "revoked"}))
+			} else {
+				steps = append(steps, execStep("user_id=$1"))
+			}
+			steps = append(steps, sqlStep{kind: "commit"})
 			_, store, _ := newSQLStub(t, steps...)
 			service := newAccess(t, store, nil)
 			if err := service.SetMembership(context.Background(), 7, 8, 2, member); err != nil {
@@ -132,14 +140,24 @@ func TestMembershipChangesRevokeAffectedSessions(t *testing.T) {
 		})
 	}
 }
-func TestGroupGrantChangesRevokeAffectedSessions(t *testing.T) {
+func TestGroupGrantChangesRotateOrRevokeAffectedSessions(t *testing.T) {
 	for _, permission := range []access.Permission{access.NoAccess, access.ViewOnly, access.ViewEdit} {
 		t.Run(string(permission), func(t *testing.T) {
 			mutation := execStep("INSERT INTO group_database_permissions")
 			if permission == access.NoAccess {
 				mutation = execStep("DELETE FROM group_database_permissions")
 			}
-			steps := append(transactionSteps(true), scalarStep("CROSS JOIN managed_databases", true), mutation, execStep("SELECT user_id FROM user_groups WHERE group_id="), sqlStep{kind: "commit"})
+			previous := access.NoAccess
+			if permission == access.NoAccess {
+				previous = access.ViewEdit
+			}
+			steps := append(transactionSteps(true), scalarStep("SELECT COALESCE((SELECT access_level", string(previous)), scalarStep("CROSS JOIN managed_databases", true), mutation)
+			if permission == access.NoAccess {
+				steps = append(steps, execStep("SELECT user_id FROM user_groups WHERE group_id="))
+			} else {
+				steps = append(steps, queryStep("FROM sessions WHERE", []string{"id", "user", "idle", "absolute", "revoked"}))
+			}
+			steps = append(steps, sqlStep{kind: "commit"})
 			_, store, _ := newSQLStub(t, steps...)
 			service := newAccess(t, store, nil)
 			if err := service.SetGrant(context.Background(), 7, 2, 3, permission); err != nil {

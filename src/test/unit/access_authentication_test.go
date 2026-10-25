@@ -154,6 +154,9 @@ func TestAuthenticationSessionLifecycle(t *testing.T) {
 				}
 				steps = append(steps, replace, insert)
 			}
+			if tc.replaced != nil && !tc.reject {
+				steps = append(steps, queryStep("WHERE session_id=$1 AND token_hash=$2", []string{"issued", "replaced", "grace"}))
+			}
 			if tc.reject {
 				steps = append(steps, sqlStep{kind: "rollback"})
 			} else {

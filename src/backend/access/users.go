@@ -73,8 +73,11 @@ func (s *Service) UpdateUser(ctx context.Context, actor, id int64, display strin
 		if err := tx.UpdateUser(ctx, id, strings.TrimSpace(display), admin, active, hash); err != nil {
 			return err
 		}
-		if previous.IsAdmin != admin || previous.Active != active || hash != "" {
+		if previous.IsAdmin && !admin || previous.Active != active || !active || hash != "" {
 			return tx.RevokeUserSessions(ctx, id, s.config.Now())
+		}
+		if !previous.IsAdmin && admin {
+			return s.rotateUserSessions(ctx, tx, id)
 		}
 		return nil
 	})
