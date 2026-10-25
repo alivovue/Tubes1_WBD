@@ -16,6 +16,7 @@ func Build(current Snapshot, operations []Operation) (Result, error) {
 		return Result{}, err
 	}
 	data := make([]Operation, 0)
+	drops := make([]Operation, 0)
 	for _, op := range operations {
 		position := -1
 		for i, table := range desired.Tables {
@@ -49,6 +50,7 @@ func Build(current Snapshot, operations []Operation) (Result, error) {
 				return Result{}, ErrInvalid
 			}
 			desired.Tables = append(desired.Tables[:position], desired.Tables[position+1:]...)
+			drops = append(drops, op)
 		case "add_column":
 			if position < 0 {
 				return Result{}, ErrInvalid
@@ -94,6 +96,7 @@ func Build(current Snapshot, operations []Operation) (Result, error) {
 			if !found {
 				return Result{}, ErrInvalid
 			}
+			drops = append(drops, op)
 		case "add_index":
 			if position < 0 {
 				return Result{}, ErrInvalid
@@ -122,6 +125,9 @@ func Build(current Snapshot, operations []Operation) (Result, error) {
 		default:
 			return Result{}, ErrUnsupported
 		}
+	}
+	if err := resolveDropDependencies(&desired, drops); err != nil {
+		return Result{}, err
 	}
 	result, err := Compare(current, desired)
 	if err != nil {

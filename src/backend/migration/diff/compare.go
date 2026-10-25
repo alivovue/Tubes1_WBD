@@ -404,6 +404,14 @@ func Compare(current, desired Snapshot) (Result, error) {
 			continue
 		}
 		wanted := constraints(new)
+		removedColumns := false
+		for _, column := range old.Columns {
+			if _, exists := columns(new)[column.Name]; !exists {
+				removedColumns = true
+			}
+		}
+		combineDrops := dbms == "mariadb" && kept && removedColumns
+		dropClauses := make([]string, 0)
 		for _, name := range keys(constraints(old)) {
 			c := constraints(old)[name]
 			if !kept && c.Type != "f" {
@@ -420,7 +428,11 @@ func Compare(current, desired Snapshot) (Result, error) {
 				if c.Type == "f" {
 					phase = 0
 				}
-				add(phase, sql)
+				if combineDrops && phase == 2 {
+					dropClauses = append(dropClauses, strings.TrimPrefix(sql, "ALTER TABLE "+target+" "))
+				} else {
+					add(phase, sql)
+				}
 				if kept && (!exists || !sameConstraint(c, other)) {
 					change("drop_constraint", old.Table, name, c, nil, false)
 				}
@@ -442,7 +454,11 @@ func Compare(current, desired Snapshot) (Result, error) {
 				}
 				if _, kept := constraints(new)[index.ConstraintName]; !kept {
 					indexName, _ := quote(dbms, index.Name)
-					add(1, "DROP INDEX "+indexName+" ON "+target)
+					if combineDrops {
+						dropClauses = append(dropClauses, "DROP INDEX "+indexName)
+					} else {
+						add(1, "DROP INDEX "+indexName+" ON "+target)
+					}
 				}
 			}
 		}
@@ -461,16 +477,27 @@ func Compare(current, desired Snapshot) (Result, error) {
 				qualified, _ := quote(dbms, old.Table.Schema, name)
 				sql = "DROP INDEX " + qualified
 			}
-			add(1, sql)
+			if combineDrops {
+				dropClauses = append(dropClauses, "DROP INDEX "+quoted)
+			} else {
+				add(1, sql)
+			}
 			change("drop_index", old.Table, name, index, nil, false)
 		}
 		a, b := columns(old), columns(new)
 		for _, column := range old.Columns {
 			if _, exists := b[column.Name]; !exists {
 				name, _ := quote(dbms, column.Name)
-				add(5, "ALTER TABLE "+target+" DROP COLUMN "+name)
+				if combineDrops {
+					dropClauses = append(dropClauses, "DROP COLUMN "+name)
+				} else {
+					add(5, "ALTER TABLE "+target+" DROP COLUMN "+name)
+				}
 				change("drop_column", old.Table, column.Name, column, nil, true)
 			}
+		}
+		if len(dropClauses) > 0 {
+			add(5, "ALTER TABLE "+target+" "+strings.Join(dropClauses, ", "))
 		}
 		for _, column := range new.Columns {
 			previous, exists := a[column.Name]

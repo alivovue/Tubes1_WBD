@@ -100,6 +100,12 @@ func (Engine) Assess(ctx context.Context, q adapters.Querier, statements []adapt
 func (Engine) SafeFailure(err error) string {
 	var native *mysql.MySQLError
 	if errors.As(err, &native) {
+		switch native.Number {
+		case 1075:
+			return "An AUTO_INCREMENT column must remain indexed. Keep or replace its key in the same ALTER TABLE statement"
+		case 1553, 1828, 1833:
+			return "A foreign key depends on this column or index. Remove or change the foreign key explicitly before retrying"
+		}
 		return fmt.Sprintf("MariaDB rejected the statement (error %d, SQLSTATE %s)", native.Number, native.SQLState[:])
 	}
 	if errors.Is(err, context.Canceled) {

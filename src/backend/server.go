@@ -374,6 +374,8 @@ func userError(err error) (string, int) {
 		return "The execution outcome needs reconciliation. Check the changelog before retrying.", 409
 	case errors.Is(err, migration.ErrExecution):
 		return "Migration failed. Check its changelog entry for the outcome and completed statements.", 400
+	case errors.Is(err, diff.ErrDependency):
+		return err.Error(), 409
 	case errors.Is(err, diff.ErrNoChanges):
 		return "The change set has no schema or data changes.", 400
 	case errors.Is(err, dbmanagement.ErrReadOnly):

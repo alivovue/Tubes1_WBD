@@ -108,3 +108,18 @@ func TestDAORejectsInvalidExecutionFinalization(t *testing.T) {
 	_, err := store.StartExecution(context.Background(), dao.MigrationExecution{Mode: "unknown"})
 	wantError(t, err, dao.ErrInvalid)
 }
+
+func TestDraftDeletionRollsBackHistoryDetachmentOnFailure(t *testing.T) {
+	_, store, _ := newSQLStub(t,
+		sqlStep{kind: "begin"},
+		scalarStep("FROM migration_drafts WHERE database_id=$1 AND id=$2 FOR UPDATE", int64(4)),
+		execStep("UPDATE migration_executions SET draft_id=NULL WHERE database_id=$1 AND draft_id=$2"),
+		sqlStep{kind: "exec", query: "DELETE FROM migration_drafts", err: &pgconn.PgError{Code: "23503"}},
+		sqlStep{kind: "rollback"})
+	wantError(t, store.DeleteDraft(context.Background(), 3, 4), dao.ErrConflict)
+	_, missing, _ := newSQLStub(t,
+		sqlStep{kind: "begin"},
+		queryStep("FROM migration_drafts WHERE database_id=$1 AND id=$2 FOR UPDATE", []string{"id"}),
+		sqlStep{kind: "rollback"})
+	wantError(t, missing.DeleteDraft(context.Background(), 3, 4), dao.ErrNotFound)
+}

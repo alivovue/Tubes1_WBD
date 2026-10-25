@@ -87,7 +87,16 @@ func (d *Store) UpdateDraft(ctx context.Context, database, id int64, title, quer
 }
 
 func (d *Store) DeleteDraft(ctx context.Context, database, id int64) error {
-	return affected(d.q.ExecContext(ctx, `DELETE FROM migration_drafts WHERE database_id=$1 AND id=$2`, database, id))
+	return d.Transaction(ctx, func(tx *Store) error {
+		var locked int64
+		if err := tx.q.QueryRowContext(ctx, `SELECT id FROM migration_drafts WHERE database_id=$1 AND id=$2 FOR UPDATE`, database, id).Scan(&locked); err != nil {
+			return classify(err)
+		}
+		if _, err := tx.q.ExecContext(ctx, `UPDATE migration_executions SET draft_id=NULL WHERE database_id=$1 AND draft_id=$2`, database, id); err != nil {
+			return classify(err)
+		}
+		return affected(tx.q.ExecContext(ctx, `DELETE FROM migration_drafts WHERE database_id=$1 AND id=$2`, database, id))
+	})
 }
 
 func (d *Store) HasMigrationHistory(ctx context.Context, database int64) (bool, error) {

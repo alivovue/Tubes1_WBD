@@ -99,7 +99,7 @@ func TestDraftOptimisticConflictAndDeletion(t *testing.T) {
 	stub.append(permissionStep(access.ViewEdit), permissionStep(access.ViewEdit), metadataStep(), queryStep("UPDATE migration_drafts SET", []string{"id"}), draftStep("FROM migration_drafts WHERE"))
 	_, err := service.SaveDraft(context.Background(), 7, 3, migration.DraftInput{ID: 4, Title: "A draft", SQL: "SELECT 1", ExpectedUpdatedAt: testTime})
 	wantError(t, err, access.ErrConflict)
-	stub.append(permissionStep(access.ViewEdit), execStep("DELETE FROM migration_drafts"))
+	stub.append(permissionStep(access.ViewEdit), sqlStep{kind: "begin"}, scalarStep("FROM migration_drafts WHERE database_id=$1 AND id=$2 FOR UPDATE", int64(4)), execStep("UPDATE migration_executions SET draft_id=NULL"), execStep("DELETE FROM migration_drafts"), sqlStep{kind: "commit"})
 	if err := service.DeleteDraft(context.Background(), 7, 3, 4); err != nil {
 		t.Fatal(err)
 	}
@@ -166,6 +166,16 @@ func TestMigrationFailuresDoNotLeakDriverDetails(t *testing.T) {
 	mariaMessage := maria.SafeFailure(native)
 	if !strings.Contains(mariaMessage, "1062") || strings.Contains(mariaMessage, "secret") {
 		t.Fatal("MariaDB driver details leaked")
+	}
+	dependency := pg.SafeFailure(&pgconn.PgError{Code: "2BP01", Message: "secret object details"})
+	if !strings.Contains(dependency, "CASCADE") || strings.Contains(dependency, "secret") {
+		t.Fatal("PostgreSQL dependency error did not provide safe CASCADE guidance")
+	}
+	for _, number := range []uint16{1075, 1553, 1828, 1833} {
+		message := maria.SafeFailure(&mysql.MySQLError{Number: number, Message: "secret object details"})
+		if !strings.Contains(message, "key") || strings.Contains(message, "secret") {
+			t.Fatal("MariaDB dependency error did not provide safe key guidance")
+		}
 	}
 	for _, engine := range []engines.Engine{pg, maria} {
 		for _, failure := range []error{context.Canceled, context.DeadlineExceeded, errors.New("password=hidden")} {

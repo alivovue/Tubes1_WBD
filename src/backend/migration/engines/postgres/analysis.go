@@ -54,6 +54,9 @@ func (Engine) Assess(context.Context, adapters.Querier, []adapters.Statement) (s
 func (Engine) SafeFailure(err error) string {
 	var pg *pgconn.PgError
 	if errors.As(err, &pg) {
+		if pg.Code == "2BP01" {
+			return "Other objects depend on the object being changed. Remove those dependencies explicitly, or review a DROP ... CASCADE migration in the SQL editor"
+		}
 		return fmt.Sprintf("PostgreSQL rejected the migration (SQLSTATE %s)", pg.Code)
 	}
 	if errors.Is(err, context.Canceled) {
