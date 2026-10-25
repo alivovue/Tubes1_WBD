@@ -107,6 +107,55 @@ func TestMariaDBReferencesStayWithinSelectedDatabase(t *testing.T) {
 		}
 	}
 }
+
+func TestPostgreSQLMigrationRejectsExecutableLiteralsAndIdentifierBypasses(t *testing.T) {
+	for _, query := range []string{
+		`DO $$ BEGIN DELETE FROM _schakker.migration_receipts; END $$`,
+		`DO $body$ BEGIN EXECUTE 'DELETE FROM ' || quote_ident('_sch' || 'akker') || '.migration_receipts'; END $body$`,
+		`DO 'BEGIN DELETE FROM _schakker.migration_receipts; END'`,
+		`CALL public.erase_receipts()`,
+		`CREATE FUNCTION public.erase_receipts() RETURNS void LANGUAGE sql AS $$DELETE FROM _schakker.migration_receipts$$`,
+		`CREATE OR REPLACE FUNCTION public.erase_receipts() RETURNS void LANGUAGE plpgsql AS $$BEGIN EXECUTE 'DELETE FROM _schakker.migration_receipts'; END$$`,
+		`CREATE PROCEDURE public.erase_receipts() LANGUAGE plpgsql AS $$BEGIN DELETE FROM _schakker.migration_receipts; END$$`,
+		`CREATE TRIGGER erase_receipts AFTER INSERT ON people EXECUTE FUNCTION public.erase_receipts()`,
+		`CREATE RULE erase_receipts AS ON INSERT TO people DO ALSO DELETE FROM _schakker.migration_receipts`,
+		`SELECT "set_config"('search_path','_schakker',false)`,
+		`SELECT "pg_catalog"."set_config"('standard_conforming_strings','off',true)`,
+		`SELECT pg_catalog."set_config"('role','other_user',false)`,
+		`SELECT U&"set\005fconfig"('search_path','_schakker',true)`,
+		`DELETE FROM U&"\005fschakker".migration_receipts`,
+		`DELETE FROM U&"!005fschakker" UESCAPE '!'.migration_receipts`,
+		`SELECT query_to_xml('WITH erased AS (DELETE FROM _schakker.migration_receipts RETURNING *) SELECT * FROM erased',true,false,'')`,
+		`SELECT "dblink_exec"('dbname=target','DELETE FROM _schakker.migration_receipts')`,
+	} {
+		t.Run(query, func(t *testing.T) {
+			_, err := migration.ValidateSQL(query, "postgresql")
+			wantError(t, err, migration.ErrUnsafeSQL)
+			wantError(t, err, adapters.ErrInvalid)
+		})
+	}
+}
+
+func TestPostgreSQLMigrationKeepsExplicitSQLAndLiteralData(t *testing.T) {
+	for _, query := range []string{
+		`CREATE TABLE "People"(id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,note text DEFAULT 'DO; set_config; _schakker')`,
+		`CREATE UNIQUE INDEX people_note_idx ON people(note)`,
+		`CREATE OR REPLACE VIEW people_view AS SELECT id,note FROM people`,
+		`CREATE TEMP TABLE temporary_people(id integer)`,
+		`CREATE MATERIALIZED VIEW people_copy AS SELECT * FROM people`,
+		`CREATE TYPE status AS ENUM ('pending','done')`,
+		`CREATE TABLE preferences("set_config" text)`,
+		`SELECT "set_config" FROM preferences`,
+		`INSERT INTO people(note) VALUES ($text$DO $$ BEGIN DELETE FROM _schakker.migration_receipts; END $$;$text$)`,
+		`INSERT INTO people(note) VALUES (U&'ordinary\0020text')`,
+		`SELECT 'set_config', '_schakker', 'CREATE FUNCTION'`,
+		`UPDATE people SET note=upper(note) WHERE id=1`,
+	} {
+		if _, err := migration.ValidateSQL(query, "postgresql"); err != nil {
+			t.Errorf("explicit SQL or ordinary literal was rejected: %s: %v", query, err)
+		}
+	}
+}
 func TestExplainableStatementClassification(t *testing.T) {
 	statements, err := adapters.ParseSQL("CREATE TABLE people(id integer); INSERT INTO people VALUES(1); UPDATE people SET id=2; DELETE FROM people; SELECT 1", "postgresql")
 	if err != nil {

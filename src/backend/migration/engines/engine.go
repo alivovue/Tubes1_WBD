@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"time"
 
 	"tubes1_wbd/backend/dbmanagement/adapters"
@@ -15,6 +16,8 @@ const Reconcile = "reconcile"
 
 var ErrOutcomeUnknown = errors.New("migration outcome is unconfirmed; reconcile history before retrying")
 var ErrUnsupported = adapters.ErrUnsupported
+var ErrUnsafeSQL = fmt.Errorf("%w: migration SQL uses protected or dynamic operations", adapters.ErrInvalid)
+var ErrProtectedMetadata = errors.New("protected migration metadata changed or could not be verified")
 
 type Receipt struct {
 	Namespace           string

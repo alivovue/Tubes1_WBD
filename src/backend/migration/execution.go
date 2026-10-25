@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -289,6 +290,9 @@ func (s *Service) Execute(ctx context.Context, actor, database int64, input Exec
 		}
 		committed, err := session.Commit(ctx, receipt)
 		if err != nil {
+			if errors.Is(err, engines.ErrProtectedMetadata) {
+				return fail(ErrExecution, engine.SafeFailure(err))
+			}
 			session.Close()
 			cleanup, stop := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
 			defer stop()

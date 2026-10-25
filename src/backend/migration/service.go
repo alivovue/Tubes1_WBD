@@ -26,6 +26,7 @@ var (
 	ErrForbidden           = access.ErrForbidden
 	ErrStale               = errors.New("migration review is stale; analyze the current SQL again")
 	ErrExecution           = errors.New("migration execution failed")
+	ErrUnsafeSQL           = engines.ErrUnsafeSQL
 	ErrOutcomeUnknown      = engines.ErrOutcomeUnknown
 	ErrHistoryPending      = errors.New("migration history requires reconciliation")
 	ErrNonAtomicAcceptance = errors.New("explicit acceptance is required for a non-atomic migration")

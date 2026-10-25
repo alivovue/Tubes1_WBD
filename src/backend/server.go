@@ -374,6 +374,8 @@ func userError(err error) (string, int) {
 		return "The execution outcome needs reconciliation. Check the changelog before retrying.", 409
 	case errors.Is(err, migration.ErrExecution):
 		return "Migration failed. Check its changelog entry for the outcome and completed statements.", 400
+	case errors.Is(err, migration.ErrUnsafeSQL):
+		return "Migration SQL cannot run procedural blocks, define executable routines, change session settings, use dynamic SQL helpers, or access internal migration metadata. Use explicit schema or data statements.", 400
 	case errors.Is(err, diff.ErrDependency):
 		return err.Error(), 409
 	case errors.Is(err, diff.ErrNoChanges):

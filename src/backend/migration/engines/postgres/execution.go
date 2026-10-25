@@ -15,6 +15,7 @@ type session struct {
 	once      sync.Once
 	completed int
 	total     int
+	protected *protectedMetadata
 }
 
 func (Engine) Open(ctx context.Context, db *sql.DB, adapter adapters.Adapter, mode string) (engines.Session, error) {
@@ -25,7 +26,7 @@ func (Engine) Open(ctx context.Context, db *sql.DB, adapter adapters.Adapter, mo
 	if err != nil {
 		return nil, adapters.ErrConnection
 	}
-	if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(73421108)`); err != nil {
+	if _, err := tx.ExecContext(ctx, `SELECT pg_catalog.pg_advisory_xact_lock(73421108)`); err != nil {
 		tx.Rollback()
 		return nil, adapters.ErrQuery
 	}
@@ -36,11 +37,22 @@ func (s *session) Fingerprint(ctx context.Context) (string, error) {
 }
 func (s *session) Prepare(ctx context.Context, r engines.Receipt) error {
 	s.total = r.TotalStatements
-	_, err := s.tx.ExecContext(ctx, `CREATE SCHEMA IF NOT EXISTS _schakker; CREATE TABLE IF NOT EXISTS _schakker.migration_receipts(namespace text NOT NULL,attempt_id bigint NOT NULL,version bigint NOT NULL,sql_hash text NOT NULL,applied_at timestamptz NOT NULL DEFAULT clock_timestamp(),PRIMARY KEY(namespace,attempt_id),UNIQUE(namespace,version))`)
+	if _, err := s.tx.ExecContext(ctx, `CREATE SCHEMA IF NOT EXISTS _schakker; CREATE TABLE IF NOT EXISTS _schakker.migration_receipts(namespace text NOT NULL,attempt_id bigint NOT NULL,version bigint NOT NULL,sql_hash text NOT NULL,applied_at timestamptz NOT NULL DEFAULT pg_catalog.clock_timestamp(),PRIMARY KEY(namespace,attempt_id),UNIQUE(namespace,version)); LOCK TABLE _schakker.migration_receipts IN SHARE ROW EXCLUSIVE MODE`); err != nil {
+		return err
+	}
+	var err error
+	s.protected, err = s.captureProtectedMetadata(ctx)
 	return err
 }
 func (s *session) Execute(ctx context.Context, statement adapters.Statement) error {
-	if _, err := s.tx.ExecContext(ctx, `SELECT set_config('standard_conforming_strings','on',true)`); err != nil {
+	statements, err := (Engine{}).Parse(statement.SQL)
+	if err != nil {
+		return err
+	}
+	if len(statements) != 1 || s.protected == nil {
+		return engines.ErrUnsafeSQL
+	}
+	if _, err := s.tx.ExecContext(ctx, `SELECT pg_catalog.set_config('standard_conforming_strings','on',true)`); err != nil {
 		return err
 	}
 	if _, err := s.tx.ExecContext(ctx, statement.SQL); err != nil {
