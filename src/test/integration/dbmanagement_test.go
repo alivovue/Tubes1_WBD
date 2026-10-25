@@ -234,3 +234,91 @@ func TestDuplicateDatabaseRegistrationShowsActionableConflict(t *testing.T) {
 		t.Fatalf("duplicate registration did not show the expected conflict: %d", response.Code)
 	}
 }
+
+func TestConnectionEditsAndDisableRevokeAdminAndReaderSessions(t *testing.T) {
+	for _, action := range []string{"save_connection", "disable_connection"} {
+		t.Run(action, func(t *testing.T) {
+			f := newFixture(t, true)
+			reader := f.user(t, "connection.reader")
+			unrelated := f.user(t, "unrelated.reader")
+			target := f.register(t)
+			f.grant(t, f.admin, target.ID, access.ViewEdit)
+			f.grant(t, reader.ID, target.ID, access.ViewOnly)
+			identity, adminToken := f.login(t, "it.admin")
+			_, readerToken := f.login(t, reader.Username)
+			_, unrelatedToken := f.login(t, unrelated.Username)
+			csrf, err := f.access.CSRFToken(identity)
+			must(t, err)
+			input := f.dbs.Connection()
+			form := url.Values{"csrf": {csrf}, "id": {fmt.Sprint(target.ID)}, "action": {action}, "dbms": {input.DBMS}, "name": {"Renamed connection"}, "host": {input.Host}, "port": {fmt.Sprint(input.Port)}, "database_name": {input.DatabaseName}, "username": {input.Username}, "password": {input.Password}, "sslmode": {input.SSLMode}, "active": {"on"}}
+			request := httptest.NewRequest(http.MethodPost, "/admin/connections", strings.NewReader(form.Encode()))
+			request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			request.AddCookie(&http.Cookie{Name: access.CookieName, Value: adminToken})
+			response := httptest.NewRecorder()
+			handler := promotionHandler(t, f)
+			handler.ServeHTTP(response, request)
+			if response.Code != http.StatusSeeOther || !strings.HasPrefix(response.Header().Get("Location"), "/admin/connections") {
+				t.Fatalf("connection change returned %d", response.Code)
+			}
+			for _, check := range []struct{ token, path string }{{adminToken, "/admin/connections"}, {readerToken, "/dashboard"}} {
+				_, _, err := f.access.Authenticate(f.ctx, check.token)
+				wantError(t, err, access.ErrUnauthenticated)
+				request := httptest.NewRequest(http.MethodGet, check.path, nil)
+				request.AddCookie(&http.Cookie{Name: access.CookieName, Value: check.token})
+				response := httptest.NewRecorder()
+				handler.ServeHTTP(response, request)
+				if response.Code != http.StatusSeeOther || response.Header().Get("Location") != "/login" {
+					t.Fatalf("revoked session was not redirected to login: %s returned %d", check.path, response.Code)
+				}
+			}
+			_, _, err = f.access.Authenticate(f.ctx, unrelatedToken)
+			must(t, err)
+		})
+	}
+}
+
+func TestExplorerReadsCommittedManualDataAndSchemaChanges(t *testing.T) {
+	f := newFixture(t, true)
+	reader := f.user(t, "manual.reader")
+	target := f.register(t)
+	f.grant(t, reader.ID, target.ID, access.ViewOnly)
+	_, token := f.login(t, reader.Username)
+	handler := promotionHandler(t, f)
+	path := fmt.Sprintf("/explorer?db=%d&schema=public&table=employees&tab=rows-panel", target.ID)
+	get := func() *httptest.ResponseRecorder {
+		t.Helper()
+		request := httptest.NewRequest(http.MethodGet, path, nil)
+		request.AddCookie(&http.Cookie{Name: access.CookieName, Value: token})
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(response, request)
+		if response.Code != http.StatusOK {
+			t.Fatalf("explorer returned %d", response.Code)
+		}
+		return response
+	}
+	if !strings.Contains(get().Body.String(), ">5000<") {
+		t.Fatal("initial employee data was not displayed")
+	}
+	tx, err := f.dbs.Managed.BeginTx(f.ctx, nil)
+	must(t, err)
+	defer tx.Rollback()
+	_, err = tx.ExecContext(f.ctx, `UPDATE public.employees SET salary=901234 WHERE name='Alice'`)
+	must(t, err)
+	if strings.Contains(get().Body.String(), ">901234<") {
+		t.Fatal("explorer exposed an uncommitted external update")
+	}
+	must(t, tx.Commit())
+	if !strings.Contains(get().Body.String(), ">901234<") {
+		t.Fatal("explorer did not load the committed external update")
+	}
+	_, err = f.dbs.Managed.ExecContext(f.ctx, `ALTER TABLE public.employees ADD COLUMN manual_department TEXT`)
+	must(t, err)
+	if !strings.Contains(get().Body.String(), "manual_department") {
+		t.Fatal("explorer did not load the external schema change")
+	}
+	history, err := f.migrations.History(f.ctx, reader.ID, target.ID, 50, 0)
+	must(t, err)
+	if len(history) != 0 {
+		t.Fatal("external changes were incorrectly recorded as platform migrations")
+	}
+}

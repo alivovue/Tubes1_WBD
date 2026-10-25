@@ -62,6 +62,12 @@ function setupTabs() {
       candidate.tabIndex = selected ? 0 : -1;
     });
     panels.forEach((panel) => { panel.hidden = panel.id !== tab.dataset.tab; });
+    const refresh = one("[data-explorer-refresh]");
+    if (refresh) {
+      const url = new URL(refresh.href, location.href);
+      url.searchParams.set("tab", tab.dataset.tab);
+      refresh.href = url.href;
+    }
   };
   tabs.forEach((tab, index) => {
     tab.addEventListener("click", () => activate(tab));

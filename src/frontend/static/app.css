@@ -886,7 +886,7 @@ svg {
 .page-heading--compact { align-items: center; }
 .page-heading h1 { margin-bottom: 7px; font-size: clamp(25px, 3vw, 34px); line-height: 1.16; letter-spacing: -0.035em; }
 .page-heading p:not(.eyebrow) { margin-bottom: 0; color: var(--text-muted); }
-.heading-actions { display: flex; gap: 10px; }
+.heading-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 .metrics-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

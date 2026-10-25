@@ -211,6 +211,8 @@ SCHAKKER_POSTGRES_BIN="C:\Program Files\PostgreSQL\18\bin"
 | Interval rotasi identifier | 15 menit | Identifier sesi diperbarui pada request terautentikasi berikutnya setelah interval tercapai. Identifier juga diperbarui ketika privilege meningkat; setiap login berhasil menghasilkan sesi baru. |
 | Grace period | 30 detik | Setelah rotasi berkala atau peningkatan privilege, identifier lama tetap diterima selama 30 detik untuk menangani request bersamaan atau respons yang tidak diterima. Masa ini dibatasi oleh absolute expiration. |
 
-Rotasi identifier tidak memperpanjang absolute expiration. Logout, penonaktifan akun, perubahan password, dan pencabutan akses membatalkan sesi terkait di backend.
+Rotasi identifier tidak memperpanjang absolute expiration. Logout, penonaktifan akun, perubahan password, dan pencabutan akses melalui grup membatalkan sesi terkait di backend.
+
+Mengubah pengaturan atau menonaktifkan koneksi database membatalkan sesi pengguna yang memiliki akses ke database tersebut, termasuk sesi admin jika admin juga memiliki akses melalui grup. Pengguna terkait harus login kembali; koneksi nonaktif tetap tidak dapat diakses sampai diaktifkan kembali.
 
 Client menerima identifier sesi melalui cookie `schakker_session`; data sesi disimpan di backend. Cookie menggunakan `HttpOnly` dan `SameSite=Lax`, serta `Secure` pada HTTPS atau mode production. Request yang mengubah state dilindungi token CSRF.
