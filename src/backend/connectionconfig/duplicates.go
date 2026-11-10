@@ -1,4 +1,4 @@
-package dbmanagement
+package connectionconfig
 
 import (
 	"context"

@@ -1,6 +1,7 @@
 package integration_test
 
 import (
+	"bytes"
 	"database/sql"
 	"fmt"
 	"net"
@@ -47,7 +48,7 @@ func TestMariaDBMockRetainsDataAndRegistersWithPermissions(t *testing.T) {
 		t.Fatal("MariaDB-only fixtures also started PostgreSQL")
 	}
 	input := mocks.MariaDB.Connection()
-	must(t, mocks.MariaDB.AttachManaged(f.ctx, f.store, f.access, f.databases))
+	must(t, mocks.MariaDB.AttachManaged(f.ctx, f.store, bytes.Repeat([]byte{21}, 32)))
 	connections, err := f.databases.Connections(f.ctx, f.admin)
 	must(t, err)
 	var target dao.Database
@@ -62,7 +63,7 @@ func TestMariaDBMockRetainsDataAndRegistersWithPermissions(t *testing.T) {
 	for _, check := range []struct {
 		user       int64
 		permission access.Permission
-	}{{f.admin, access.ViewEdit}, {writer.ID, access.ViewEdit}, {reader.ID, access.ViewOnly}} {
+	}{{f.admin, access.NoAccess}, {writer.ID, access.ViewEdit}, {reader.ID, access.ViewOnly}} {
 		permission, err := f.access.EffectivePermission(f.ctx, check.user, target.ID)
 		must(t, err)
 		if permission != check.permission {
@@ -108,7 +109,7 @@ func TestMariaDBMockRetainsDataAndRegistersWithPermissions(t *testing.T) {
 	if mocks.MariaDB.Connection() != input {
 		t.Fatal("reopening changed retained MariaDB connection settings or credentials")
 	}
-	must(t, mocks.MariaDB.AttachManaged(f.ctx, f.store, f.access, f.databases))
+	must(t, mocks.MariaDB.AttachManaged(f.ctx, f.store, bytes.Repeat([]byte{21}, 32)))
 	reopened, err := f.databases.Connections(f.ctx, f.admin)
 	must(t, err)
 	if len(reopened) != len(connections) {

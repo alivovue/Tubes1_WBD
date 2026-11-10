@@ -13,6 +13,8 @@ import (
 
 	"tubes1_wbd/backend"
 	"tubes1_wbd/backend/access"
+	"tubes1_wbd/backend/connectionconfig"
+	adminbackend "tubes1_wbd_admin/backend"
 )
 
 func rotationClock(t *testing.T, f *fixture) *time.Time {
@@ -22,7 +24,10 @@ func rotationClock(t *testing.T, f *fixture) *time.Time {
 	config.Now = func() time.Time { return now }
 	service, err := access.NewService(f.store, config)
 	must(t, err)
-	f.access = service
+	f.userAccess = service
+	administration, err := access.NewAdministrationService(f.store, f.adminAuth, config)
+	must(t, err)
+	f.access = administration
 	return &now
 }
 func currentHash(t *testing.T, f *fixture, session string) []byte {
@@ -31,18 +36,28 @@ func currentHash(t *testing.T, f *fixture, session string) []byte {
 	must(t, f.dbs.Website.QueryRowContext(f.ctx, `SELECT token_hash FROM session_tokens WHERE session_id=$1 AND replaced_at IS NULL`, session).Scan(&hash))
 	return hash
 }
-func promotionHandler(t *testing.T, f *fixture) http.Handler {
+func userHandler(t *testing.T, f *fixture) http.Handler {
 	t.Helper()
 	root, err := filepath.Abs(filepath.Join("..", ".."))
 	must(t, err)
-	handler, err := backend.NewHandlerWithServices(root, backend.Services{Access: f.access, Databases: f.databases, Migrations: f.migrations})
+	handler, err := backend.NewHandlerWithServices(root, backend.Services{Access: f.userAccess, Databases: f.databases, Migrations: f.migrations})
 	must(t, err)
 	return handler
 }
-func TestPrivilegePromotionRotatesAllActiveSessionsAndDeliversCookie(t *testing.T) {
+func adminHandler(t *testing.T, f *fixture) http.Handler {
+	t.Helper()
+	root, err := filepath.Abs(filepath.Join("..", "..", "..", "src-admin"))
+	must(t, err)
+	connections, err := connectionconfig.NewService(f.store, f.access, connectionconfig.DefaultConfig(bytes.Repeat([]byte{21}, 32), false))
+	must(t, err)
+	handler, err := adminbackend.NewHandlerWithServices(root, adminbackend.Services{Authentication: f.adminAuth, Access: f.access, Connections: connections})
+	must(t, err)
+	return handler
+}
+func TestMembershipIncreaseRotatesAllActiveSessionsAndDeliversCookie(t *testing.T) {
 	f := newFixture(t, true)
 	now := rotationClock(t, f)
-	user := f.user(t, "promotion.employee")
+	user := f.user(t, "membership.employee")
 	first, oldFirst := f.login(t, user.Username)
 	second, oldSecond := f.login(t, user.Username)
 	expired, oldExpired := f.login(t, user.Username)
@@ -52,27 +67,28 @@ func TestPrivilegePromotionRotatesAllActiveSessionsAndDeliversCookie(t *testing.
 	secondHash := currentHash(t, f, second.SessionID)
 	expiredHash := currentHash(t, f, expired.SessionID)
 	*now = now.Add(3 * time.Second)
-	must(t, f.access.UpdateUser(f.ctx, f.admin, user.ID, user.DisplayName, true, true, ""))
+	groupForIncrease := f.group(t, "Session rotation group")
+	must(t, f.access.SetMembership(f.ctx, f.admin, user.ID, groupForIncrease.ID, true))
 	if bytes.Equal(currentHash(t, f, first.SessionID), firstHash) || bytes.Equal(currentHash(t, f, second.SessionID), secondHash) {
-		t.Fatal("promotion did not immediately rotate every active session")
+		t.Fatal("membership increase did not immediately rotate every active session")
 	}
 	if !bytes.Equal(currentHash(t, f, expired.SessionID), expiredHash) {
-		t.Fatal("promotion rotated an expired session")
+		t.Fatal("membership increase rotated an expired session")
 	}
 	for _, identity := range []access.Identity{first, second} {
 		var revoked bool
 		var absolute, idle time.Time
 		must(t, f.dbs.Website.QueryRowContext(f.ctx, `SELECT revoked_at IS NOT NULL,absolute_expires_at,idle_expires_at FROM sessions WHERE id=$1`, identity.SessionID).Scan(&revoked, &absolute, &idle))
 		if revoked || !absolute.Equal(identity.AbsoluteExpires) || !idle.Equal(first.AbsoluteExpires.Add(-8*time.Hour).Add(30*time.Minute)) {
-			t.Fatal("promotion revoked the session or changed its original expiration")
+			t.Fatal("membership increase revoked the session or changed its original expiration")
 		}
 	}
-	request := httptest.NewRequest(http.MethodGet, "https://schakker.test/api/admin/users", nil)
+	request := httptest.NewRequest(http.MethodGet, "https://schakker.test/api/dashboard", nil)
 	request.AddCookie(&http.Cookie{Name: access.CookieName, Value: oldFirst})
 	response := httptest.NewRecorder()
-	promotionHandler(t, f).ServeHTTP(response, request)
+	userHandler(t, f).ServeHTTP(response, request)
 	if response.Code != http.StatusOK {
-		t.Fatalf("promoted user's existing session cannot open admin pages: %d", response.Code)
+		t.Fatalf("ordinary user's existing session cannot open its dashboard: %d", response.Code)
 	}
 	var replacement *http.Cookie
 	for _, cookie := range response.Result().Cookies() {
@@ -92,7 +108,7 @@ func TestPrivilegePromotionRotatesAllActiveSessionsAndDeliversCookie(t *testing.
 	}
 	identity, newSecond, err := f.access.Authenticate(f.ctx, oldSecond)
 	must(t, err)
-	if !identity.User.IsAdmin || newSecond == "" || newSecond == oldSecond || !identity.AbsoluteExpires.Equal(second.AbsoluteExpires) {
+	if identity.User.IsAdmin || newSecond == "" || newSecond == oldSecond || !identity.AbsoluteExpires.Equal(second.AbsoluteExpires) {
 		t.Fatal("second browser did not receive its replacement session")
 	}
 	_, _, err = f.access.Authenticate(f.ctx, oldExpired)
@@ -112,7 +128,8 @@ func TestPrivilegeRotationsRecoverLatestTokenForConcurrentGraceRequests(t *testi
 	now := rotationClock(t, f)
 	user := f.user(t, "concurrent.employee")
 	identity, old := f.login(t, user.Username)
-	must(t, f.access.UpdateUser(f.ctx, f.admin, user.ID, user.DisplayName, true, true, ""))
+	groupForIncrease := f.group(t, "Session rotation group")
+	must(t, f.access.SetMembership(f.ctx, f.admin, user.ID, groupForIncrease.ID, true))
 	target := f.register(t)
 	group := f.grant(t, user.ID, target.ID, access.ViewOnly)
 	must(t, f.access.SetGrant(f.ctx, f.admin, group.ID, target.ID, access.ViewEdit))
@@ -133,7 +150,7 @@ func TestPrivilegeRotationsRecoverLatestTokenForConcurrentGraceRequests(t *testi
 				return
 			}
 			hash := sha256.Sum256([]byte(replacement))
-			if !bytes.Equal(hash[:], expected) || !current.User.IsAdmin || !current.AbsoluteExpires.Equal(identity.AbsoluteExpires) {
+			if !bytes.Equal(hash[:], expected) || current.User.IsAdmin || !current.AbsoluteExpires.Equal(identity.AbsoluteExpires) {
 				failures <- errors.New("parallel request did not recover the latest token")
 				return
 			}
@@ -164,7 +181,7 @@ func TestPrivilegeRotationsRecoverLatestTokenForConcurrentGraceRequests(t *testi
 		must(t, err)
 	}
 }
-func TestPrivilegeRotationFailureRollsBackPromotionAndTokens(t *testing.T) {
+func TestPrivilegeRotationFailureRollsBackMembershipAndTokens(t *testing.T) {
 	f := newFixture(t, true)
 	rotationClock(t, f)
 	user := f.user(t, "rollback.employee")
@@ -172,8 +189,9 @@ func TestPrivilegeRotationFailureRollsBackPromotionAndTokens(t *testing.T) {
 	before := currentHash(t, f, identity.SessionID)
 	_, err := f.dbs.Website.ExecContext(f.ctx, `CREATE FUNCTION reject_rotation() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'simulated token storage failure'; END $$; CREATE TRIGGER reject_rotation BEFORE INSERT ON session_tokens FOR EACH ROW EXECUTE FUNCTION reject_rotation()`)
 	must(t, err)
-	if err := f.access.UpdateUser(f.ctx, f.admin, user.ID, user.DisplayName, true, true, ""); err == nil {
-		t.Fatal("promotion succeeded despite a failed token rotation")
+	groupForIncrease := f.group(t, "Rollback rotation group")
+	if err := f.access.SetMembership(f.ctx, f.admin, user.ID, groupForIncrease.ID, true); err == nil {
+		t.Fatal("membership increase succeeded despite a failed token rotation")
 	}
 	saved, err := f.store.User(f.ctx, user.ID)
 	must(t, err)
@@ -181,12 +199,12 @@ func TestPrivilegeRotationFailureRollsBackPromotionAndTokens(t *testing.T) {
 		t.Fatal("failed rotation committed the increased privilege")
 	}
 	if !bytes.Equal(before, currentHash(t, f, identity.SessionID)) {
-		t.Fatal("failed promotion committed a replacement token")
+		t.Fatal("failed membership increase committed a replacement token")
 	}
 	current, replacement, err := f.access.Authenticate(f.ctx, old)
 	must(t, err)
 	if current.User.IsAdmin || replacement != "" {
-		t.Fatal("rolled-back promotion changed the existing session")
+		t.Fatal("rolled-back membership increase changed the existing session")
 	}
 }
 func TestPrivilegeRotationGraceDoesNotOutliveAbsoluteExpiration(t *testing.T) {
@@ -197,12 +215,13 @@ func TestPrivilegeRotationGraceDoesNotOutliveAbsoluteExpiration(t *testing.T) {
 	_, err := f.dbs.Website.ExecContext(f.ctx, `UPDATE sessions SET idle_expires_at=absolute_expires_at WHERE id=$1`, identity.SessionID)
 	must(t, err)
 	*now = identity.AbsoluteExpires.Add(-5 * time.Second)
-	must(t, f.access.UpdateUser(f.ctx, f.admin, user.ID, user.DisplayName, true, true, ""))
+	groupForIncrease := f.group(t, "Session rotation group")
+	must(t, f.access.SetMembership(f.ctx, f.admin, user.ID, groupForIncrease.ID, true))
 	hash := sha256.Sum256([]byte(old))
 	var grace time.Time
 	must(t, f.dbs.Website.QueryRowContext(f.ctx, `SELECT grace_expires_at FROM session_tokens WHERE token_hash=$1`, hash[:]).Scan(&grace))
 	if !grace.Equal(identity.AbsoluteExpires) {
-		t.Fatal("promotion grace period exceeded the absolute expiration")
+		t.Fatal("membership rotation grace period exceeded the absolute expiration")
 	}
 	current, replacement, err := f.access.Authenticate(f.ctx, old)
 	must(t, err)

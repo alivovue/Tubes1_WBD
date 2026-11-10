@@ -152,20 +152,6 @@ export type PageData = {
   CanEdit: boolean;
   EditableCount: number;
   Recent: Execution[] | null;
-  Admin: {
-    Users: User[] | null;
-    Groups: Group[] | null;
-    Databases: Database[] | null;
-  };
-  Groups:
-    | (Group & {
-        Members: User[] | null;
-        Grants: { Database: Database; Permission: string }[] | null;
-        Editor: string;
-        Focus: boolean;
-      })[]
-    | null;
-  DBMS: string[] | null;
   Schemas: { Name: string }[] | null;
   Tables: { Name: string }[] | null;
   Schema: string;

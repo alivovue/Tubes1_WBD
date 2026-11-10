@@ -25,7 +25,7 @@ func newWebHandler(t *testing.T, production bool) http.Handler {
 	return handler
 }
 
-var frontendRoutes = []string{"/", "/login", "/dashboard", "/databases", "/explorer", "/sql-viewer", "/migrations", "/migrations/new", "/admin/users", "/admin/groups", "/admin/access", "/admin/connections"}
+var frontendRoutes = []string{"/", "/login", "/dashboard", "/databases", "/explorer", "/sql-viewer", "/migrations", "/migrations/new"}
 
 func TestWebServesSameSPAShellForDirectNavigation(t *testing.T) {
 	handler := newWebHandler(t, false)
@@ -128,6 +128,19 @@ func TestWebRejectsUnsupportedMethodsAndKeepsHEADBodyEmpty(t *testing.T) {
 		handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, route, nil))
 		if response.Code != 404 {
 			t.Fatalf("unknown route %s was not rejected", route)
+		}
+	}
+}
+
+func TestUserServerRemovesAdministrativeRoutes(t *testing.T) {
+	handler := newWebHandler(t, false)
+	for _, route := range []string{"/admin/users", "/admin/groups", "/admin/access", "/admin/connections"} {
+		for _, prefix := range []string{"", "/api"} {
+			response := httptest.NewRecorder()
+			handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, prefix+route, nil))
+			if response.Code != 404 {
+				t.Fatalf("administrative route survived on user server: %s%s %d", prefix, route, response.Code)
+			}
 		}
 	}
 }

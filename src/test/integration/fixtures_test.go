@@ -3,6 +3,7 @@ package integration_test
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"os"
@@ -10,11 +11,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"tubes1_wbd/backend/access"
 	"tubes1_wbd/backend/dbmanagement"
 	"tubes1_wbd/backend/migration"
 	"tubes1_wbd/database/dao"
 	fixtures "tubes1_wbd/test/data"
+	adminsetup "tubes1_wbd/test/data/adminsetup"
+	adminaccess "tubes1_wbd_admin/backend/access"
 )
 
 var factory *fixtures.Factory
@@ -26,9 +30,14 @@ type fixture struct {
 	dbs        *fixtures.Databases
 	store      *dao.Store
 	access     *access.Service
+	userAccess *access.Service
+	adminAuth  *access.Service
+	adminStore *dao.Store
+	adminDB    *sql.DB
 	databases  *dbmanagement.Service
 	migrations *migration.Service
 	admin      int64
+	editor     int64
 }
 
 func TestMain(m *testing.M) { os.Exit(runIntegration(m)) }
@@ -82,20 +91,48 @@ func newFixture(t *testing.T, admin bool) *fixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	management, err := dbmanagement.NewService(store, auth, dbmanagement.DefaultConfig(key, false))
-	if err != nil {
-		t.Fatal(err)
-	}
+	adminName := databases.WebsiteName + "_admin"
+	_, err = factory.Cluster.EnsureDatabase(ctx, adminName, "", "")
+	must(t, err)
+	adminDB, err := factory.Cluster.Open(ctx, adminName)
+	must(t, err)
+	t.Cleanup(func() {
+		adminDB.Close()
+		cleanup, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		defer cancel()
+		db, err := factory.Cluster.Open(cleanup, "postgres")
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		defer db.Close()
+		if _, err := db.ExecContext(cleanup, "DROP DATABASE "+pgx.Identifier{adminName}.Sanitize()+" WITH (FORCE)"); err != nil {
+			t.Error(err)
+		}
+	})
+	must(t, adminsetup.EnsureInitialized(ctx, adminDB))
+	_, err = adminDB.ExecContext(ctx, `ALTER SEQUENCE admin_users_id_seq RESTART WITH 1000`)
+	must(t, err)
+	adminStore, err := dao.NewAdminAuthentication(adminDB)
+	must(t, err)
+	adminAuth, err := adminaccess.NewService(adminStore, access.DefaultConfig(key))
+	must(t, err)
+	administration, err := access.NewAdministrationService(store, adminAuth, access.DefaultConfig(key))
+	must(t, err)
+	management, err := dbmanagement.NewService(store, administration, dbmanagement.DefaultConfig(key, false))
+	must(t, err)
 	migrations, err := migration.NewService(store, auth, management)
-	if err != nil {
-		t.Fatal(err)
-	}
-	f := &fixture{ctx: ctx, dbs: databases, store: store, access: auth, databases: management, migrations: migrations}
+	must(t, err)
+	f := &fixture{ctx: ctx, dbs: databases, store: store, access: administration, userAccess: auth, adminAuth: adminAuth, adminStore: adminStore, adminDB: adminDB, databases: management, migrations: migrations}
 	if admin {
-		must(t, auth.BootstrapAdmin(ctx, "it.admin", "Integration Admin", password))
-		credentials, err := store.Credentials(ctx, "it.admin")
+		must(t, fixtures.BootstrapAdmin(ctx, adminStore, "it.admin", "Integration Admin", password))
+		credentials, err := adminStore.Credentials(ctx, "it.admin")
 		must(t, err)
 		f.admin = credentials.ID
+		must(t, administration.CreateUser(ctx, f.admin, "it.editor", "Integration Editor", password, false))
+		editor, err := store.Credentials(ctx, "it.editor")
+		must(t, err)
+		f.editor = editor.ID
 	}
 	return f
 }
@@ -134,7 +171,11 @@ func (f *fixture) grant(t *testing.T, user, database int64, permission access.Pe
 }
 func (f *fixture) login(t *testing.T, username string) (access.Identity, string) {
 	t.Helper()
-	identity, raw, err := f.access.Login(f.ctx, username, password, "")
+	service := f.userAccess
+	if username == "it.admin" {
+		service = f.adminAuth
+	}
+	identity, raw, err := service.Login(f.ctx, username, password, "")
 	must(t, err)
 	return identity, raw
 }

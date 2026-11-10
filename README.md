@@ -1,273 +1,162 @@
 # Schakker
 
-## Lingkungan yang disarankan
+Schakker terdiri dari aplikasi pengguna dan aplikasi administrasi yang berjalan
+sebagai dua server Go dengan dua React SPA.
 
-**Disarankan menggunakan Linux (Ubuntu atau Debian)** dengan Bash. Proyek juga dapat dijalankan di Windows 10/11 menggunakan Windows PowerShell 5.1 atau lebih baru. Jika menggunakan WSL2, ikuti langkah Linux dan pasang dependensi di dalam WSL2.
+| Aplikasi | Source | Port HTTP | Port Vite | Launcher |
+| --- | --- | --- | --- | --- |
+| Pengguna | `src/` | `PORT=3000` | `5173` | `bash ./run.sh` / `run.bat` |
+| Administrasi | `src-admin/` | `ADMIN_PORT=3001` | `5174` | `bash ./run-admin.sh` / `run-admin.bat` |
 
-Siapkan koneksi internet untuk mengunduh dependensi Go dan toolchain saat build pertama. Port bawaan aplikasi adalah `3000`; pastikan port tersebut tersedia.
+Aplikasi pengguna menyediakan explorer, SQL viewer, query plan, serta migrasi SQL
+untuk pengguna yang memiliki grant. Aplikasi admin mengelola akun, grup,
+keanggotaan, permission, serta konfigurasi koneksi. Validasi koneksi admin tidak
+menyediakan eksekusi SQL atau akses isi database target.
 
-## Dependensi dan unduhan
+## Database dan konfigurasi
 
-| Perangkat lunak | Kebutuhan | Unduhan / instalasi |
-| --- | --- | --- |
-| Go | Wajib, versi 1.26 atau lebih baru. `src/go.mod` menetapkan toolchain `go1.26.10`. | [Unduh dan pasang Go](https://go.dev/doc/install) sesuai sistem operasi dan arsitektur komputer. |
-| Node.js dan npm | Wajib untuk build React SPA, Node.js 22.12 atau lebih baru. | [Unduh Node.js](https://nodejs.org/) (npm disertakan). |
-| PostgreSQL Server | Wajib untuk menjalankan database lokal bawaan. Pasang versi 14 atau lebih baru, termasuk `postgres`, `initdb`, dan `pg_ctl`. | [Unduh PostgreSQL](https://www.postgresql.org/download/). |
-| Bash | Wajib untuk launcher Linux, versi 4 atau lebih baru. | Tersedia melalui paket `bash` pada Linux. |
-| Windows PowerShell | Wajib untuk launcher Windows, versi 5.1 atau lebih baru. | Sudah tersedia pada Windows 10/11. |
-| Browser | Wajib untuk membuka aplikasi. | Gunakan browser yang tersedia di komputer. |
-| MariaDB Server | Opsional, jika ingin menjalankan database contoh (mock) MariaDB secara lokal. Target MariaDB yang didukung minimal versi 10.6. | [Unduh MariaDB](https://mariadb.org/download/) dan pilih rilis yang masih didukung. |
-| Git | Opsional, untuk mengunduh repositori melalui `git clone`. | Dapat digantikan dengan mengunduh dan mengekstrak ZIP repositori. |
+Database, schema, role PostgreSQL, akun administrator pertama, serta master key
+harus disediakan melalui pengelolaan database di luar aplikasi. Startup hanya
+membuka koneksi dan memeriksa schema serta role yang sudah ada. Startup tidak
+menjalankan server PostgreSQL, membuat database/tabel/role, mengisi data contoh,
+membuat akun awal, menjalankan upgrade data, atau menghasilkan key file.
 
-Dependensi Go utama berikut diunduh otomatis saat build, atau melalui `go mod download` dari folder `src/`:
+- `schakker_platform`: akun dan sesi pengguna biasa, grup, keanggotaan, grant,
+  registrasi koneksi, draft migrasi, dan riwayat eksekusi.
+- `schakker_admin`: akun, sesi, serta token autentikasi administrator.
 
-| Modul | Versi |
-| --- | --- |
-| `github.com/go-sql-driver/mysql` | `v1.9.3` |
-| `github.com/jackc/pgx/v5` | `v5.11.0` |
-| `golang.org/x/crypto` | `v0.58.0` |
+Server pengguna tidak membuka koneksi ke database admin. Akun dengan ID atau
+username yang sama di kedua database tetap memiliki credential dan sesi terpisah.
+Akun pengguna tidak dapat dipromosikan menjadi admin; akun admin dikelola melalui
+`/admin/administrators`.
 
-Dependensi transitif mengikuti `src/go.mod` dan `src/go.sum` serta diunduh otomatis bersama modul di atas.
+Panduan koneksi dan kontrak schema ada di
+[pemisahan database admin](docs/admin-auth-database.md).
 
-## Instalasi dependensi di Linux
+Launcher membaca `src/.env`. Launcher admin juga membaca `src-admin/.env` sebagai
+override. Berkas `.env` tidak disimpan di Git.
 
-Untuk Ubuntu/Debian:
+Contoh `src/.env` untuk aplikasi pengguna, dengan nilai rahasia diganti sesuai
+konfigurasi deployment:
+
+```dotenv
+SCHAKKER_PLATFORM_DATABASE_URL='postgres://schakker_user:PRIVATE_PASSWORD@HOST/schakker_platform?sslmode=verify-full'
+SCHAKKER_MASTER_KEY='SHARED_32_BYTE_KEY_ENCODED_AS_HEX_OR_BASE64'
+PORT=3000
+```
+
+Contoh `src-admin/.env`:
+
+```dotenv
+SCHAKKER_PLATFORM_DATABASE_URL='postgres://schakker_administration:PRIVATE_PASSWORD@HOST/schakker_platform?sslmode=verify-full'
+SCHAKKER_ADMIN_DATABASE_URL='postgres://schakker_admin_auth:PRIVATE_PASSWORD@HOST/schakker_admin?sslmode=verify-full'
+ADMIN_PORT=3001
+```
+
+Kedua aplikasi memakai master key yang sama. Key berisi 32 byte, dalam bentuk hex
+atau base64. Pada mode development, key juga dapat dibaca dari **berkas yang sudah
+ada** di `src/.schakker/master.key` atau `SCHAKKER_STATE_DIR/master.key`. Aplikasi
+tidak membuat berkas tersebut. Mode production (`SCHAKKER_ENV=production`)
+mewajibkan `SCHAKKER_MASTER_KEY` dari environment.
+
+`SCHAKKER_DATABASE_URL` dan `DATABASE_URL` tetap menjadi alias URL platform.
+Server admin selalu membutuhkan `SCHAKKER_ADMIN_DATABASE_URL` tersendiri.
+`SCHAKKER_STATE_DIR` hanya menentukan lokasi pembacaan key yang sudah ada; launcher
+menafsirkan path relatif dari `src/`.
+
+## Dependensi
+
+- Go 1.26 atau lebih baru; modul menetapkan toolchain `go1.26.10`.
+- Node.js 22.12 atau lebih baru beserta npm.
+- Bash 4+ di Linux atau Windows PowerShell 5.1+ di Windows.
+- Koneksi ke dua database PostgreSQL yang telah disediakan secara eksternal.
+- PostgreSQL server tools diperlukan untuk integration test lokal. MariaDB server
+  tools bersifat opsional untuk pengujian fixture MariaDB.
+
+Go dan npm mengunduh dependensi sesuai `go.mod`, `go.sum`, dan lockfile masing-masing
+frontend. Instal PostgreSQL server tools pada Ubuntu/Debian untuk menjalankan
+integration test:
 
 ```bash
-sudo apt update
-sudo apt install postgresql postgresql-client bash
+sudo apt install postgresql postgresql-client
 ```
 
-Pasang Node.js 22.12+ beserta npm, lalu pasang Go sesuai [panduan instalasi resmi untuk Linux](https://go.dev/doc/install). Pastikan direktori Go sudah masuk ke `PATH`, lalu periksa instalasi:
+`SCHAKKER_POSTGRES_BIN` dapat menunjuk direktori berisi `postgres`, `initdb`, dan
+`pg_ctl` untuk **pengujian**. `SCHAKKER_MARIADB_BIN` menentukan tools fixture
+MariaDB. Database aplikasi tidak dimulai oleh launcher.
 
-```bash
-node --version
-npm --version
-go version
-psql --version
-bash --version
-ls /usr/lib/postgresql/*/bin/{postgres,initdb,pg_ctl}
-```
+## Menjalankan aplikasi
 
-Jika ingin menggunakan mock MariaDB, pasang juga:
-
-```bash
-sudo apt install mariadb-server
-```
-
-Mock MariaDB memerlukan `mariadbd` dan `mariadb-install-db`.
-
-## Instalasi dependensi di Windows
-
-1. Pasang Node.js 22.12+ dari [halaman unduhan Node.js](https://nodejs.org/), termasuk npm. Pasang Go menggunakan installer Windows dari [halaman instalasi Go](https://go.dev/doc/install).
-2. Pasang PostgreSQL Server dari [halaman unduhan PostgreSQL](https://www.postgresql.org/download/) dengan memilih Windows. Sertakan `postgres.exe`, `initdb.exe`, dan `pg_ctl.exe`. Direktori standar `C:\Program Files\PostgreSQL\<versi>\bin` dideteksi otomatis.
-3. Jika ingin menggunakan mock MariaDB, pasang MariaDB Server dari [halaman unduhan MariaDB](https://mariadb.org/download/). Pastikan tersedia `mariadbd.exe` dan `mariadb-install-db.exe`; nama lama `mysqld.exe` dan `mysql_install_db.exe` juga didukung.
-4. Buka kembali PowerShell setelah instalasi, lalu periksa Go dan versi PowerShell:
-
-```powershell
-go version
-$PSVersionTable.PSVersion
-```
-
-## Perintah build dan menjalankan aplikasi
-
-Unduh atau clone repositori, lalu buka terminal di folder utama `Tubes1_WBD` yang berisi `README.md`, `run.sh`, dan `run.bat`. Jalankan perintah sesuai sistem operasi sebagai pengguna biasa.
-
-### Jika menggunakan Linux
-
-Untuk **build sekaligus menjalankan aplikasi**, gunakan Bash:
+Dari root repositori, gunakan terminal terpisah:
 
 ```bash
 bash ./run.sh
+bash ./run-admin.sh
 ```
 
-Jika hanya ingin build tanpa menjalankan aplikasi:
+Pada Windows gunakan `run.bat` dan `run-admin.bat`. Launcher membangun kedua SPA,
+menawarkan unit/integration test, membangun Go, lalu menjalankan satu server.
+Binary tersimpan di `src/bin/` atau `src-admin/bin/`. Jika schema atau konfigurasi
+belum tersedia, server berhenti dengan pesan konfigurasi; tidak ada penyiapan akun
+atau data otomatis. Ctrl+C menghentikan server HTTP terkait tanpa mengelola proses
+PostgreSQL eksternal.
+
+Pilihan launcher hanya mencakup pengujian. Fixture yang dipakai integration test
+bersifat sementara dan tidak diteruskan ke aplikasi yang dijalankan.
+
+Untuk build manual:
 
 ```bash
-cd src/frontend
-npm ci
-npm run build
-cd ..
-go mod download
-go build -o schakker .
-cd ..
+(cd src/frontend && npm ci && npm run build)
+(cd src-admin/frontend && npm ci && npm run build)
+(cd src && go build -o bin/user-server .)
+(cd src-admin && go build -o bin/admin-server .)
 ```
 
-Hasil build saja adalah `src/schakker`. Untuk menjalankan aplikasi beserta penyiapan admin, gunakan `bash ./run.sh`.
+Jalankan binary dari folder aplikasi terkait agar hasil build frontend ditemukan:
+`cd src && ./bin/user-server` atau `cd src-admin && ./bin/admin-server`.
 
-### Jika menggunakan Windows
+## Pengembangan frontend
 
-Untuk **build sekaligus menjalankan aplikasi**, gunakan PowerShell:
+Jalankan server Go pengguna pada port `3000`, kemudian `npm run dev` dari
+`src/frontend/` untuk membuka Vite pada port `5173`. Untuk admin, jalankan server Go
+pada port `3001` dan `npm run dev` dari `src-admin/frontend/` pada port `5174`.
+Proxy Vite meneruskan `/api/` dan `/public/` ke server Go terkait. Sesuaikan
+`vite.config.ts` jika port Go diubah.
 
-```powershell
-.\run.bat
-```
+API memakai JSON di `/api/session`, `/api/login`, `/api/logout`, dan `/api` diikuti
+route halaman. POST menerima string atau array string dan memerlukan header
+`X-CSRF-Token`. Identifier sesi hanya dikirim lewat cookie HttpOnly.
 
-Jika menggunakan Command Prompt (CMD), perintahnya:
+## Sesi dan permission
 
-```bat
-run.bat
-```
+Cookie pengguna adalah `schakker_session`, sedangkan admin memakai
+`schakker_admin_session`, dengan cookie challenge login yang juga terpisah.
+Cookie menggunakan `HttpOnly`, `SameSite=Lax`, serta `Secure` pada HTTPS atau
+production. Idle timeout 30 menit, absolute lifetime delapan jam, interval rotasi
+15 menit, dan grace period 30 detik tetap berlaku.
 
-Jika hanya ingin build tanpa menjalankan aplikasi, gunakan PowerShell atau CMD:
+Logout, perubahan password, dan penonaktifan akun membatalkan sesi pada domain
+terkait. Pengurangan grant membatalkan sesi pengguna yang terdampak; perubahan
+grant platform tidak membatalkan sesi admin. Permission selalu diperiksa backend.
 
-```powershell
-cd src/frontend
-npm ci
-npm run build
-cd ..
-go mod download
-go build -o schakker.exe .
-cd ..
-```
+## Pengujian
 
-Hasil build saja adalah `src\schakker.exe`. Untuk menjalankan aplikasi beserta penyiapan admin, gunakan `.\run.bat` di PowerShell atau `run.bat` di CMD.
+Setup database, seed data, bootstrap akun, dan skenario upgrade lama tetap tersedia
+khusus untuk pengujian di `src/test/data/`. Kode tersebut tidak menjadi dependensi
+kedua aplikasi server.
 
-Kedua launcher (`run.sh` dan `run.bat`) menginstal dependensi frontend sesuai lockfile, membangun React SPA, lalu mencakup build Go, penyiapan database PostgreSQL lokal, dan menjalankan server. Database proyek tidak perlu dibuat secara manual.
-
-## Penyiapan saat menjalankan aplikasi
-
-Kedua launcher menampilkan pilihan berikut. Jawab `y` untuk ya atau `n` untuk tidak; tekan Enter untuk menggunakan nilai bawaan.
-
-| Pilihan | Nilai bawaan |
-| --- | --- |
-| Jalankan unit test sebelum aplikasi dimulai | `y` |
-| Jalankan integration test PostgreSQL | `y` |
-| Gunakan database mock website | `n` |
-| Gunakan database mock PostgreSQL yang dikelola | `n` |
-| Gunakan database mock MariaDB | `n` |
-
-Untuk menjalankan tanpa pengujian dan data contoh, jawab `n` pada kelima pilihan. Pilih `y` untuk mock MariaDB hanya jika tools MariaDB sudah dipasang. Jika pengujian yang dipilih gagal, launcher menghentikan proses; laporan tersedia di `src/test/output/`.
-
-Pada startup pertama, jika belum ada pengguna, masukkan username admin (bawaan `admin`), nama tampilan (bawaan `Platform Admin`), serta password sepanjang **12–72 byte** dan konfirmasinya.
-
-Setelah terminal menampilkan alamat server, buka **http://localhost:3000** di browser dan masuk menggunakan akun admin tersebut. Tekan **Ctrl+C** di terminal untuk menghentikan aplikasi dan instance database yang dijalankannya.
-
-Untuk restart biasa, tekan **Ctrl+C**, lalu jalankan kembali `bash ./run.sh` (Linux), `.\run.bat` (Windows PowerShell), atau `run.bat` (Windows CMD). Akun dan data tetap tersimpan, sehingga penyiapan admin tidak diminta lagi.
-
-## Reset penuh agar penyiapan admin muncul kembali
-
-**Reset menghapus seluruh isi folder data lokal proyek**, termasuk akun admin, pengguna lain, sesi, pengaturan, database lokal, database mock yang disimpan, dan key. Database target pada server lain tidak ikut terhapus.
-
-1. Hentikan aplikasi dengan **Ctrl+C** dan tunggu sampai proses berhenti.
-2. Jika ada di `src/.env`, hapus baris `SCHAKKER_ADMIN_USERNAME`, `SCHAKKER_ADMIN_NAME`, dan `SCHAKKER_ADMIN_PASSWORD` agar akun admin tidak dibuat otomatis.
-3. Panduan ini menggunakan database lokal bawaan. Jika sebelumnya memakai database eksternal, kosongkan `SCHAKKER_DATABASE_URL` dan `DATABASE_URL` di `src/.env` serta environment terminal sebelum melanjutkan. Gunakan mode pengembangan (hapus `SCHAKKER_ENV=production` jika sebelumnya diatur).
-4. Jalankan perintah reset sesuai sistem operasi dari folder utama repositori.
-
-### Jika menggunakan Linux
-
-Untuk lokasi data bawaan (`src/.schakker/`):
+Bangun kedua frontend sebelum integration test HTTP, lalu jalankan dari root:
 
 ```bash
-unset SCHAKKER_ADMIN_USERNAME SCHAKKER_ADMIN_NAME SCHAKKER_ADMIN_PASSWORD
-rm -rf -- ./src/.schakker
-bash ./run.sh
+go test -count=1 -timeout=10m ./src/... ./src-admin/...
+(cd src/frontend && npm test)
+(cd src-admin/frontend && npm test)
 ```
 
-Jika memakai `SCHAKKER_STATE_DIR`, ganti `./src/.schakker` pada perintah penghapusan dengan folder data yang dikonfigurasi. Path relatif pada variabel tersebut dihitung dari `src/`.
-
-Pada WSL2, jika repositori berada di `/mnt/<drive>/...` dan `SCHAKKER_STATE_DIR` tidak diatur, lokasi data bawaan berada di `${XDG_STATE_HOME:-$HOME/.local/state}/schakker/<id-proyek>/`. Gunakan path lengkap dari baris **`WSL detected; PostgreSQL state:`** yang ditampilkan launcher sebagai pengganti `./src/.schakker`.
-
-### Jika menggunakan Windows (PowerShell)
-
-Data bawaan disimpan di `%LOCALAPPDATA%\Schakker\<id-proyek>\`. Salin **path lengkap** dari baris **`Schakker state:`** yang ditampilkan saat menjalankan `run.bat`. Jika memakai `SCHAKKER_STATE_DIR`, baris tersebut menampilkan lokasi khusus yang digunakan.
-
-Jalankan perintah berikut melalui PowerShell. Saat diminta, tempel hanya path folder data proyek dari baris tersebut:
-
-```powershell
-$schakkerState = Read-Host 'Tempel path folder data dari baris Schakker state'
-if ([string]::IsNullOrWhiteSpace($schakkerState)) { throw 'Path folder data harus diisi.' }
-Remove-Item -LiteralPath $schakkerState -Recurse -Force -ErrorAction Stop
-$env:SCHAKKER_ADMIN_USERNAME = $null
-$env:SCHAKKER_ADMIN_NAME = $null
-$env:SCHAKKER_ADMIN_PASSWORD = $null
-.\run.bat
-```
-
-Setelah reset, jawab pilihan pengujian dan mock sesuai kebutuhan. Launcher akan meminta kembali **username admin, nama tampilan, password, dan konfirmasi password**. Untuk mulai dengan database kosong tanpa data contoh, jawab `n` pada ketiga pilihan mock.
-
-## Konfigurasi opsional
-
-Pengaturan bawaan dapat digunakan tanpa file `.env`. Jika diperlukan, buat `src/.env` berisi satu penugasan `NAMA=nilai` per baris, lalu jalankan kembali launcher.
-
-| Variabel | Kegunaan |
-| --- | --- |
-| `PORT` | Mengganti port aplikasi, misalnya `PORT=3001`. |
-| `SCHAKKER_POSTGRES_BIN` | Direktori berisi `postgres`, `initdb`, dan `pg_ctl` jika tidak terdeteksi otomatis. Gunakan nama berakhiran `.exe` pada Windows. |
-| `SCHAKKER_MARIADB_BIN` | Direktori tools MariaDB jika tidak terdeteksi otomatis. |
-| `SCHAKKER_STATE_DIR` | Mengganti lokasi penyimpanan data lokal. Path relatif dihitung dari folder `src/`. |
-
-Contoh `src/.env` di Linux; sesuaikan versi PostgreSQL dengan instalasi:
-
-```dotenv
-PORT=3000
-SCHAKKER_POSTGRES_BIN=/usr/lib/postgresql/18/bin
-```
-
-Contoh `src/.env` di Windows; sesuaikan versi dan lokasi instalasi:
-
-```dotenv
-PORT=3000
-SCHAKKER_POSTGRES_BIN="C:\Program Files\PostgreSQL\18\bin"
-```
-
-## Kebijakan sesi
-
-| Pengaturan | Nilai | Perilaku |
-| --- | --- | --- |
-| Idle timeout | 30 menit | Sesi berakhir jika tidak ada akses ke fitur yang dilindungi selama 30 menit. Akses berikutnya memperbarui batas idle, maksimal sampai absolute expiration. |
-| Absolute expiration | 8 jam sejak login | Pengguna wajib login kembali setelah 8 jam, meskipun masih aktif menggunakan aplikasi. |
-| Interval rotasi identifier | 15 menit | Identifier sesi diperbarui pada request terautentikasi berikutnya setelah interval tercapai. Identifier juga diperbarui ketika privilege meningkat; setiap login berhasil menghasilkan sesi baru. |
-| Grace period | 30 detik | Setelah rotasi berkala atau peningkatan privilege, identifier lama tetap diterima selama 30 detik untuk menangani request bersamaan atau respons yang tidak diterima. Masa ini dibatasi oleh absolute expiration. |
-
-Rotasi identifier tidak memperpanjang absolute expiration. Logout, penonaktifan akun, perubahan password, dan pencabutan akses melalui grup membatalkan sesi terkait di backend.
-
-Mengubah pengaturan atau menonaktifkan koneksi database membatalkan sesi pengguna yang memiliki akses ke database tersebut, termasuk sesi admin jika admin juga memiliki akses melalui grup. Pengguna terkait harus login kembali; koneksi nonaktif tetap tidak dapat diakses sampai diaktifkan kembali.
-
-Client menerima identifier sesi melalui cookie `schakker_session`; data sesi disimpan di backend. Cookie menggunakan `HttpOnly` dan `SameSite=Lax`, serta `Secure` pada HTTPS atau mode production. Request yang mengubah state dilindungi token CSRF.
-
-
-## Pengembangan React SPA
-
-Seluruh halaman menggunakan React, TypeScript, Vite, dan React Router di `src/frontend/app/`.
-Go menyajikan hasil build dari `src/frontend/dist/`, termasuk fallback entry HTML pada route
-seperti `/explorer` dan `/migrations/new`. Setelah mengubah frontend, jalankan `npm run build`
-atau jalankan ulang launcher. `dist/` tidak disimpan di Git.
-
-Untuk pengembangan dengan hot reload, jalankan server Go pada port bawaan `3000`, lalu:
-
-```bash
-cd src/frontend
-npm ci
-npm run dev
-```
-
-Buka alamat Vite yang ditampilkan di terminal. Vite meneruskan `/api/` dan `/public/`
-ke Go pada `127.0.0.1:3000`, sehingga cookie sesi dan CSRF tetap menggunakan origin browser
-yang sama. Jika port Go diubah, sesuaikan target proxy pada `vite.config.ts`.
-
-Pengujian dan build:
-
-```bash
-cd src/frontend
-npm test
-npm run build
-cd ..
-go test ./test/unit/...
-go test -count=1 -timeout=5m ./test/integration/...
-```
-
-API frontend menggunakan JSON pada `/api/session`, `/api/login`, `/api/logout`, dan
-`/api` diikuti route halaman yang sama (misalnya `/api/explorer?db=1`). POST menerima
-objek berisi string atau array string untuk field berulang dan wajib menyertakan header
-`X-CSRF-Token`. `/api/session` memberikan token CSRF login saat belum terautentikasi,
-atau pengguna, token CSRF sesi, dan waktu kedaluwarsa setelah login. Identifier sesi
-hanya tersedia melalui cookie HttpOnly. Respons aksi yang memerlukan perpindahan halaman
-mengembalikan `{ "location": "/route?..." }` untuk React Router; error mengembalikan
-`{ "error": "..." }` dengan status HTTP yang sesuai. Nilai sel hasil query dikirim sebagai
-teks atau `null`, sehingga angka besar tetap dapat ditampilkan secara utuh.
-
-Halaman admin masih berada dalam aplikasi yang sama. Pemisahan server admin belum diterapkan.
+Pengujian PostgreSQL membuat cluster dan database sementara sendiri. Pengujian
+MariaDB dilewati jika tools opsionalnya tidak tersedia. Laporan dari launcher
+tersimpan di `src/test/output/`.
 
 ## Query Plan
 

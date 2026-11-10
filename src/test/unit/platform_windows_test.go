@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"tubes1_wbd/database/setup"
 	fixtures "tubes1_wbd/test/data"
+	"tubes1_wbd/test/data/setup"
 )
 
 func windowsFixtureFile(t *testing.T, directory, name, contents string) {

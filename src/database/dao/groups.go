@@ -30,7 +30,7 @@ func (d *Store) DeleteGroup(ctx context.Context, id int64) error {
 
 func (d *Store) SetMembership(ctx context.Context, user, group int64, member bool) error {
 	var exists bool
-	if err := d.q.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM users u CROSS JOIN access_groups g WHERE u.id=$1 AND g.id=$2)`, user, group).Scan(&exists); err != nil {
+	if err := d.q.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM users u CROSS JOIN access_groups g WHERE u.id=$1 AND g.id=$2 AND NOT u.is_legacy_admin)`, user, group).Scan(&exists); err != nil {
 		return classify(err)
 	}
 	if !exists {
@@ -60,7 +60,7 @@ func (d *Store) SetGrant(ctx context.Context, actor, group, database int64, perm
 	if permission == NoAccess {
 		_, err = d.q.ExecContext(ctx, `DELETE FROM group_database_permissions WHERE group_id=$1 AND database_id=$2`, group, database)
 	} else {
-		_, err = d.q.ExecContext(ctx, `INSERT INTO group_database_permissions(group_id,database_id,access_level,granted_by) VALUES($1,$2,$3,$4) ON CONFLICT(group_id,database_id) DO UPDATE SET access_level=EXCLUDED.access_level,granted_by=EXCLUDED.granted_by,granted_at=CURRENT_TIMESTAMP`, group, database, permission, actor)
+		_, err = d.q.ExecContext(ctx, `INSERT INTO group_database_permissions(group_id,database_id,access_level,granted_by_admin_id) VALUES($1,$2,$3,NULLIF($4,0)) ON CONFLICT(group_id,database_id) DO UPDATE SET access_level=EXCLUDED.access_level,granted_by_admin_id=EXCLUDED.granted_by_admin_id,granted_at=CURRENT_TIMESTAMP`, group, database, permission, actor)
 	}
 	return classify(err)
 }

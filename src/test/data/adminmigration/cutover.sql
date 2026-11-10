@@ -1,0 +1,15 @@
+ALTER TABLE users RENAME COLUMN created_by TO legacy_created_by_user_id;
+ALTER TABLE users ADD COLUMN created_by_admin_id BIGINT;
+UPDATE users t SET created_by_admin_id=t.legacy_created_by_user_id FROM users a WHERE t.legacy_created_by_user_id=a.id AND a.is_platform_admin;
+ALTER TABLE managed_databases RENAME COLUMN created_by TO legacy_created_by_user_id;
+ALTER TABLE managed_databases ADD COLUMN created_by_admin_id BIGINT;
+UPDATE managed_databases t SET created_by_admin_id=t.legacy_created_by_user_id FROM users a WHERE t.legacy_created_by_user_id=a.id AND a.is_platform_admin;
+ALTER TABLE group_database_permissions RENAME COLUMN granted_by TO legacy_granted_by_user_id;
+ALTER TABLE group_database_permissions ADD COLUMN granted_by_admin_id BIGINT;
+UPDATE group_database_permissions t SET granted_by_admin_id=t.legacy_granted_by_user_id FROM users a WHERE t.legacy_granted_by_user_id=a.id AND a.is_platform_admin;
+UPDATE sessions SET revoked_at=CURRENT_TIMESTAMP WHERE user_id IN (SELECT id FROM users WHERE is_platform_admin) AND revoked_at IS NULL;
+DELETE FROM session_tokens WHERE session_id IN (SELECT s.id FROM sessions s JOIN users u ON u.id=s.user_id WHERE u.is_platform_admin);
+DELETE FROM user_groups WHERE user_id IN (SELECT id FROM users WHERE is_platform_admin);
+UPDATE users SET is_active=FALSE,password_hash='',updated_at=CURRENT_TIMESTAMP WHERE is_platform_admin;
+ALTER TABLE users RENAME COLUMN is_platform_admin TO is_legacy_admin;
+ALTER TABLE users ADD CONSTRAINT users_legacy_admin_inert CHECK (NOT is_legacy_admin OR (NOT is_active AND password_hash=''));

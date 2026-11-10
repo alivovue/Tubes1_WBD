@@ -6,8 +6,11 @@ import (
 	"strings"
 	"testing"
 
+	"database/sql"
 	"golang.org/x/crypto/bcrypt"
 	"tubes1_wbd/backend/access"
+	"tubes1_wbd/database/dao"
+	fixtures "tubes1_wbd/test/data"
 )
 
 func TestAdminCreatesHashedEmployee(t *testing.T) {
@@ -15,8 +18,7 @@ func TestAdminCreatesHashedEmployee(t *testing.T) {
 	insert.check = func(args []driver.NamedValue) {
 		wantArg(t, args, 0, "new.employee")
 		wantArg(t, args, 1, "New Employee")
-		wantArg(t, args, 3, false)
-		wantArg(t, args, 4, int64(7))
+		wantArg(t, args, 3, int64(7))
 		hash, ok := args[2].Value.(string)
 		if !ok || bcrypt.CompareHashAndPassword([]byte(hash), []byte(testPassword)) != nil {
 			t.Error("employee password was not hashed")
@@ -79,18 +81,17 @@ func TestAdminInputValidationRunsBeforeStorage(t *testing.T) {
 		wantError(t, service.SetGrants(context.Background(), 7, 2, updates), access.ErrInvalid)
 	}
 }
-func TestLastActiveAdminCannotBeDemotedOrDisabled(t *testing.T) {
-	for _, tc := range []struct {
-		name          string
-		admin, active bool
-	}{{"demotion", false, true}, {"disable", true, false}} {
-		t.Run(tc.name, func(t *testing.T) {
-			steps := append(transactionSteps(true), userStep(true, true), scalarStep("SELECT count(*) FROM users", int64(1)), sqlStep{kind: "rollback"})
-			_, store, _ := newSQLStub(t, steps...)
-			service := newAccess(t, store, nil)
-			wantError(t, service.UpdateUser(context.Background(), 7, 7, "Admin", tc.admin, tc.active, ""), access.ErrInvalid)
-		})
-	}
+func TestLastActiveAdminCannotBeDisabled(t *testing.T) {
+	steps := []sqlStep{{kind: "begin"}, execStep("pg_advisory_xact_lock"), scalarStep("admin_users", true), queryStep("FROM admin_users WHERE id=", []string{"id", "username", "display", "admin", "active"}, []driver.Value{int64(7), "admin", "Admin", true, true}), scalarStep("SELECT count(*) FROM admin_users", int64(1)), {kind: "rollback"}}
+	_, store, _ := newSQLStub(t, steps...)
+	service := newAdminAccess(t, store)
+	wantError(t, service.UpdateAdmin(context.Background(), 7, 7, "Admin", false, ""), access.ErrInvalid)
+}
+func TestOrdinaryAccountsCannotBePromoted(t *testing.T) {
+	_, store, _ := newSQLStub(t)
+	service := newAccess(t, store, nil)
+	wantError(t, service.UpdateUser(context.Background(), 7, 7, "Employee", true, true, ""), access.ErrInvalid)
+	wantError(t, service.CreateUser(context.Background(), 7, "new.admin", "Admin", testPassword, true), access.ErrInvalid)
 }
 func TestUserSecurityChangesRotateOrRevokeSessions(t *testing.T) {
 	for _, tc := range []struct {
@@ -99,19 +100,20 @@ func TestUserSecurityChangesRotateOrRevokeSessions(t *testing.T) {
 		password      string
 		revoke        bool
 	}{
-		{"display change only", false, true, "", false}, {"role increase", true, true, "", false}, {"account disable", false, false, "", true}, {"password change", false, true, testPassword, true},
+		{"display change only", false, true, "", false}, {"account disable", false, false, "", true}, {"password change", false, true, testPassword, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			update := execStep("UPDATE users SET display_name=")
 			update.check = func(args []driver.NamedValue) {
-				wantArg(t, args, 2, tc.admin)
-				wantArg(t, args, 3, tc.active)
+				wantArg(t, args, 2, tc.active)
 				if tc.password != "" {
-					if bcrypt.CompareHashAndPassword([]byte(args[4].Value.(string)), []byte(tc.password)) != nil {
+					if bcrypt.CompareHashAndPassword([]byte(args[3].Value.(string)), []byte(tc.password)) != nil {
 						t.Error("replacement password was not hashed")
 					}
 				} else {
-					wantArg(t, args, 4, "")
+					if len(args) != 3 {
+						t.Error("unchanged credentials should not be read or rewritten")
+					}
 				}
 			}
 			steps := append(transactionSteps(true), userStep(false, true), update)
@@ -177,20 +179,24 @@ func TestGroupGrantChangesRotateOrRevokeAffectedSessions(t *testing.T) {
 		})
 	}
 }
-func TestBootstrapOnlyOnEmptyPlatform(t *testing.T) {
+func TestBootstrapOnlyOnEmptyAdminDatabase(t *testing.T) {
 	for _, exists := range []bool{false, true} {
 		t.Run(debugBool(exists), func(t *testing.T) {
-			steps := []sqlStep{{kind: "begin"}, execStep("pg_advisory_xact_lock"), scalarStep("SELECT EXISTS(SELECT 1 FROM users)", exists)}
+			steps := []sqlStep{{kind: "begin"}, execStep("pg_advisory_xact_lock"), scalarStep("SELECT EXISTS(SELECT 1 FROM admin_users)", exists)}
 			if exists {
 				steps = append(steps, sqlStep{kind: "rollback"})
 			} else {
-				insert := execStep("INSERT INTO users(")
-				insert.check = func(args []driver.NamedValue) { wantArg(t, args, 3, true); wantArg(t, args, 4, nil) }
+				insert := execStep("INSERT INTO admin_users(")
+				insert.check = func(args []driver.NamedValue) { wantArg(t, args, 0, "initial.admin") }
 				steps = append(steps, insert, sqlStep{kind: "commit"})
 			}
 			_, store, _ := newSQLStub(t, steps...)
-			service := newAccess(t, store, nil)
-			err := service.BootstrapAdmin(context.Background(), "initial.admin", "Initial Admin", testPassword)
+			value, _ := testDatabases.Load(store)
+			adminStore, err := dao.NewAdminAuthentication(value.(*sql.DB))
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = fixtures.BootstrapAdmin(context.Background(), adminStore, "initial.admin", "Initial Admin", testPassword)
 			if exists {
 				wantError(t, err, access.ErrConflict)
 			} else if err != nil {

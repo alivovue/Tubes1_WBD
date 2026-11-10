@@ -515,36 +515,6 @@ export function History() {
                         Reconcile from target receipt
                       </Button>
                     </Form>
-                    {data.User.IsAdmin && execution.Mode === "non_atomic" && (
-                      <details>
-                        <summary>Resolve an ambiguous outcome</summary>
-                        <p>
-                          Verify the actual target database state before
-                          confirming the result. Your reason will be recorded in
-                          history.
-                        </p>
-                        <Form confirm="Record this manually verified execution outcome?">
-                          <Hidden name="db" value={data.Database.ID} />
-                          <Hidden name="id" value={execution.ID} />
-                          <Field label="Verified outcome">
-                            <select name="outcome">
-                              <option value="applied">
-                                All statements applied
-                              </option>
-                              <option value="failed">
-                                Migration incomplete / failed
-                              </option>
-                            </select>
-                          </Field>
-                          <Field label="Verification reason">
-                            <textarea name="reason" required maxLength={2000} />
-                          </Field>
-                          <Button action="resolve" danger>
-                            Record outcome
-                          </Button>
-                        </Form>
-                      </details>
-                    )}
                   </>
                 )}
               </div>

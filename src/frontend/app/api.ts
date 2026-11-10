@@ -56,10 +56,5 @@ export function formFields(
     if (key in fields && !Array.isArray(fields[key]))
       fields[key] = [fields[key]];
   }
-  if (fields.action === "set_grants") {
-    for (const key of ["db", "permission"])
-      if (key in fields && !Array.isArray(fields[key]))
-        fields[key] = [fields[key]];
-  }
   return fields;
 }

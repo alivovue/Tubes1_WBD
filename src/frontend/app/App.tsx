@@ -24,7 +24,6 @@ import { Button, Field, Icon, initials, Notice, PageContext } from "./ui";
 import { Dashboard, Databases, Explorer, History } from "./workspace";
 import { SQLViewer } from "./SQLViewer";
 import { MigrationEditor } from "./MigrationEditor";
-import { Connections, Groups, Users } from "./admin";
 
 const SessionContext = createContext<{
   session: APIResult;
@@ -89,16 +88,9 @@ export function App() {
             "sql-viewer",
             "migrations",
             "migrations/new",
-            "admin/users",
-            "admin/groups",
-            "admin/connections",
           ].map((path) => (
             <Route key={path} path={path} element={<Page />} />
           ))}
-          <Route
-            path="admin/access"
-            element={<Navigate to="/admin/groups" replace />}
-          />
         </Route>
         <Route
           path="*"
@@ -342,16 +334,6 @@ function Layout() {
             {nav("/sql-viewer", "SQL Viewer", "code")}
             {nav("/migrations/new", "SQL Migration", "code")}
             {nav("/migrations", "Changelog", "history")}
-            {session.User?.IsAdmin && (
-              <>
-                <p className="nav-label nav-label--admin">
-                  Administration <span>Admin</span>
-                </p>
-                {nav("/admin/users", "Employees", "users")}
-                {nav("/admin/groups", "Groups", "layers")}
-                {nav("/admin/connections", "DB Connections", "server")}
-              </>
-            )}
           </nav>
           <div className="sidebar__footer">
             <div className="avatar avatar--small">
@@ -534,15 +516,6 @@ function Page() {
       break;
     case "/migrations":
       content = <History />;
-      break;
-    case "/admin/users":
-      content = <Users />;
-      break;
-    case "/admin/groups":
-      content = <Groups />;
-      break;
-    case "/admin/connections":
-      content = <Connections />;
       break;
   }
   return (

@@ -16,10 +16,12 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5"
+	"time"
 	"tubes1_wbd/backend/access"
+	"tubes1_wbd/backend/connectionconfig"
 	"tubes1_wbd/backend/dbmanagement"
 	"tubes1_wbd/database/dao"
-	"tubes1_wbd/database/setup"
+	"tubes1_wbd/test/data/setup"
 )
 
 const WebsiteName = "schakker_mock_website"
@@ -164,8 +166,6 @@ func openPostgres(ctx context.Context, directory string, website, managed bool) 
 		if err != nil {
 			return fail(err)
 		}
-	} else if err := factory.drop(ctx, WebsiteName); err != nil {
-		return fail(err)
 	}
 	if managed {
 		created, err := cluster.EnsureDatabase(ctx, factory.managedName, managedRole, "")
@@ -183,8 +183,6 @@ func openPostgres(ctx context.Context, directory string, website, managed bool) 
 				return fail(err)
 			}
 		}
-	} else if err := factory.drop(ctx, factory.managedName); err != nil {
-		return fail(err)
 	}
 	return factory, nil
 }
@@ -271,20 +269,9 @@ func (f *Factory) drop(ctx context.Context, name string) error {
 	return err
 }
 
-func PopulateWebsite(ctx context.Context, website *sql.DB, store *dao.Store, auth *access.Service, password string) error {
-	users, err := store.Users(ctx)
-	if err != nil {
+func PopulateWebsite(ctx context.Context, website *sql.DB, store *dao.Store, auth *access.Service, password string, admin int64) error {
+	if err := auth.RequireAdmin(ctx, admin); err != nil {
 		return err
-	}
-	var admin int64
-	for _, user := range users {
-		if user.Active && user.IsAdmin {
-			admin = user.ID
-			break
-		}
-	}
-	if admin == 0 {
-		return errors.New("mock website setup requires an active admin")
 	}
 	for _, entry := range []struct{ name, description string }{{"Mock Editors", "Sample editors"}, {"Mock Readers", "Sample readers"}} {
 		groups, err := store.Groups(ctx)
@@ -322,25 +309,36 @@ func PopulateWebsite(ctx context.Context, website *sql.DB, store *dao.Store, aut
 	}
 	return nil
 }
-func (f *Factory) AttachManaged(ctx context.Context, store *dao.Store, auth *access.Service, databases *dbmanagement.Service) error {
-	return attachManaged(ctx, store, auth, databases, f.Connection(f.managedName))
+func (f *Factory) AttachManaged(ctx context.Context, store *dao.Store, key []byte) error {
+	return attachManaged(ctx, store, key, f.Connection(f.managedName))
 }
-func attachManaged(ctx context.Context, store *dao.Store, auth *access.Service, databases *dbmanagement.Service, input dbmanagement.ConnectionInput) error {
-	if err := PopulateWebsite(ctx, nil, store, auth, ""); err != nil {
-		return err
+
+// attachManaged seeds only explicitly selected local development fixtures using
+// the initializer connection. It never creates an administrator or authenticates
+// against the admin database. System-seeded records have no admin attribution.
+func attachManaged(ctx context.Context, store *dao.Store, key []byte, input dbmanagement.ConnectionInput) error {
+	for _, entry := range []struct{ name, description string }{{"Mock Editors", "Sample editors"}, {"Mock Readers", "Sample readers"}} {
+		groups, err := store.Groups(ctx)
+		if err != nil {
+			return err
+		}
+		exists := false
+		for _, group := range groups {
+			if group.Name == entry.name {
+				exists = true
+			}
+		}
+		if !exists {
+			if err := store.SaveGroup(ctx, 0, entry.name, entry.description); err != nil {
+				return err
+			}
+		}
 	}
 	users, err := store.Users(ctx)
 	if err != nil {
 		return err
 	}
-	var actor int64
-	for _, user := range users {
-		if user.IsAdmin && user.Active {
-			actor = user.ID
-			break
-		}
-	}
-	connections, err := databases.Connections(ctx, actor)
+	connections, err := store.Databases(ctx)
 	if err != nil {
 		return err
 	}
@@ -352,7 +350,12 @@ func attachManaged(ctx context.Context, store *dao.Store, auth *access.Service, 
 		}
 	}
 	if target.ID == 0 {
-		target, err = databases.SaveConnection(ctx, actor, 0, input)
+		encrypted, encryptErr := connectionconfig.EncryptPassword(key, input.Password)
+		if encryptErr != nil {
+			return encryptErr
+		}
+		target = dao.Database{DBMS: input.DBMS, Name: input.Name, Host: input.Host, Port: input.Port, DatabaseName: input.DatabaseName, SSLMode: input.SSLMode, Active: true}
+		target.ID, err = store.SaveDatabaseMetadata(ctx, 0, dao.DatabaseMetadata{Database: target, Username: input.Username, EncryptedPassword: encrypted}, time.Now())
 		if err != nil {
 			return err
 		}
@@ -379,7 +382,7 @@ func attachManaged(ctx context.Context, store *dao.Store, auth *access.Service, 
 			continue
 		}
 		for _, user := range users {
-			belongs := group.Name == "Mock Editors" && (user.IsAdmin || user.Username == "mock.writer") || group.Name == "Mock Readers" && user.Username == "mock.reader"
+			belongs := group.Name == "Mock Editors" && (!user.IsAdmin && user.Username == "mock.writer") || group.Name == "Mock Readers" && user.Username == "mock.reader"
 			if !belongs || !user.Active {
 				continue
 			}
@@ -391,7 +394,7 @@ func attachManaged(ctx context.Context, store *dao.Store, auth *access.Service, 
 				}
 			}
 			if !exists {
-				if err := auth.SetMembership(ctx, actor, user.ID, group.ID, true); err != nil {
+				if err := store.SetMembership(ctx, user.ID, group.ID, true); err != nil {
 					return err
 				}
 			}
@@ -404,7 +407,7 @@ func attachManaged(ctx context.Context, store *dao.Store, auth *access.Service, 
 			}
 		}
 		if !exists {
-			if err := auth.SetGrant(ctx, actor, group.ID, target.ID, permission); err != nil {
+			if err := store.SetGrant(ctx, 0, group.ID, target.ID, permission); err != nil {
 				return err
 			}
 		}

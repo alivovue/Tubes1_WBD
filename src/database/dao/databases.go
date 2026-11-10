@@ -26,7 +26,7 @@ func (d *Store) SaveDatabaseMetadata(ctx context.Context, actor int64, in Databa
 	id := in.ID
 	err = d.Transaction(ctx, func(tx *Store) error {
 		if id == 0 {
-			return tx.q.QueryRowContext(ctx, `INSERT INTO managed_databases(display_name,dbms_type,host,port,database_name,db_username,encrypted_password,connection_options,is_active,created_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id`, in.Name, in.DBMS, in.Host, in.Port, in.DatabaseName, in.Username, in.EncryptedPassword, string(options), in.Active, actor).Scan(&id)
+			return tx.q.QueryRowContext(ctx, `INSERT INTO managed_databases(display_name,dbms_type,host,port,database_name,db_username,encrypted_password,connection_options,is_active,created_by_admin_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,NULLIF($10,0)) RETURNING id`, in.Name, in.DBMS, in.Host, in.Port, in.DatabaseName, in.Username, in.EncryptedPassword, string(options), in.Active, actor).Scan(&id)
 		}
 		if err := affected(tx.q.ExecContext(ctx, `UPDATE managed_databases SET display_name=$2,dbms_type=$3,host=$4,port=$5,database_name=$6,db_username=$7,encrypted_password=$8,connection_options=COALESCE(connection_options,'{}'::jsonb)||$9::jsonb,is_active=$10,updated_at=CURRENT_TIMESTAMP WHERE id=$1`, id, in.Name, in.DBMS, in.Host, in.Port, in.DatabaseName, in.Username, in.EncryptedPassword, string(options), in.Active)); err != nil {
 			return err
@@ -64,7 +64,7 @@ func (d *Store) EffectivePermission(ctx context.Context, user, database int64) (
 	var level int
 	err := d.q.QueryRowContext(ctx, `SELECT COALESCE(MAX(CASE p.access_level WHEN 'view_edit' THEN 2 WHEN 'view_only' THEN 1 ELSE 0 END),0)
 	 FROM users u JOIN user_groups m ON m.user_id=u.id JOIN group_database_permissions p ON p.group_id=m.group_id
-	 JOIN managed_databases d ON d.id=p.database_id WHERE u.id=$1 AND u.is_active AND d.id=$2 AND d.is_active`, user, database).Scan(&level)
+	 JOIN managed_databases d ON d.id=p.database_id WHERE u.id=$1 AND u.is_active AND NOT u.is_legacy_admin AND d.id=$2 AND d.is_active`, user, database).Scan(&level)
 	if err != nil {
 		return NoAccess, classify(err)
 	}
@@ -74,7 +74,7 @@ func (d *Store) EffectivePermission(ctx context.Context, user, database int64) (
 func (d *Store) AccessibleDatabases(ctx context.Context, user int64) ([]Database, error) {
 	rows, err := d.q.QueryContext(ctx, `SELECT d.id,d.display_name,d.dbms_type,CASE MAX(CASE p.access_level WHEN 'view_edit' THEN 2 ELSE 1 END) WHEN 2 THEN 'view_edit' ELSE 'view_only' END
 	 FROM managed_databases d JOIN group_database_permissions p ON p.database_id=d.id JOIN user_groups m ON m.group_id=p.group_id JOIN users u ON u.id=m.user_id
-	 WHERE u.id=$1 AND u.is_active AND d.is_active GROUP BY d.id,d.display_name ORDER BY d.display_name`, user)
+	 WHERE u.id=$1 AND u.is_active AND NOT u.is_legacy_admin AND d.is_active GROUP BY d.id,d.display_name ORDER BY d.display_name`, user)
 	if err != nil {
 		return nil, classify(err)
 	}

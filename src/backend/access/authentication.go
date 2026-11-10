@@ -19,6 +19,15 @@ type Identity struct {
 }
 
 func (s *Service) Login(ctx context.Context, username, password, oldToken string) (Identity, string, error) {
+	return s.login(ctx, username, password, oldToken, nil)
+}
+
+// LoginForRole rejects the wrong application role before replacing an existing
+// session. The role is rechecked under the credentials lock before any mutation.
+func (s *Service) LoginForRole(ctx context.Context, username, password, oldToken string, admin bool) (Identity, string, error) {
+	return s.login(ctx, username, password, oldToken, &admin)
+}
+func (s *Service) login(ctx context.Context, username, password, oldToken string, admin *bool) (Identity, string, error) {
 	if len(username) > 100 || len(password) > 72 {
 		return Identity{}, "", ErrUnauthenticated
 	}
@@ -31,8 +40,11 @@ func (s *Service) Login(ctx context.Context, username, password, oldToken string
 		compare = s.dummyHash
 	}
 	valid := bcrypt.CompareHashAndPassword(compare, []byte(password)) == nil
-	if !valid || err != nil || !credentials.Active {
+	if !valid || err != nil || !credentials.Active || credentials.IsAdmin != s.store.AdminAuthentication() {
 		return Identity{}, "", ErrUnauthenticated
+	}
+	if admin != nil && credentials.IsAdmin != *admin {
+		return Identity{}, "", ErrForbidden
 	}
 	raw, err := randomToken()
 	if err != nil {
@@ -50,6 +62,9 @@ func (s *Service) Login(ctx context.Context, username, password, oldToken string
 		user, err := tx.User(ctx, credentials.ID)
 		if err != nil {
 			return err
+		}
+		if admin != nil && user.IsAdmin != *admin {
+			return ErrForbidden
 		}
 		now := s.config.Now()
 		absolute := now.Add(s.config.AbsoluteLifetime)
@@ -97,7 +112,7 @@ func (s *Service) Authenticate(ctx context.Context, raw string) (Identity, strin
 		if err != nil {
 			return authenticationError(err)
 		}
-		if !user.Active {
+		if !user.Active || user.IsAdmin != s.store.AdminAuthentication() {
 			return ErrUnauthenticated
 		}
 		if token.ReplacedAt == nil && !now.Before(token.IssuedAt.Add(s.config.RotationInterval)) {

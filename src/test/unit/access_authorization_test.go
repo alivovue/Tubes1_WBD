@@ -51,7 +51,7 @@ func TestAdminRoleEnforcement(t *testing.T) {
 	service := newAccess(t, store, nil)
 	wantError(t, service.RequireAdmin(context.Background(), 0), access.ErrForbidden)
 	for _, allowed := range []bool{false, true} {
-		stub.append(scalarStep("is_platform_admin", allowed))
+		stub.append(scalarStep("admin_users", allowed))
 		err := service.RequireAdmin(context.Background(), 7)
 		if allowed {
 			if err != nil {
@@ -62,7 +62,7 @@ func TestAdminRoleEnforcement(t *testing.T) {
 		}
 	}
 	failure := errors.New("admin storage unavailable")
-	stub.append(sqlStep{kind: "query", query: "is_platform_admin", err: failure})
+	stub.append(sqlStep{kind: "query", query: "admin_users", err: failure})
 	wantError(t, service.RequireAdmin(context.Background(), 7), failure)
 }
 func TestAccessibleDatabasesExposeOnlyPublicConnectionData(t *testing.T) {

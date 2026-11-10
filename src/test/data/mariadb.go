@@ -17,7 +17,6 @@ import (
 	"sync"
 	"time"
 
-	"tubes1_wbd/backend/access"
 	"tubes1_wbd/backend/dbmanagement"
 	"tubes1_wbd/database/dao"
 )
@@ -126,8 +125,8 @@ func (m *MariaDB) Connection() dbmanagement.ConnectionInput {
 	return dbmanagement.ConnectionInput{DBMS: "mariadb", Name: "Mock MariaDB Database " + m.id, Host: "127.0.0.1", Port: m.Port, DatabaseName: m.DatabaseName, Username: managedRole, Password: m.password, SSLMode: "disable", Active: true}
 }
 
-func (m *MariaDB) AttachManaged(ctx context.Context, store *dao.Store, auth *access.Service, databases *dbmanagement.Service) error {
-	return attachManaged(ctx, store, auth, databases, m.Connection())
+func (m *MariaDB) AttachManaged(ctx context.Context, store *dao.Store, key []byte) error {
+	return attachManaged(ctx, store, key, m.Connection())
 }
 
 func mariaDBPassword(directory, dataDirectory string) (string, error) {

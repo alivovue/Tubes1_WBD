@@ -42,9 +42,9 @@ func TestGroupsPageManagesMembersAndDatabasePermissions(t *testing.T) {
 	employee := f.user(t, "groups.reader")
 	target := f.register(t)
 	identity, cookie := f.login(t, "it.admin")
-	csrf, err := f.access.CSRFToken(identity)
+	csrf, err := f.adminAuth.CSRFToken(identity)
 	must(t, err)
-	handler := promotionHandler(t, f)
+	handler := adminHandler(t, f)
 	request := func(method, path string, form url.Values) *httptest.ResponseRecorder {
 		return apiRequest(t, handler, method, path, cookie, form)
 	}
@@ -148,9 +148,9 @@ func TestGroupsBatchAccessSaveIsAtomic(t *testing.T) {
 	second, err := f.databases.SaveConnection(f.ctx, f.admin, 0, input)
 	must(t, err)
 	identity, cookie := f.login(t, "it.admin")
-	csrf, err := f.access.CSRFToken(identity)
+	csrf, err := f.adminAuth.CSRFToken(identity)
 	must(t, err)
-	handler := promotionHandler(t, f)
+	handler := adminHandler(t, f)
 	request := func(method, path string, form url.Values) *httptest.ResponseRecorder {
 		return apiRequest(t, handler, method, path, cookie, form)
 	}
@@ -207,14 +207,14 @@ func TestGroupsPermissionControlsRejectOrdinaryEmployees(t *testing.T) {
 	f := newFixture(t, true)
 	employee := f.user(t, "groups.employee")
 	identity, cookie := f.login(t, employee.Username)
-	csrf, err := f.access.CSRFToken(identity)
+	csrf, err := f.userAccess.CSRFToken(identity)
 	must(t, err)
-	handler := promotionHandler(t, f)
+	handler := adminHandler(t, f)
 	for _, path := range []string{"/admin/groups", "/admin/access"} {
 		for _, method := range []string{http.MethodGet, http.MethodPost} {
 			form := url.Values{"csrf": {csrf}, "action": {"set_grant"}, "id": {"1"}, "db": {"1"}, "permission": {string(access.ViewEdit)}}
 			response := apiRequest(t, handler, method, path, cookie, form)
-			if response.Code != http.StatusForbidden {
+			if response.Code != http.StatusUnauthorized {
 				t.Fatalf("employee received %d for %s %s", response.Code, method, path)
 			}
 		}

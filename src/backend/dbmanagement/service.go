@@ -2,16 +2,12 @@ package dbmanagement
 
 import (
 	"context"
-	"crypto/aes"
-	"crypto/cipher"
 	"crypto/hmac"
-	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
-	"fmt"
-	"time"
 
 	"tubes1_wbd/backend/access"
+	"tubes1_wbd/backend/connectionconfig"
 	"tubes1_wbd/backend/dbmanagement/adapters"
 	"tubes1_wbd/backend/dbmanagement/adapters/mariadb"
 	"tubes1_wbd/backend/dbmanagement/adapters/postgres"
@@ -26,25 +22,21 @@ var (
 	ErrConflict            = access.ErrConflict
 	ErrNotFound            = access.ErrNotFound
 	ErrUnsupported         = adapters.ErrUnsupported
-	ErrDuplicateConnection = fmt.Errorf("%w: target database is already registered", ErrConflict)
+	ErrDuplicateConnection = connectionconfig.ErrDuplicateConnection
 )
 
-type Config struct {
-	Key            []byte
-	Production     bool
-	ConnectTimeout time.Duration
-	QueryTimeout   time.Duration
-}
+type Config = connectionconfig.Config
 
 func DefaultConfig(key []byte, production bool) Config {
-	return Config{Key: key, Production: production, ConnectTimeout: 5 * time.Second, QueryTimeout: 30 * time.Second}
+	return connectionconfig.DefaultConfig(key, production)
 }
 
 type Service struct {
-	store    *dao.Store
-	access   *access.Service
-	config   Config
-	registry *adapters.Registry
+	store       *dao.Store
+	access      *access.Service
+	config      Config
+	registry    *adapters.Registry
+	connections *connectionconfig.Service
 }
 
 func NewService(store *dao.Store, auth *access.Service, config Config) (*Service, error) {
@@ -56,48 +48,24 @@ func NewService(store *dao.Store, auth *access.Service, config Config) (*Service
 	if err != nil {
 		return nil, err
 	}
-	return &Service{store: store, access: auth, config: config, registry: registry}, nil
+	registrations, err := connectionconfig.NewService(store, auth, config)
+	if err != nil {
+		return nil, err
+	}
+	return &Service{store: store, access: auth, config: config, registry: registry, connections: registrations}, nil
 }
 func (s *Service) SupportedDBMS() []string { return s.registry.Supported() }
 func (s *Service) Databases(ctx context.Context, actor int64) ([]dao.Database, error) {
 	return s.access.AccessibleDatabases(ctx, actor)
 }
 func (s *Service) Connections(ctx context.Context, actor int64) ([]dao.Database, error) {
-	if err := s.access.RequireAdmin(ctx, actor); err != nil {
-		return nil, err
-	}
-	return s.store.Databases(ctx)
+	return s.connections.Connections(ctx, actor)
 }
 func (s *Service) encrypt(value string) ([]byte, error) {
-	block, err := aes.NewCipher(s.config.Key)
-	if err != nil {
-		return nil, ErrConnection
-	}
-	gcm, err := cipher.NewGCM(block)
-	if err != nil {
-		return nil, ErrConnection
-	}
-	nonce := make([]byte, gcm.NonceSize())
-	if _, err := rand.Read(nonce); err != nil {
-		return nil, ErrConnection
-	}
-	return gcm.Seal(nonce, nonce, []byte(value), []byte("schakker/target-password/v1")), nil
+	return connectionconfig.EncryptPassword(s.config.Key, value)
 }
-
 func (s *Service) decrypt(value []byte) (string, error) {
-	block, err := aes.NewCipher(s.config.Key)
-	if err != nil {
-		return "", ErrConnection
-	}
-	gcm, err := cipher.NewGCM(block)
-	if err != nil || len(value) < gcm.NonceSize() {
-		return "", ErrConnection
-	}
-	plain, err := gcm.Open(nil, value[:gcm.NonceSize()], value[gcm.NonceSize():], []byte("schakker/target-password/v1"))
-	if err != nil {
-		return "", ErrConnection
-	}
-	return string(plain), nil
+	return connectionconfig.DecryptPassword(s.config.Key, value)
 }
 
 func (s *Service) SignReview(value string) string {

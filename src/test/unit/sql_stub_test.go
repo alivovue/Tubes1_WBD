@@ -18,6 +18,8 @@ import (
 	"tubes1_wbd/database/dao"
 )
 
+var testDatabases sync.Map
+
 type sqlStep struct {
 	kind, query string
 	columns     []string
@@ -49,7 +51,7 @@ func scalarStep(query string, value driver.Value) sqlStep {
 }
 func execStep(query string) sqlStep { return sqlStep{kind: "exec", query: query, affected: 1} }
 func transactionSteps(allowed bool) []sqlStep {
-	return []sqlStep{{kind: "begin"}, execStep("pg_advisory_xact_lock"), scalarStep("is_platform_admin", allowed)}
+	return []sqlStep{{kind: "begin"}, execStep("pg_advisory_xact_lock"), scalarStep("admin_users", allowed)}
 }
 func newSQLStub(t *testing.T, steps ...sqlStep) (*sql.DB, *dao.Store, *sqlStub) {
 	t.Helper()
@@ -60,7 +62,9 @@ func newSQLStub(t *testing.T, steps ...sqlStep) (*sql.DB, *dao.Store, *sqlStub) 
 	if err != nil {
 		t.Fatal(err)
 	}
+	testDatabases.Store(store, db)
 	t.Cleanup(func() {
+		testDatabases.Delete(store)
 		db.Close()
 		state.mu.Lock()
 		defer state.mu.Unlock()
@@ -152,7 +156,16 @@ func newAccess(t *testing.T, store *dao.Store, clock func() time.Time) *access.S
 		clock = func() time.Time { return testTime }
 	}
 	config.Now = clock
-	service, err := access.NewService(store, config)
+	db, _ := testDatabases.Load(store)
+	adminStore, err := dao.NewAdminAuthentication(db.(*sql.DB))
+	if err != nil {
+		t.Fatal(err)
+	}
+	authority, err := access.NewService(adminStore, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	service, err := access.NewAdministrationService(store, authority, config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -187,7 +200,7 @@ func wantArg(t *testing.T, args []driver.NamedValue, index int, want any) {
 	}
 }
 func userStep(admin, active bool) sqlStep {
-	return queryStep("FROM users WHERE id=", []string{"id", "username", "display_name", "is_platform_admin", "is_active"}, []driver.Value{int64(7), "employee", "Employee", admin, active})
+	return queryStep("FROM users WHERE id=", []string{"id", "username", "display_name", "is_admin_domain", "is_active"}, []driver.Value{int64(7), "employee", "Employee", admin, active})
 }
 func permissionStep(permission dao.Permission) sqlStep {
 	level := int64(0)
@@ -206,4 +219,19 @@ func hashArgument(t *testing.T, value driver.Value) []byte {
 		t.Fatalf("hashed token has type %T", value)
 	}
 	return hash
+}
+
+func newAdminAccess(t *testing.T, store *dao.Store) *access.Service {
+	db, _ := testDatabases.Load(store)
+	adminStore, err := dao.NewAdminAuthentication(db.(*sql.DB))
+	if err != nil {
+		t.Fatal(err)
+	}
+	config := access.DefaultConfig(testKey)
+	config.Now = func() time.Time { return testTime }
+	service, err := access.NewService(adminStore, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return service
 }

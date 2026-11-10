@@ -1,202 +1,26 @@
 package backend
 
 import (
-	"context"
-	"crypto/rand"
-	"database/sql"
-	"encoding/base64"
-	"encoding/hex"
-	"errors"
-	"os"
-	"path/filepath"
-	"strings"
-	"time"
-
-	"tubes1_wbd/backend/access"
 	"tubes1_wbd/backend/dbmanagement"
 	"tubes1_wbd/backend/migration"
-	"tubes1_wbd/database/dao"
-	"tubes1_wbd/database/setup"
-	fixtures "tubes1_wbd/test/data"
+	"tubes1_wbd/database/platform"
 )
 
-var ErrAdminSetupRequired = errors.New("initial admin setup is required; start with run.sh on Linux or run.bat on Windows from the repository root")
-
 func servicesFromEnvironment(root string) (Services, func(), error) {
-	production := os.Getenv("SCHAKKER_ENV") == "production"
-	dsn := os.Getenv("SCHAKKER_DATABASE_URL")
-	if dsn == "" {
-		dsn = os.Getenv("DATABASE_URL")
-	}
-	if production && dsn == "" {
-		return Services{}, nil, errors.New("production requires SCHAKKER_DATABASE_URL")
-	}
-	directory := os.Getenv("SCHAKKER_STATE_DIR")
-	if directory == "" {
-		directory = filepath.Join(root, ".schakker")
-	}
-	key, err := masterKey(directory, production)
+	runtime, err := platform.Open(root)
 	if err != nil {
 		return Services{}, nil, err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-	defer cancel()
-	var db *sql.DB
-	stopDatabase := func() {}
-	useMockWebsite := os.Getenv("SCHAKKER_USE_MOCK_WEBSITE") == "yes"
-	useMockManaged := os.Getenv("SCHAKKER_USE_MOCK_MANAGED") == "yes"
-	useMockMariaDB := os.Getenv("SCHAKKER_USE_MOCK_MARIADB") == "yes"
-	var mocks *fixtures.Factory
-	if useMockWebsite || useMockManaged || useMockMariaDB {
-		if production {
-			return Services{}, nil, errors.New("mock databases are available in development only")
-		}
-		state := os.Getenv("SCHAKKER_FIXTURE_STATE")
-		if state == "" {
-			return Services{}, nil, errors.New("mock database state was not provided by the launcher")
-		}
-		mocks, err = fixtures.OpenWithOptions(ctx, state, fixtures.Options{Website: useMockWebsite, Managed: useMockManaged, MariaDB: useMockMariaDB})
-		if err != nil {
-			return Services{}, nil, err
-		}
-	}
-	if useMockWebsite {
-		db, err = mocks.Cluster.Open(ctx, fixtures.WebsiteName)
-	} else if dsn == "" {
-		db, stopDatabase, err = setup.OpenLocal(ctx, directory)
-	} else {
-		db, err = setup.Open(ctx, dsn)
-	}
+	closeDB := func() { runtime.Close() }
+	databases, err := dbmanagement.NewService(runtime.Store, runtime.Access, dbmanagement.DefaultConfig(runtime.Key, runtime.Production))
 	if err != nil {
-		if mocks != nil {
-			mocks.Close()
-		}
+		closeDB()
 		return Services{}, nil, err
 	}
-	closeDB := func() {
-		db.Close()
-		stopDatabase()
-		if mocks != nil {
-			mocks.Close()
-		}
-	}
-	fail := func(err error) (Services, func(), error) { closeDB(); return Services{}, nil, err }
-	if err := setup.EnsureInitialized(ctx, db); err != nil {
-		return fail(err)
-	}
-	store, err := dao.New(db)
+	migrations, err := migration.NewService(runtime.Store, runtime.Access, databases)
 	if err != nil {
-		return fail(err)
+		closeDB()
+		return Services{}, nil, err
 	}
-	auth, err := access.NewService(store, access.DefaultConfig(key))
-	if err != nil {
-		return fail(err)
-	}
-	exists, err := store.UsersExist(ctx)
-	if err != nil {
-		return fail(err)
-	}
-	bootstrapPassword := ""
-	if !exists {
-		username, password := os.Getenv("SCHAKKER_ADMIN_USERNAME"), os.Getenv("SCHAKKER_ADMIN_PASSWORD")
-		display := os.Getenv("SCHAKKER_ADMIN_NAME")
-		if display == "" {
-			display = username
-		}
-		if username == "" || password == "" {
-			return fail(ErrAdminSetupRequired)
-		}
-		if err := auth.BootstrapAdmin(ctx, username, display, password); err != nil {
-			return fail(errors.New("initial admin could not be created; use a valid username and a password containing 12–72 bytes"))
-		}
-		bootstrapPassword = password
-	}
-	databases, err := dbmanagement.NewService(store, auth, dbmanagement.DefaultConfig(key, production))
-	if err != nil {
-		return fail(err)
-	}
-	migrations, err := migration.NewService(store, auth, databases)
-	if err != nil {
-		return fail(err)
-	}
-	if useMockWebsite {
-		if err := fixtures.PopulateWebsite(ctx, db, store, auth, bootstrapPassword); err != nil {
-			return fail(err)
-		}
-	}
-	if useMockManaged {
-		if err := mocks.AttachManaged(ctx, store, auth, databases); err != nil {
-			return fail(err)
-		}
-	}
-	if useMockMariaDB {
-		if err := mocks.MariaDB.AttachManaged(ctx, store, auth, databases); err != nil {
-			return fail(err)
-		}
-	}
-	return Services{Access: auth, Databases: databases, Migrations: migrations, Production: production}, closeDB, nil
-}
-
-func masterKey(directory string, production bool) ([]byte, error) {
-	encoded := strings.TrimSpace(os.Getenv("SCHAKKER_MASTER_KEY"))
-	if encoded == "" {
-		if production {
-			return nil, errors.New("production requires SCHAKKER_MASTER_KEY")
-		}
-		if err := os.MkdirAll(directory, 0700); err != nil {
-			return nil, err
-		}
-		if err := os.Chmod(directory, 0700); err != nil {
-			return nil, err
-		}
-		filename := filepath.Join(directory, "master.key")
-		data, err := os.ReadFile(filename)
-		if errors.Is(err, os.ErrNotExist) {
-			if _, err := os.Stat(filepath.Join(directory, "postgres", "PG_VERSION")); err == nil {
-				return nil, errors.New("the existing local database is missing its master key; restore .schakker/master.key")
-			}
-			key := make([]byte, 32)
-			if _, err := rand.Read(key); err != nil {
-				return nil, err
-			}
-			data = []byte(hex.EncodeToString(key) + "\n")
-			temporary, err := os.CreateTemp(directory, ".master-key-")
-			if err != nil {
-				return nil, err
-			}
-			defer os.Remove(temporary.Name())
-			if _, err := temporary.Write(data); err != nil {
-				temporary.Close()
-				return nil, err
-			}
-			if err := temporary.Sync(); err != nil {
-				temporary.Close()
-				return nil, err
-			}
-			if err := temporary.Close(); err != nil {
-				return nil, err
-			}
-			if err := os.Link(temporary.Name(), filename); err != nil && !errors.Is(err, os.ErrExist) {
-				return nil, err
-			}
-			data, err = os.ReadFile(filename)
-			if err != nil {
-				return nil, err
-			}
-		} else if err != nil {
-			return nil, err
-		}
-		if err := os.Chmod(filename, 0600); err != nil {
-			return nil, err
-		}
-		encoded = strings.TrimSpace(string(data))
-	}
-	key, err := hex.DecodeString(encoded)
-	if err != nil || len(key) != 32 {
-		key, err = base64.StdEncoding.DecodeString(encoded)
-	}
-	if err != nil || len(key) != 32 {
-		return nil, errors.New("the master key must contain 32 bytes encoded as hex or base64")
-	}
-	return key, nil
+	return Services{Access: runtime.Access, Databases: databases, Migrations: migrations, Production: runtime.Production}, closeDB, nil
 }

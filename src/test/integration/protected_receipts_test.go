@@ -16,10 +16,10 @@ func receiptFixture(t *testing.T) (*fixture, dao.Database, dao.MigrationExecutio
 	t.Helper()
 	f := newFixture(t, true)
 	target := f.register(t)
-	f.grant(t, f.admin, target.ID, access.ViewEdit)
-	review, err := f.migrations.Analyze(f.ctx, f.admin, target.ID, "CREATE TABLE public.receipt_guard_demo(id integer PRIMARY KEY,note text)")
+	f.grant(t, f.editor, target.ID, access.ViewEdit)
+	review, err := f.migrations.Analyze(f.ctx, f.editor, target.ID, "CREATE TABLE public.receipt_guard_demo(id integer PRIMARY KEY,note text)")
 	must(t, err)
-	execution, err := f.migrations.Execute(f.ctx, f.admin, target.ID, migration.ExecuteInput{Review: review})
+	execution, err := f.migrations.Execute(f.ctx, f.editor, target.ID, migration.ExecuteInput{Review: review})
 	must(t, err)
 	return f, target, execution
 }
@@ -41,7 +41,7 @@ func assertOriginalReceipt(t *testing.T, f *fixture, original dao.MigrationExecu
 
 func TestPostgreSQLRejectsReceiptAttacksAndPreviouslySignedReviews(t *testing.T) {
 	f, target, original := receiptFixture(t)
-	base, err := f.migrations.Analyze(f.ctx, f.admin, target.ID, "SELECT 1")
+	base, err := f.migrations.Analyze(f.ctx, f.editor, target.ID, "SELECT 1")
 	must(t, err)
 	attacks := []string{
 		`DO $$BEGIN DELETE FROM _schakker.migration_receipts; END$$`,
@@ -51,39 +51,39 @@ func TestPostgreSQLRejectsReceiptAttacksAndPreviouslySignedReviews(t *testing.T)
 		`CREATE OR REPLACE FUNCTION public.erase_receipts() RETURNS void LANGUAGE sql AS $$DELETE FROM _schakker.migration_receipts$$`,
 	}
 	for _, query := range attacks {
-		_, err := f.migrations.SaveDraft(f.ctx, f.admin, target.ID, migration.DraftInput{Title: "Rejected receipt attack", SQL: query})
+		_, err := f.migrations.SaveDraft(f.ctx, f.editor, target.ID, migration.DraftInput{Title: "Rejected receipt attack", SQL: query})
 		wantError(t, err, migration.ErrUnsafeSQL)
-		_, err = f.migrations.Analyze(f.ctx, f.admin, target.ID, query)
+		_, err = f.migrations.Analyze(f.ctx, f.editor, target.ID, query)
 		wantError(t, err, migration.ErrUnsafeSQL)
 		review := base
 		review.SQL = query
 		review.SQLHash = migration.SQLHash(query)
 		review.Signature = f.databases.SignReview(fmt.Sprintf("%d\x00%s\x00%d\x00%s\x00%s\x00%s\x00%s", review.DatabaseID, review.SQLHash, review.BaseVersion, review.SchemaFingerprint, review.ConnectionFingerprint, review.DBMS, review.Mode))
-		execution, err := f.migrations.Execute(f.ctx, f.admin, target.ID, migration.ExecuteInput{Review: review})
+		execution, err := f.migrations.Execute(f.ctx, f.editor, target.ID, migration.ExecuteInput{Review: review})
 		wantError(t, err, migration.ErrUnsafeSQL)
 		if execution.ID != 0 {
 			t.Fatal("rejected SQL created an execution attempt")
 		}
 		assertOriginalReceipt(t, f, original, 1)
 	}
-	identity, raw := f.login(t, "it.admin")
+	identity, raw := f.login(t, "it.editor")
 	csrf, err := f.access.CSRFToken(identity)
 	must(t, err)
 	form := url.Values{"csrf": {csrf}, "action": {"analyze"}, "db": {fmt.Sprint(target.ID)}, "description": {"Rejected SQL"}, "sql": {attacks[0]}}
-	handler := promotionHandler(t, f)
+	handler := userHandler(t, f)
 	response := apiRequest(t, handler, http.MethodPost, "/migrations/new", raw, form)
 	if response.Code != http.StatusBadRequest || !strings.Contains(response.Body.String(), "Migration SQL cannot run procedural blocks") {
 		t.Fatalf("unsafe SQL did not show the policy rejection: %d", response.Code)
 	}
-	review, err := f.migrations.Analyze(f.ctx, f.admin, target.ID, "INSERT INTO public.receipt_guard_demo VALUES(1,'normal migration')")
+	review, err := f.migrations.Analyze(f.ctx, f.editor, target.ID, "INSERT INTO public.receipt_guard_demo VALUES(1,'normal migration')")
 	must(t, err)
-	second, err := f.migrations.Execute(f.ctx, f.admin, target.ID, migration.ExecuteInput{Review: review})
+	second, err := f.migrations.Execute(f.ctx, f.editor, target.ID, migration.ExecuteInput{Review: review})
 	must(t, err)
 	if second.AppliedVersion == nil || *second.AppliedVersion != 2 {
 		t.Fatal("normal migration did not advance the version")
 	}
 	assertOriginalReceipt(t, f, original, 2)
-	history, err := f.migrations.History(f.ctx, f.admin, target.ID, 50, 0)
+	history, err := f.migrations.History(f.ctx, f.editor, target.ID, 50, 0)
 	must(t, err)
 	if len(history) != 2 {
 		t.Fatal("rejected attacks changed successful migration history")
@@ -95,9 +95,9 @@ func TestHiddenReceiptDeletionRollsBackTheWholeMigration(t *testing.T) {
 	_, err := f.dbs.Managed.ExecContext(f.ctx, `CREATE FUNCTION public.erase_receipts() RETURNS integer LANGUAGE plpgsql AS $$BEGIN DELETE FROM _schakker.migration_receipts; RETURN 1; END$$`)
 	must(t, err)
 	query := "CREATE TABLE public.receipt_guard_rolled_back(id integer); INSERT INTO public.receipt_guard_demo VALUES(1,'must roll back'); SELECT public.erase_receipts()"
-	review, err := f.migrations.Analyze(f.ctx, f.admin, target.ID, query)
+	review, err := f.migrations.Analyze(f.ctx, f.editor, target.ID, query)
 	must(t, err)
-	execution, err := f.migrations.Execute(f.ctx, f.admin, target.ID, migration.ExecuteInput{Review: review})
+	execution, err := f.migrations.Execute(f.ctx, f.editor, target.ID, migration.ExecuteInput{Review: review})
 	wantError(t, err, migration.ErrExecution)
 	if execution.Status != "failed" || execution.AppliedVersion != nil || execution.CompletedStatements != 0 || !strings.Contains(execution.ErrorMessage, "Protected migration metadata") || !strings.Contains(execution.ErrorMessage, "rolled back") {
 		t.Fatalf("metadata tampering was not recorded as a rollback: %#v", execution)
@@ -128,9 +128,9 @@ func TestHiddenReceiptDDLAndSessionChangesAreRolledBack(t *testing.T) {
 			f, target, original := receiptFixture(t)
 			_, err := f.dbs.Managed.ExecContext(f.ctx, `CREATE FUNCTION public.change_receipt_state() RETURNS integer LANGUAGE plpgsql AS $$BEGIN `+tc.body+` RETURN 1; END$$`)
 			must(t, err)
-			review, err := f.migrations.Analyze(f.ctx, f.admin, target.ID, "SELECT public.change_receipt_state()")
+			review, err := f.migrations.Analyze(f.ctx, f.editor, target.ID, "SELECT public.change_receipt_state()")
 			must(t, err)
-			execution, err := f.migrations.Execute(f.ctx, f.admin, target.ID, migration.ExecuteInput{Review: review})
+			execution, err := f.migrations.Execute(f.ctx, f.editor, target.ID, migration.ExecuteInput{Review: review})
 			wantError(t, err, migration.ErrExecution)
 			if execution.Status != "failed" || !strings.Contains(execution.ErrorMessage, "Protected migration metadata") {
 				t.Fatalf("hidden metadata or session changes were accepted: %#v", execution)
@@ -154,9 +154,9 @@ func TestReceiptInsertTriggerCannotErasePreviousCommitEvidence(t *testing.T) {
 			f, target, original := receiptFixture(t)
 			_, err := f.dbs.Managed.ExecContext(f.ctx, `CREATE FUNCTION public.prune_receipts() RETURNS trigger LANGUAGE plpgsql AS $$BEGIN DELETE FROM _schakker.migration_receipts WHERE attempt_id<>NEW.attempt_id; RETURN NEW; END$$; `+trigger)
 			must(t, err)
-			review, err := f.migrations.Analyze(f.ctx, f.admin, target.ID, "INSERT INTO public.receipt_guard_demo VALUES(1,'must roll back')")
+			review, err := f.migrations.Analyze(f.ctx, f.editor, target.ID, "INSERT INTO public.receipt_guard_demo VALUES(1,'must roll back')")
 			must(t, err)
-			execution, err := f.migrations.Execute(f.ctx, f.admin, target.ID, migration.ExecuteInput{Review: review})
+			execution, err := f.migrations.Execute(f.ctx, f.editor, target.ID, migration.ExecuteInput{Review: review})
 			wantError(t, err, migration.ErrExecution)
 			if execution.Status != "failed" || !strings.Contains(execution.ErrorMessage, "Protected migration metadata") {
 				t.Fatalf("receipt insertion side effects were accepted: %#v", execution)

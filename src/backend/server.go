@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -15,6 +14,7 @@ import (
 
 	"tubes1_wbd/backend/access"
 	"tubes1_wbd/backend/dbmanagement"
+	"tubes1_wbd/backend/httpapi"
 	"tubes1_wbd/backend/migration"
 	"tubes1_wbd/backend/migration/diff"
 	"tubes1_wbd/database/dao"
@@ -23,18 +23,14 @@ import (
 type page struct{ title, active, section string }
 
 var pages = map[string]page{
-	"/":                  {"Masuk", "login", "Authentication"},
-	"/login":             {"Masuk", "login", "Authentication"},
-	"/dashboard":         {"Dashboard", "dashboard", "Overview"},
-	"/databases":         {"My Databases", "databases", "Workspace"},
-	"/explorer":          {"Database Explorer", "databases", "Workspace"},
-	"/sql-viewer":        {"SQL Viewer", "sql-viewer", "Workspace"},
-	"/migrations/new":    {"SQL Migration", "migration-editor", "Workspace"},
-	"/migrations":        {"Changelog", "migration-history", "Workspace"},
-	"/admin/users":       {"Employees", "admin-users", "Administration"},
-	"/admin/groups":      {"Groups", "admin-groups", "Administration"},
-	"/admin/connections": {"Database Connections", "admin-connections", "Administration"},
-	"/admin/access":      {"Groups", "admin-groups", "Administration"},
+	"/":               {"Masuk", "login", "Authentication"},
+	"/login":          {"Masuk", "login", "Authentication"},
+	"/dashboard":      {"Dashboard", "dashboard", "Overview"},
+	"/databases":      {"My Databases", "databases", "Workspace"},
+	"/explorer":       {"Database Explorer", "databases", "Workspace"},
+	"/sql-viewer":     {"SQL Viewer", "sql-viewer", "Workspace"},
+	"/migrations/new": {"SQL Migration", "migration-editor", "Workspace"},
+	"/migrations":     {"Changelog", "migration-history", "Workspace"},
 }
 
 var legacyRoutes = map[string]string{
@@ -56,17 +52,6 @@ type application struct {
 	productJSON    []byte
 }
 
-type groupView struct {
-	dao.Group
-	Members []dao.User
-	Grants  []grantCell
-	Editor  string
-	Focus   bool
-}
-type grantCell struct {
-	Database   dao.Database
-	Permission dao.Permission
-}
 type recentExecution struct {
 	dao.MigrationExecution
 	DatabaseName string
@@ -83,9 +68,6 @@ type pageData struct {
 	CanEdit                                        bool
 	EditableCount                                  int
 	Recent                                         []recentExecution
-	Admin                                          dao.AdminData
-	Groups                                         []groupView
-	DBMS                                           []string
 	Schemas                                        []dbmanagement.Schema
 	Tables                                         []dbmanagement.Table
 	Schema, Table, Sort, Direction                 string
@@ -159,9 +141,7 @@ func link(route string, args ...any) string {
 }
 
 func (app *application) serveHTTP(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("X-Content-Type-Options", "nosniff")
-	w.Header().Set("Referrer-Policy", "same-origin")
-	w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'")
+	httpapi.SecurityHeaders(w)
 	if strings.HasPrefix(r.URL.Path, "/assets/") {
 		app.assets.ServeHTTP(w, r)
 		return
@@ -225,26 +205,8 @@ func (app *application) serveAPI(w http.ResponseWriter, r *http.Request) {
 		app.jsonError(w, r, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	identity, replacement, err := app.services.Access.Authenticate(r.Context(), cookieValue(r, access.CookieName))
-	if err != nil {
-		if errors.Is(err, access.ErrUnauthenticated) {
-			app.clearCookie(w, r, access.CookieName)
-			if r.URL.Path == "/session" {
-				app.loginChallenge(w, r, "", http.StatusOK)
-			} else {
-				app.jsonError(w, r, "Your session expired. Please sign in again.", http.StatusUnauthorized)
-			}
-		} else {
-			app.jsonError(w, r, "Authentication is unavailable. Please retry.", http.StatusServiceUnavailable)
-		}
-		return
-	}
-	if replacement != "" {
-		app.setCookie(w, r, access.CookieName, replacement, identity.AbsoluteExpires)
-	}
-	csrf, err := app.services.Access.CSRFToken(identity)
-	if err != nil {
-		app.jsonError(w, r, "Session is unavailable", http.StatusUnauthorized)
+	identity, csrf, ok := app.authHTTP().Authenticate(w, r, r.URL.Path == "/session")
+	if !ok {
 		return
 	}
 	data := pageData{Title: p.title, Active: p.active, Section: p.section, User: identity.User, CSRF: csrf, Now: time.Now(), Expires: identity.AbsoluteExpires}
@@ -253,32 +215,13 @@ func (app *application) serveAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Method == http.MethodPost {
-		if err := parseActionJSON(w, r); err != nil {
+		if err := app.authHTTP().ValidateAction(w, r, identity); err != nil {
 			app.fail(w, r, data, err)
-			return
-		}
-		if !sameOrigin(r) || app.services.Access.ValidateCSRF(identity, r.Header.Get("X-CSRF-Token")) != nil {
-			app.fail(w, r, data, access.ErrForbidden)
 			return
 		}
 	}
 	if r.URL.Path == "/logout" {
-		if err := app.services.Access.Logout(r.Context(), identity.SessionID); err != nil {
-			app.fail(w, r, data, err)
-			return
-		}
-		app.clearCookie(w, r, access.CookieName)
-		app.redirect(w, r, "/login", "")
-		return
-	}
-	if strings.HasPrefix(r.URL.Path, "/admin/") {
-		if err := app.services.Access.RequireAdmin(r.Context(), identity.User.ID); err != nil {
-			app.fail(w, r, data, err)
-			return
-		}
-	}
-	if r.URL.Path == "/admin/access" && r.Method != http.MethodPost {
-		app.redirect(w, r, "/admin/groups", "")
+		app.authHTTP().Logout(w, r, identity)
 		return
 	}
 	if r.Method == http.MethodPost {
@@ -322,48 +265,11 @@ func normalizeDisplayRows(rows [][]any) {
 	}
 }
 
-// JSON action bodies retain repeated fields (for atomic grants and visual filters)
-// while reusing the existing validated action/service boundary.
-func parseActionJSON(w http.ResponseWriter, r *http.Request) error {
-	r.Body = http.MaxBytesReader(w, r.Body, 4<<20)
-	if strings.Split(r.Header.Get("Content-Type"), ";")[0] != "application/json" {
-		return access.ErrInvalid
-	}
-	var values map[string]json.RawMessage
-	decoder := json.NewDecoder(r.Body)
-	if decoder.Decode(&values) != nil || values == nil {
-		return access.ErrInvalid
-	}
-	var extra any
-	if decoder.Decode(&extra) != io.EOF {
-		return access.ErrInvalid
-	}
-	r.PostForm = url.Values{}
-	for key, value := range values {
-		var single string
-		if json.Unmarshal(value, &single) == nil {
-			r.PostForm.Set(key, single)
-			continue
-		}
-		var multiple []string
-		if json.Unmarshal(value, &multiple) != nil || multiple == nil {
-			return access.ErrInvalid
-		}
-		r.PostForm[key] = multiple
-	}
-	return nil
-}
-
 func (app *application) json(w http.ResponseWriter, r *http.Request, status int, value any) {
-	body, err := json.Marshal(value)
-	if err != nil {
-		app.jsonError(w, r, "The response could not be encoded.", http.StatusInternalServerError)
-		return
-	}
-	writeResponse(w, r, status, "application/json; charset=utf-8", body)
+	httpapi.JSON(w, r, status, value)
 }
 func (app *application) jsonError(w http.ResponseWriter, r *http.Request, message string, status int) {
-	app.json(w, r, status, map[string]string{"error": message})
+	httpapi.Error(w, r, message, status)
 }
 func (app *application) fail(w http.ResponseWriter, r *http.Request, data pageData, err error) {
 	message, status := userError(err)
@@ -414,12 +320,7 @@ func userError(err error) (string, int) {
 	}
 }
 func writeResponse(w http.ResponseWriter, r *http.Request, status int, contentType string, body []byte) {
-	w.Header().Set("Content-Type", contentType)
-	w.Header().Set("Content-Length", strconv.Itoa(len(body)))
-	w.WriteHeader(status)
-	if r.Method != http.MethodHead {
-		_, _ = w.Write(body)
-	}
+	httpapi.Write(w, r, status, contentType, body)
 }
 func requestID(raw string) (int64, error) {
 	if raw == "" {

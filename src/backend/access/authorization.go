@@ -3,6 +3,9 @@ package access
 import "context"
 
 func (s *Service) EffectivePermission(ctx context.Context, user, database int64) (Permission, error) {
+	if s.store.AdminAuthentication() {
+		return NoAccess, ErrForbidden
+	}
 	if user < 1 || database < 1 {
 		return NoAccess, ErrInvalid
 	}
@@ -21,6 +24,9 @@ func (s *Service) RequirePermission(ctx context.Context, user, database int64, r
 }
 
 func (s *Service) AccessibleDatabases(ctx context.Context, user int64) ([]Database, error) {
+	if s.store.AdminAuthentication() {
+		return nil, ErrForbidden
+	}
 	if user < 1 {
 		return nil, ErrUnauthenticated
 	}

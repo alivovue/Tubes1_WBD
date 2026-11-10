@@ -7,17 +7,18 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 	"tubes1_wbd/backend/access"
+	fixtures "tubes1_wbd/test/data"
 )
 
 func TestIT01CreateAdminAndLogin(t *testing.T) {
 	f := newFixture(t, false)
 	var before int
-	must(t, f.dbs.Website.QueryRowContext(f.ctx, `SELECT count(*) FROM users`).Scan(&before))
+	must(t, f.adminDB.QueryRowContext(f.ctx, `SELECT count(*) FROM admin_users`).Scan(&before))
 	if before != 0 {
 		t.Fatal("website fixture already contains users")
 	}
-	must(t, f.access.BootstrapAdmin(f.ctx, "it.admin", "Integration Admin", password))
-	credentials, err := f.store.Credentials(f.ctx, "it.admin")
+	must(t, fixtures.BootstrapAdmin(f.ctx, f.adminStore, "it.admin", "Integration Admin", password))
+	credentials, err := f.adminStore.Credentials(f.ctx, "it.admin")
 	must(t, err)
 	if !credentials.IsAdmin || !credentials.Active || credentials.PasswordHash == password {
 		t.Fatal("persisted admin or password storage is invalid")
@@ -30,17 +31,17 @@ func TestIT01CreateAdminAndLogin(t *testing.T) {
 	var user int64
 	var revoked bool
 	var idle, absolute time.Time
-	must(t, f.dbs.Website.QueryRowContext(f.ctx, `SELECT user_id,revoked_at IS NOT NULL,idle_expires_at,absolute_expires_at FROM sessions WHERE id=$1`, identity.SessionID).Scan(&user, &revoked, &idle, &absolute))
+	must(t, f.adminDB.QueryRowContext(f.ctx, `SELECT admin_id,revoked_at IS NOT NULL,idle_expires_at,absolute_expires_at FROM admin_sessions WHERE id=$1`, identity.SessionID).Scan(&user, &revoked, &idle, &absolute))
 	if user != credentials.ID || revoked || absolute.Sub(identity.AbsoluteExpires).Abs() > time.Microsecond || !idle.Before(absolute) {
 		t.Fatal("persisted session does not match the login")
 	}
 	hash := sha256.Sum256([]byte(raw))
 	var stored int
-	must(t, f.dbs.Website.QueryRowContext(f.ctx, `SELECT count(*) FROM session_tokens WHERE session_id=$1 AND token_hash=$2`, identity.SessionID, hash[:]).Scan(&stored))
+	must(t, f.adminDB.QueryRowContext(f.ctx, `SELECT count(*) FROM admin_session_tokens WHERE session_id=$1 AND token_hash=$2`, identity.SessionID, hash[:]).Scan(&stored))
 	if stored != 1 {
 		t.Fatal("opaque token was not stored as a hash")
 	}
-	authenticated, _, err := f.access.Authenticate(f.ctx, raw)
+	authenticated, _, err := f.adminAuth.Authenticate(f.ctx, raw)
 	must(t, err)
 	if authenticated.SessionID != identity.SessionID {
 		t.Fatal("returned token does not authenticate")
@@ -49,15 +50,15 @@ func TestIT01CreateAdminAndLogin(t *testing.T) {
 func TestIT02IncorrectCredentialsCreateNoSession(t *testing.T) {
 	f := newFixture(t, true)
 	for _, input := range []struct{ username, password string }{{"it.admin", "incorrect-password"}, {"missing.user", password}} {
-		identity, raw, err := f.access.Login(f.ctx, input.username, input.password, "")
+		identity, raw, err := f.adminAuth.Login(f.ctx, input.username, input.password, "")
 		wantError(t, err, access.ErrUnauthenticated)
 		if identity.User.ID != 0 || raw != "" {
 			t.Fatal("rejected login returned credentials")
 		}
 	}
-	for _, table := range []string{"sessions", "session_tokens"} {
+	for _, table := range []string{"admin_sessions", "admin_session_tokens"} {
 		var count int
-		must(t, f.dbs.Website.QueryRowContext(f.ctx, `SELECT count(*) FROM `+table).Scan(&count))
+		must(t, f.adminDB.QueryRowContext(f.ctx, `SELECT count(*) FROM `+table).Scan(&count))
 		if count != 0 {
 			t.Fatalf("rejected login inserted into %s", table)
 		}
@@ -66,13 +67,13 @@ func TestIT02IncorrectCredentialsCreateNoSession(t *testing.T) {
 func TestIT03LogoutInvalidatesPersistedSession(t *testing.T) {
 	f := newFixture(t, true)
 	identity, raw := f.login(t, "it.admin")
-	_, _, err := f.access.Authenticate(f.ctx, raw)
+	_, _, err := f.adminAuth.Authenticate(f.ctx, raw)
 	must(t, err)
-	must(t, f.access.Logout(f.ctx, identity.SessionID))
-	_, _, err = f.access.Authenticate(f.ctx, raw)
+	must(t, f.adminAuth.Logout(f.ctx, identity.SessionID))
+	_, _, err = f.adminAuth.Authenticate(f.ctx, raw)
 	wantError(t, err, access.ErrUnauthenticated)
 	var revoked bool
-	must(t, f.dbs.Website.QueryRowContext(f.ctx, `SELECT revoked_at IS NOT NULL FROM sessions WHERE id=$1`, identity.SessionID).Scan(&revoked))
+	must(t, f.adminDB.QueryRowContext(f.ctx, `SELECT revoked_at IS NOT NULL FROM admin_sessions WHERE id=$1`, identity.SessionID).Scan(&revoked))
 	if !revoked {
 		t.Fatal("logout did not persist session revocation")
 	}
@@ -99,13 +100,11 @@ func TestIT04DeactivateUserInvalidatesSessions(t *testing.T) {
 }
 func TestIT05LastActiveAdminCannotBeRemoved(t *testing.T) {
 	f := newFixture(t, true)
-	for _, change := range []struct{ admin, active bool }{{false, true}, {true, false}} {
-		wantError(t, f.access.UpdateUser(f.ctx, f.admin, f.admin, "Integration Admin", change.admin, change.active, ""), access.ErrInvalid)
-		saved, err := f.store.User(f.ctx, f.admin)
-		must(t, err)
-		if !saved.Active || !saved.IsAdmin {
-			t.Fatal("the last active admin was removed")
-		}
+	wantError(t, f.adminAuth.UpdateAdmin(f.ctx, f.admin, f.admin, "Integration Admin", false, ""), access.ErrInvalid)
+	saved, err := f.adminStore.User(f.ctx, f.admin)
+	must(t, err)
+	if !saved.Active || !saved.IsAdmin {
+		t.Fatal("last active admin was disabled")
 	}
 	f.login(t, "it.admin")
 }

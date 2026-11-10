@@ -195,10 +195,10 @@ func TestSQLHashBindsExactText(t *testing.T) {
 func TestManualOutcomeResolutionRequiresAdminAndDatabaseEdit(t *testing.T) {
 	_, store, stub := newSQLStub(t)
 	_, _, service := newServices(t, store)
-	stub.append(scalarStep("is_platform_admin", false))
+	stub.append(scalarStep("admin_users", false))
 	wantError(t, service.ResolveOutcome(context.Background(), 7, 3, 1, true, "Verified target state"), access.ErrForbidden)
-	stub.append(scalarStep("is_platform_admin", true), permissionStep(access.ViewOnly))
+	stub.append(scalarStep("admin_users", true), permissionStep(access.ViewOnly))
 	wantError(t, service.ResolveOutcome(context.Background(), 7, 3, 1, true, "Verified target state"), access.ErrForbidden)
-	stub.append(scalarStep("is_platform_admin", true), permissionStep(access.ViewEdit))
+	stub.append(scalarStep("admin_users", true), permissionStep(access.ViewEdit))
 	wantError(t, service.ResolveOutcome(context.Background(), 7, 3, 1, true, "  "), access.ErrInvalid)
 }

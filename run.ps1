@@ -1,12 +1,12 @@
 #requires -Version 5.1
-
+param([switch]$Admin)
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $false
 $previousDirectory = Get-Location
 $previousEnvironment = @{}
 $fixtureState = ''
-$retainFixtures = $false
+$stateDirectory = [IO.Path]::GetTempPath().TrimEnd([IO.Path]::DirectorySeparatorChar)
 $launchExitCode = 0
 
 function Set-LaunchEnvironment([string]$Name, [AllowNull()]$Value) {
@@ -92,7 +92,7 @@ function Test-FixtureDirectory([string]$Path) {
 }
 
 function Remove-TemporaryFixtures {
-    if (-not $fixtureState -or $retainFixtures) { return }
+    if (-not $fixtureState) { return }
     if (-not (Test-FixtureDirectory $fixtureState)) {
         if ((Test-Path -LiteralPath $fixtureState -PathType Container) -and
             -not (Get-ChildItem -LiteralPath $fixtureState -Force | Select-Object -First 1)) {
@@ -119,12 +119,13 @@ function Remove-TemporaryFixtures {
 
 function Invoke-TestSuite([string]$Name, [string]$Package) {
     $log = Join-Path $reportDirectory ($Name + '.log')
+    $timeout = if ($Name -eq 'integration') { '10m' } else { '5m' }
     $encoding = New-Object Text.UTF8Encoding -ArgumentList $false
     $writer = New-Object IO.StreamWriter -ArgumentList $log, $false, $encoding
     $preference = $ErrorActionPreference
     try {
         $ErrorActionPreference = 'Continue'
-        & $goCommand test -count=1 -timeout=5m -v $Package 2>&1 | ForEach-Object {
+        & $goCommand test -count=1 "-timeout=$timeout" -v $Package 2>&1 | ForEach-Object {
             $line = $_.ToString()
             Write-Host $line
             $writer.WriteLine($line)
@@ -140,68 +141,29 @@ function Invoke-TestSuite([string]$Name, [string]$Package) {
     return $status -eq 0
 }
 
-function Read-AdminPassword {
-    while ($true) {
-        $first = Read-Host 'Admin password (12-72 UTF-8 bytes)' -AsSecureString
-        $second = Read-Host 'Confirm password' -AsSecureString
-        $firstPointer = [IntPtr]::Zero
-        $secondPointer = [IntPtr]::Zero
-        try {
-            $firstPointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($first)
-            $secondPointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($second)
-            $plain = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($firstPointer)
-            $confirmation = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($secondPointer)
-            $bytes = [Text.Encoding]::UTF8.GetByteCount($plain)
-            if ($plain -ceq $confirmation -and $bytes -ge 12 -and $bytes -le 72) { return $plain }
-            Write-Host 'Passwords must match and contain 12-72 bytes. Try again.'
-        } finally {
-            if ($firstPointer -ne [IntPtr]::Zero) { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($firstPointer) }
-            if ($secondPointer -ne [IntPtr]::Zero) { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($secondPointer) }
-            $first.Dispose()
-            $second.Dispose()
-            $plain = $null
-            $confirmation = $null
-        }
-    }
-}
-
 try {
     Set-Location -LiteralPath (Join-Path $PSScriptRoot 'src')
     Import-LaunchEnvironment (Join-Path (Get-Location).Path '.env')
+    if ($Admin) { Import-LaunchEnvironment (Join-Path $PSScriptRoot 'src-admin\.env') }
+    if ($env:SCHAKKER_STATE_DIR -and -not [IO.Path]::IsPathRooted($env:SCHAKKER_STATE_DIR)) {
+        Set-LaunchEnvironment 'SCHAKKER_STATE_DIR' ([IO.Path]::GetFullPath((Join-Path (Get-Location).Path $env:SCHAKKER_STATE_DIR)))
+    }
     $command = Get-Command go -CommandType Application -ErrorAction SilentlyContinue
     if (-not $command) { throw 'Install Go for Windows and reopen the terminal before starting Schakker.' }
     $goCommand = $command.Source
-
     $npm = Get-Command npm.cmd -CommandType Application -ErrorAction SilentlyContinue
-    if (-not $npm) { throw 'Install Node.js 22.12+ (with npm) and reopen the terminal before starting Schakker.' }
-    Push-Location -LiteralPath 'frontend'
-    try {
-        & $npm.Source ci --no-audit --no-fund
-        if ($LASTEXITCODE -ne 0) { throw 'Frontend dependency installation failed.' }
-        & $npm.Source run build
-        if ($LASTEXITCODE -ne 0) { throw 'Frontend build failed.' }
-    } finally { Pop-Location }
-
+    if (-not $npm) { throw 'Install Node.js 22.12+ (with npm) before starting Schakker.' }
+    foreach ($frontendDirectory in @('frontend','..\src-admin\frontend')) {
+        Push-Location -LiteralPath $frontendDirectory
+        try {
+            & $npm.Source ci --no-audit --no-fund
+            if ($LASTEXITCODE -ne 0) { throw 'Frontend dependency installation failed.' }
+            & $npm.Source run build
+            if ($LASTEXITCODE -ne 0) { throw 'Frontend build failed.' }
+        } finally { Pop-Location }
+    }
     $runUnitTests = Read-LaunchChoice 'Run unit tests before launching the website?' $true
     $runIntegrationTests = Read-LaunchChoice 'Run PostgreSQL integration tests before launching the website?' $true
-
-    if ($env:SCHAKKER_STATE_DIR) {
-        $statePath = $env:SCHAKKER_STATE_DIR
-        if (-not [IO.Path]::IsPathRooted($statePath)) { $statePath = Join-Path (Get-Location).Path $statePath }
-        $stateDirectory = [IO.Path]::GetFullPath($statePath)
-    } else {
-        $localData = [Environment]::GetFolderPath('LocalApplicationData')
-        $hash = [Security.Cryptography.SHA256]::Create()
-        try {
-            $projectKey = ([BitConverter]::ToString($hash.ComputeHash([Text.Encoding]::UTF8.GetBytes($PSScriptRoot.ToLowerInvariant())))).Replace('-', '').Substring(0, 16).ToLowerInvariant()
-        } finally { $hash.Dispose() }
-        $stateDirectory = Join-Path $localData (Join-Path 'Schakker' $projectKey)
-    }
-    [void][IO.Directory]::CreateDirectory($stateDirectory)
-    $stateDirectory = (Get-Item -LiteralPath $stateDirectory).FullName
-    Set-LaunchEnvironment 'SCHAKKER_STATE_DIR' $stateDirectory
-    Write-Host "Schakker state: $stateDirectory"
-
     $reportDirectory = ''
     $failures = 0
     if ($runUnitTests -or $runIntegrationTests) {
@@ -210,66 +172,35 @@ try {
         [IO.File]::WriteAllText((Join-Path $reportDirectory 'summary.txt'), "Schakker automated tests`r`n")
         Write-Host "Test reports: $reportDirectory"
     }
-    if ($runUnitTests -and -not (Invoke-TestSuite 'unit' './test/unit/...')) { $failures++ }
+    if ($runUnitTests) {
+        if (-not (Invoke-TestSuite 'unit' './test/unit/...')) { $failures++ }
+        if (-not (Invoke-TestSuite 'admin' '../src-admin/backend/...')) { $failures++ }
+    }
     if ($runIntegrationTests) {
         $fixtureState = New-FixtureDirectory
         Set-LaunchEnvironment 'SCHAKKER_TEST_STATE' $fixtureState
-        try {
-            if (-not (Invoke-TestSuite 'integration' './test/integration/...')) { $failures++ }
-        } finally { Set-LaunchEnvironment 'SCHAKKER_TEST_STATE' $null }
-    }
-    if ($failures -gt 0) { throw "Automated tests failed. The website was not started. Reports: $reportDirectory" }
-
-    $useMockWebsite = Read-LaunchChoice 'Keep and use the mock website database for the website run?' $false
-    $useMockManaged = Read-LaunchChoice 'Keep and use the mock PostgreSQL managed database for the website run?' $false
-    $useMockMariaDB = Read-LaunchChoice 'Keep and use the mock MariaDB database for the website run?' $false
-    Set-LaunchEnvironment 'SCHAKKER_USE_MOCK_WEBSITE' $(if ($useMockWebsite) { 'yes' } else { 'no' })
-    Set-LaunchEnvironment 'SCHAKKER_USE_MOCK_MANAGED' $(if ($useMockManaged) { 'yes' } else { 'no' })
-    Set-LaunchEnvironment 'SCHAKKER_USE_MOCK_MARIADB' $(if ($useMockMariaDB) { 'yes' } else { 'no' })
-    if ($useMockWebsite -or $useMockManaged -or $useMockMariaDB) {
-        $kept = Join-Path $stateDirectory 'kept-fixtures'
-        if (-not $fixtureState -and (Test-Path -LiteralPath $kept -PathType Leaf)) {
-            $previous = [IO.File]::ReadAllText($kept).Trim()
-            if ($previous -and (Test-FixtureDirectory $previous)) { $fixtureState = $previous }
-        }
-        if (-not $fixtureState) { $fixtureState = New-FixtureDirectory }
-        $retainFixtures = $true
-        [IO.File]::WriteAllText($kept, $fixtureState + "`r`n")
-        Set-LaunchEnvironment 'SCHAKKER_FIXTURE_STATE' $fixtureState
-        Write-Host "Kept mock database files: $fixtureState"
-    } else {
+        if (-not (Invoke-TestSuite 'integration' './test/integration/...')) { $failures++ }
         Remove-TemporaryFixtures
         $fixtureState = ''
-        Set-LaunchEnvironment 'SCHAKKER_FIXTURE_STATE' $null
+        Set-LaunchEnvironment 'SCHAKKER_TEST_STATE' $null
     }
-
-    $binary = Join-Path $stateDirectory 'server.exe'
-    & $goCommand build -o $binary .
+    if ($failures -gt 0) { throw "Automated tests failed. Reports: $reportDirectory" }
+    $binaryDirectory = if ($Admin) { Join-Path $PSScriptRoot 'src-admin\bin' } else { Join-Path $PSScriptRoot 'src\bin' }
+    [void][IO.Directory]::CreateDirectory($binaryDirectory)
+    $binaryName = if ($Admin) { 'admin-server.exe' } else { 'user-server.exe' }
+    $binary = Join-Path $binaryDirectory $binaryName
+    $buildTarget = if ($Admin) { '../src-admin' } else { '.' }
+    & $goCommand build -o $binary $buildTarget
     if ($LASTEXITCODE -ne 0) { throw 'The website could not be built.' }
+    if ($Admin) { Set-Location -LiteralPath (Join-Path $PSScriptRoot 'src-admin') }
     & $binary
     $launchExitCode = $LASTEXITCODE
-    if ($launchExitCode -eq 3) {
-        if ([Console]::IsInputRedirected) { throw 'First startup needs a terminal or SCHAKKER_ADMIN_USERNAME and SCHAKKER_ADMIN_PASSWORD.' }
-        Write-Host 'First-time admin setup. Your password is stored as a hash in the website database.'
-        if ($useMockWebsite) { Write-Host 'The mock.writer and mock.reader accounts will use the password you choose here.' }
-        $username = Read-Host 'Admin username [admin]'
-        if (-not $username) { $username = 'admin' }
-        $display = Read-Host 'Display name [Platform Admin]'
-        if (-not $display) { $display = 'Platform Admin' }
-        Set-LaunchEnvironment 'SCHAKKER_ADMIN_USERNAME' $username
-        Set-LaunchEnvironment 'SCHAKKER_ADMIN_NAME' $display
-        Set-LaunchEnvironment 'SCHAKKER_ADMIN_PASSWORD' (Read-AdminPassword)
-        & $binary
-        $launchExitCode = $LASTEXITCODE
-    }
 } catch {
     [Console]::Error.WriteLine($_.Exception.Message)
     if ($launchExitCode -eq 0) { $launchExitCode = 1 }
 } finally {
-    try { Remove-TemporaryFixtures } catch { Write-Warning "Temporary database cleanup did not complete: $($_.Exception.Message)" }
-    foreach ($name in $previousEnvironment.Keys) {
-        Set-LaunchEnvironment $name $previousEnvironment[$name]
-    }
+    try { Remove-TemporaryFixtures } catch { Write-Warning "Temporary test database cleanup did not complete: $($_.Exception.Message)" }
+    foreach ($name in $previousEnvironment.Keys) { Set-LaunchEnvironment $name $previousEnvironment[$name] }
     Set-Location -LiteralPath $previousDirectory.Path
 }
 exit $launchExitCode

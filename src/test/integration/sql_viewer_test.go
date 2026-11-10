@@ -38,7 +38,7 @@ func TestSQLViewerReadsWithoutWritingOrRecordingHistory(t *testing.T) {
 		_, err = f.databases.ReadQuery(f.ctx, actor, target.ID, "SELECT * INTO public.viewer_copy FROM public.employees")
 		wantError(t, err, dbmanagement.ErrReadOnly)
 	}
-	_, err := f.databases.ReadQuery(f.ctx, f.admin, target.ID, "SELECT 1")
+	_, err := f.databases.ReadQuery(f.ctx, f.editor, target.ID, "SELECT 1")
 	wantError(t, err, access.ErrForbidden)
 	query, err := f.databases.BuildReadQuery(f.ctx, reader.ID, target.ID, dbmanagement.ReadQuerySpec{Schema: "public", Table: "employees", Columns: []string{"name"}, Filters: []dbmanagement.ReadFilter{{Column: "salary", Operator: ">=", Value: "5000", Type: "number"}}, OrderBy: []dbmanagement.SortColumn{{Name: "salary", Descending: true}}, Limit: 1})
 	must(t, err)

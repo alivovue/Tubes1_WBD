@@ -56,7 +56,6 @@ function page(title: string, extra: Partial<PageData> = {}): PageData {
     DraftUpdated: "",
     ViewerSpec: { Limit: 100, Offset: 0 },
     Detail: detail,
-    Admin: { Users: [], Groups: [], Databases: [] },
     ...extra,
   } as PageData;
 }
@@ -467,73 +466,21 @@ describe("SPA workflows", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
-  it("submits all group grants in one JSON action with a CSRF header", async () => {
-    const admin = { ...user, IsAdmin: true };
-    let submitted: RequestInit | undefined;
-    mockAPI((path, init) => {
-      if (path === "/api/session")
-        return response({ ...identity, User: admin });
-      if (init?.method === "POST") {
-        submitted = init;
-        return response(
-          { error: "Check the supplied values and required fields." },
-          400,
-        );
-      }
-      return response(
-        page("Groups", {
-          User: admin,
-          Groups: [
-            {
-              ID: 2,
-              Name: "Analysts",
-              Description: "",
-              Editor: "",
-              Focus: false,
-              Members: [],
-              Grants: [{ Database: database, Permission: "view_only" }],
-            },
-          ],
-        }),
-      );
-    });
-    open("/admin/groups");
-    await screen.findByRole("heading", { name: "Analysts" });
-    fireEvent.click(screen.getByRole("button", { name: "Edit access" }));
-    fireEvent.change(
-      screen.getByRole("combobox", { name: "Analysts Employees" }),
-      { target: { value: "view_edit" } },
-    );
-    fireEvent.click(screen.getByRole("button", { name: "Save access" }));
-    await screen.findByRole("alert");
-    expect(JSON.parse(String(submitted?.body))).toMatchObject({
-      action: "set_grants",
-      db: ["7"],
-      permission: ["view_edit"],
-    });
-    expect(submitted?.headers).toMatchObject({
-      "X-CSRF-Token": "session-csrf",
-    });
-    expect(
-      screen.getByRole("combobox", { name: "Analysts Employees" }),
-    ).toHaveValue("view_edit");
-  });
-
-  it("shows backend permission errors on direct admin navigation", async () => {
-    mockAPI((path) =>
+  it("does not expose administrative routes or navigation", async () => {
+    const requests = mockAPI((path) =>
       path === "/api/session"
         ? response(identity)
-        : response(
-            { error: "You do not have permission for this action." },
-            403,
-          ),
+        : response(page("Dashboard")),
     );
     open("/admin/users");
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "You do not have permission",
-    );
+    await screen.findByRole("heading", { name: "Page not found" });
     expect(
-      screen.queryByRole("heading", { name: "Add employee" }),
+      requests.mock.calls.filter(([path]) =>
+        String(path).startsWith("/api/admin/"),
+      ),
+    ).toHaveLength(0);
+    expect(
+      screen.queryByRole("link", { name: "Groups" }),
     ).not.toBeInTheDocument();
   });
 });

@@ -16,24 +16,37 @@ import {
   usePage,
 } from "./ui";
 
-export function Users() {
+export function Users({
+  administrators = false,
+}: {
+  administrators?: boolean;
+}) {
   const { data } = usePage();
+  const label = administrators ? "administrator" : "employee";
+  const accounts = administrators ? data.Administrators : data.Admin.Users;
   return (
     <>
       <Heading
-        title="Employees"
-        text="Kelola akun, peran platform, dan status karyawan."
+        title={administrators ? "Administrators" : "Employees"}
+        text={
+          administrators
+            ? "Kelola akun admin dan sesi dalam database autentikasi admin."
+            : "Kelola akun dan status karyawan. Akun ini hanya untuk aplikasi pengguna."
+        }
       >
         <Link className="button button--secondary" to="/admin/groups">
           Manage memberships
         </Link>
       </Heading>
       <Panel
-        title="Add employee"
-        text="Passwords must contain 12–72 bytes. Promotions rotate session tokens. Password changes, demotions and deactivation revoke sessions."
+        title={`Add ${label}`}
+        text="Passwords must contain 12–72 bytes. Password changes and deactivation revoke sessions. Admin and ordinary accounts have independent credentials and permissions."
       >
         <Form>
-          <Hidden name="action" value="create_user" />
+          <Hidden
+            name="action"
+            value={administrators ? "create_admin" : "create_user"}
+          />
           <div className="form-grid">
             <Field label="Username">
               <input
@@ -58,22 +71,30 @@ export function Users() {
               />
             </Field>
           </div>
-          <Check name="admin">Platform Admin</Check>
-          <Button>Create employee</Button>
+          <Button>Create {label}</Button>
         </Form>
       </Panel>
       <Panel>
         <Table
-          headers={["Employee", "Username", "Role", "Status", "Edit"]}
-          rows={(data.Admin.Users || []).map((user) => [
+          headers={[
+            administrators ? "Administrator" : "Employee",
+            "Username",
+            "Role",
+            "Status",
+            "Edit",
+          ]}
+          rows={(accounts || []).map((user) => [
             user.DisplayName,
             <code>{user.Username}</code>,
-            user.IsAdmin ? "Platform Admin" : "Employee",
+            administrators ? "Platform Admin" : "Employee",
             user.Active ? "Active" : "Disabled",
             <details>
               <summary>Edit account</summary>
               <Form className="form-stack inline-editor">
-                <Hidden name="action" value="update_user" />
+                <Hidden
+                  name="action"
+                  value={administrators ? "update_admin" : "update_user"}
+                />
                 <Hidden name="id" value={user.ID} />
                 <Field label="Display name">
                   <input
@@ -92,9 +113,6 @@ export function Users() {
                     autoComplete="new-password"
                   />
                 </Field>
-                <Check name="admin" checked={user.IsAdmin}>
-                  Platform Admin
-                </Check>
                 <Check name="active" checked={user.Active}>
                   Active
                 </Check>
@@ -102,7 +120,7 @@ export function Users() {
               </Form>
             </details>,
           ])}
-          empty="No employees."
+          empty={`No ${label} accounts.`}
         />
       </Panel>
     </>
@@ -125,9 +143,9 @@ export function Groups() {
         <strong>Highest permission wins</strong>
         <p>
           No Access &lt; View Only &lt; View + Edit. Employees can join multiple
-          groups. Platform admins also need group access to browse or change a
-          database. Reducing or removing access requires affected users to sign
-          in again.
+          groups. Platform administrators manage access only. Group membership
+          never grants administrators access to managed data. Reducing or
+          removing access requires affected users to sign in again.
         </p>
       </Notice>
       <Panel title="Create group">

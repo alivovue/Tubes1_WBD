@@ -87,7 +87,28 @@ func StartLocalCluster(ctx context.Context, directory string, options LocalOptio
 		}
 	}
 	cluster := &LocalCluster{Directory: directory, Socket: settings.Socket, Port: settings.Port, password: password, control: filepath.Join(binaries, "pg_ctl.exe")}
+	hba := "host all schakker 127.0.0.1/32 scram-sha-256\n"
+	if options.TCPRole != "" && options.TCPRole != "schakker" {
+		hba += "host all " + options.TCPRole + " 127.0.0.1/32 scram-sha-256\n"
+	}
+	for _, role := range []string{UserRuntimeRole, AdministrationRole, AdminAuthenticationRole} {
+		hba += "host all " + role + " 127.0.0.1/32 scram-sha-256\n"
+	}
+	hba += "host all all 0.0.0.0/0 reject\nhost all all ::0/0 reject\n"
+	hbaPath := filepath.Join(data, "pg_hba.conf")
+	previousHBA, _ := os.ReadFile(hbaPath)
+	hbaChanged := string(previousHBA) != hba
+	if hbaChanged {
+		if err := os.WriteFile(hbaPath, []byte(hba), 0600); err != nil {
+			return nil, err
+		}
+	}
 	if exec.CommandContext(ctx, cluster.control, "-D", data, "status").Run() == nil {
+		if hbaChanged {
+			if err := exec.CommandContext(ctx, cluster.control, "-D", data, "reload").Run(); err != nil {
+				return nil, errors.New("local PostgreSQL authentication rules could not be reloaded")
+			}
+		}
 		return cluster, nil
 	}
 	config, err := os.OpenFile(filepath.Join(data, "postgresql.conf"), os.O_WRONLY|os.O_APPEND, 0600)
@@ -102,14 +123,7 @@ func StartLocalCluster(ctx context.Context, directory string, options LocalOptio
 	if closeErr != nil {
 		return nil, closeErr
 	}
-	hba := "host all schakker 127.0.0.1/32 scram-sha-256\n"
-	if options.TCPRole != "" && options.TCPRole != "schakker" {
-		hba += "host all " + options.TCPRole + " 127.0.0.1/32 scram-sha-256\n"
-	}
-	hba += "host all all 0.0.0.0/0 reject\nhost all all ::0/0 reject\n"
-	if err := os.WriteFile(filepath.Join(data, "pg_hba.conf"), []byte(hba), 0600); err != nil {
-		return nil, err
-	}
+
 	if _, err := exec.CommandContext(ctx, cluster.control, "-D", data, "-l", filepath.Join(directory, "postgres.log"), "-w", "-t", "15", "start").CombinedOutput(); err != nil {
 		return nil, fmt.Errorf("local PostgreSQL did not start; inspect %s", filepath.Join(directory, "postgres.log"))
 	}

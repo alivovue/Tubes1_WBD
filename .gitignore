@@ -12,3 +12,6 @@ node_modules/
 /src/frontend/public/*
 !/src/frontend/public/sc logo.png
 /.gitattributes
+
+/src-admin/frontend/dist/
+/src-admin/bin/

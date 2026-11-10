@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strings"
 
 	"github.com/jackc/pgx/v5/pgconn"
 )
@@ -24,6 +25,7 @@ type Store struct {
 	db        *sql.DB
 	q         executor
 	inTx      bool
+	adminAuth bool
 	conn      *sql.Conn
 	lockSlots chan struct{}
 }
@@ -54,7 +56,7 @@ func (d *Store) Transaction(ctx context.Context, change func(*Store) error) erro
 		return classify(err)
 	}
 	defer tx.Rollback()
-	if err := change(&Store{db: d.db, q: tx, inTx: true, conn: d.conn, lockSlots: d.lockSlots}); err != nil {
+	if err := change(&Store{db: d.db, q: tx, inTx: true, adminAuth: d.adminAuth, conn: d.conn, lockSlots: d.lockSlots}); err != nil {
 		return classify(err)
 	}
 	return classify(tx.Commit())
@@ -96,4 +98,21 @@ func affected(result sql.Result, err error) error {
 		return ErrNotFound
 	}
 	return nil
+}
+
+// NewAdminAuthentication reuses the authentication DAO against an independent
+// admin-only schema. Domain selection is fixed at construction, never by input.
+func NewAdminAuthentication(db *sql.DB) (*Store, error) {
+	s, err := New(db)
+	if err == nil {
+		s.adminAuth = true
+	}
+	return s, err
+}
+func (d *Store) AdminAuthentication() bool { return d.adminAuth }
+func (d *Store) authSQL(query string) string {
+	if !d.adminAuth {
+		return query
+	}
+	return strings.NewReplacer("session_tokens", "admin_session_tokens", "sessions", "admin_sessions", "user_id", "admin_id").Replace(query)
 }

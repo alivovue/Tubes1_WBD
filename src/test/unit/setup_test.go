@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"tubes1_wbd/database/setup"
+	"tubes1_wbd/test/data/setup"
 )
 
 func TestDatabaseSetupRejectsMissingDependencies(t *testing.T) {
@@ -25,7 +25,7 @@ func TestSetupInitializesOnlyAnEmptySchema(t *testing.T) {
 	if err := setup.EnsureInitialized(context.Background(), db); err != nil {
 		t.Fatal(err)
 	}
-	db, _, _ = newSQLStub(t, scalarStep("to_regclass('public.users')", true), queryStep("SELECT execution_mode,completed_statements,total_statements", []string{"mode", "completed", "total"}))
+	db, _, _ = newSQLStub(t, scalarStep("to_regclass('public.users')", true), scalarStep("attname='is_platform_admin'", false), scalarStep("count(*)=5", true))
 	if err := setup.EnsureInitialized(context.Background(), db); err != nil {
 		t.Fatal(err)
 	}
@@ -38,7 +38,7 @@ func TestSchemaInitializationFailureRollsBack(t *testing.T) {
 	}
 }
 func TestExistingSchemaMismatchDoesNotResetDatabase(t *testing.T) {
-	db, _, _ := newSQLStub(t, scalarStep("to_regclass('public.users')", true), sqlStep{kind: "query", query: "SELECT execution_mode,completed_statements,total_statements", err: errors.New("missing columns")})
+	db, _, _ := newSQLStub(t, scalarStep("to_regclass('public.users')", true), scalarStep("attname='is_platform_admin'", false), scalarStep("count(*)=5", false))
 	if err := setup.EnsureInitialized(context.Background(), db); err == nil {
 		t.Fatal("incompatible existing schema accepted")
 	}

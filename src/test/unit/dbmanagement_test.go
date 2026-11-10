@@ -46,12 +46,12 @@ func TestExplorerEnforcesDatabasePermissionsBeforeConnecting(t *testing.T) {
 func TestConnectionManagementRequiresAdmin(t *testing.T) {
 	_, store, stub := newSQLStub(t)
 	_, service, _ := newServices(t, store)
-	stub.append(scalarStep("is_platform_admin", false))
+	stub.append(scalarStep("admin_users", false))
 	_, err := service.Connections(context.Background(), 7)
 	wantError(t, err, access.ErrForbidden)
-	stub.append(scalarStep("is_platform_admin", false))
+	stub.append(scalarStep("admin_users", false))
 	wantError(t, service.TestConnection(context.Background(), 7, 0, dbmanagement.ConnectionInput{}), access.ErrForbidden)
-	stub.append(scalarStep("is_platform_admin", false))
+	stub.append(scalarStep("admin_users", false))
 	_, err = service.SaveConnection(context.Background(), 7, 0, dbmanagement.ConnectionInput{})
 	wantError(t, err, access.ErrForbidden)
 	stub.append(append(transactionSteps(false), sqlStep{kind: "rollback"})...)
@@ -77,7 +77,7 @@ func TestConnectionInputRejectedBeforeNetworkAccess(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			in := base
 			tc.change(&in)
-			stub.append(scalarStep("is_platform_admin", true))
+			stub.append(scalarStep("admin_users", true))
 			wantError(t, service.TestConnection(context.Background(), 7, 0, in), tc.want)
 		})
 	}
@@ -88,7 +88,7 @@ func TestConnectionInputRejectedBeforeNetworkAccess(t *testing.T) {
 		t.Fatal(err)
 	}
 	base.SSLMode = "disable"
-	stub.append(scalarStep("is_platform_admin", true))
+	stub.append(scalarStep("admin_users", true))
 	wantError(t, production.TestConnection(context.Background(), 7, 0, base), access.ErrInvalid)
 }
 
@@ -121,7 +121,7 @@ func TestDuplicateConnectionsAreRejectedBeforeConnecting(t *testing.T) {
 			}
 			columns := []string{"id", "display_name", "dbms_type", "host", "port", "database_name", "is_active", "sslmode"}
 			existing := queryStep("FROM managed_databases ORDER BY id", columns, []driver.Value{int64(3), "Original target", dbms, tc.host, int64(port), "target", tc.active, "disable"})
-			_, store, stub := newSQLStub(t, scalarStep("is_platform_admin", true))
+			_, store, stub := newSQLStub(t, scalarStep("admin_users", true))
 			stub.append(transactionSteps(true)...)
 			stub.append(existing, sqlStep{kind: "rollback"})
 			_, service, _ := newServices(t, store)

@@ -133,10 +133,10 @@ func TestDuplicateDatabaseRegistrationPreservesExistingHistory(t *testing.T) {
 	f := newFixture(t, true)
 	input := f.dbs.Connection()
 	target := f.register(t)
-	f.grant(t, f.admin, target.ID, access.ViewEdit)
-	review, err := f.migrations.Analyze(f.ctx, f.admin, target.ID, "SELECT 1")
+	f.grant(t, f.editor, target.ID, access.ViewEdit)
+	review, err := f.migrations.Analyze(f.ctx, f.editor, target.ID, "SELECT 1")
 	must(t, err)
-	_, err = f.migrations.Execute(f.ctx, f.admin, target.ID, migration.ExecuteInput{Review: review})
+	_, err = f.migrations.Execute(f.ctx, f.editor, target.ID, migration.ExecuteInput{Review: review})
 	must(t, err)
 	duplicate := input
 	duplicate.Name = "Duplicate database under another name"
@@ -154,7 +154,7 @@ func TestDuplicateDatabaseRegistrationPreservesExistingHistory(t *testing.T) {
 	if saved.ID != target.ID || !saved.Active || saved.Name != input.Name {
 		t.Fatal("editing or reactivating the original connection did not preserve its identity")
 	}
-	history, err := f.migrations.History(f.ctx, f.admin, target.ID, 50, 0)
+	history, err := f.migrations.History(f.ctx, f.editor, target.ID, 50, 0)
 	must(t, err)
 	if len(history) != 1 || history[0].AppliedVersion == nil || *history[0].AppliedVersion != 1 {
 		t.Fatal("rejecting duplicates or reactivating the connection changed migration history")
@@ -221,46 +221,51 @@ func TestDuplicateDatabaseRegistrationShowsActionableConflict(t *testing.T) {
 	f := newFixture(t, true)
 	f.register(t)
 	identity, raw := f.login(t, "it.admin")
-	csrf, err := f.access.CSRFToken(identity)
+	csrf, err := f.adminAuth.CSRFToken(identity)
 	must(t, err)
 	input := f.dbs.Connection()
 	form := url.Values{"csrf": {csrf}, "action": {"save_connection"}, "dbms": {input.DBMS}, "name": {"Duplicate HTTP target"}, "host": {input.Host}, "port": {fmt.Sprint(input.Port)}, "database_name": {input.DatabaseName}, "username": {input.Username}, "password": {input.Password}, "sslmode": {input.SSLMode}, "active": {"on"}}
-	handler := promotionHandler(t, f)
+	handler := adminHandler(t, f)
 	response := apiRequest(t, handler, http.MethodPost, "/admin/connections", raw, form)
 	if response.Code != http.StatusConflict || !strings.Contains(response.Body.String(), "This database is already registered. Edit or reactivate its existing connection.") {
 		t.Fatalf("duplicate registration did not show the expected conflict: %d", response.Code)
 	}
 }
 
-func TestConnectionEditsAndDisableRevokeAdminAndReaderSessions(t *testing.T) {
+func TestConnectionEditsAndDisableRevokeReaderSessionsAndPreserveAdminSessions(t *testing.T) {
 	for _, action := range []string{"save_connection", "disable_connection"} {
 		t.Run(action, func(t *testing.T) {
 			f := newFixture(t, true)
 			reader := f.user(t, "connection.reader")
 			unrelated := f.user(t, "unrelated.reader")
 			target := f.register(t)
-			f.grant(t, f.admin, target.ID, access.ViewEdit)
 			f.grant(t, reader.ID, target.ID, access.ViewOnly)
 			identity, adminToken := f.login(t, "it.admin")
 			_, readerToken := f.login(t, reader.Username)
 			_, unrelatedToken := f.login(t, unrelated.Username)
-			csrf, err := f.access.CSRFToken(identity)
+			csrf, err := f.adminAuth.CSRFToken(identity)
 			must(t, err)
 			input := f.dbs.Connection()
 			form := url.Values{"csrf": {csrf}, "id": {fmt.Sprint(target.ID)}, "action": {action}, "dbms": {input.DBMS}, "name": {"Renamed connection"}, "host": {input.Host}, "port": {fmt.Sprint(input.Port)}, "database_name": {input.DatabaseName}, "username": {input.Username}, "password": {input.Password}, "sslmode": {input.SSLMode}, "active": {"on"}}
-			handler := promotionHandler(t, f)
+			handler := adminHandler(t, f)
 			response := apiRequest(t, handler, http.MethodPost, "/admin/connections", adminToken, form)
 			if apiLocation(t, response).Path != "/admin/connections" {
 				t.Fatalf("connection change returned %d", response.Code)
 			}
-			for _, check := range []struct{ token, path string }{{adminToken, "/admin/connections"}, {readerToken, "/dashboard"}} {
+			for _, check := range []struct{ token, path string }{{readerToken, "/dashboard"}} {
 				_, _, err := f.access.Authenticate(f.ctx, check.token)
 				wantError(t, err, access.ErrUnauthenticated)
-				response := apiRequest(t, handler, http.MethodGet, check.path, check.token, nil)
+				checkHandler := handler
+				if check.path == "/dashboard" {
+					checkHandler = userHandler(t, f)
+				}
+				response := apiRequest(t, checkHandler, http.MethodGet, check.path, check.token, nil)
 				if response.Code != http.StatusUnauthorized {
 					t.Fatalf("revoked session was not denied: %s returned %d", check.path, response.Code)
 				}
 			}
+			_, _, err = f.adminAuth.Authenticate(f.ctx, adminToken)
+			must(t, err)
 			_, _, err = f.access.Authenticate(f.ctx, unrelatedToken)
 			must(t, err)
 		})
@@ -273,7 +278,7 @@ func TestExplorerReadsCommittedManualDataAndSchemaChanges(t *testing.T) {
 	target := f.register(t)
 	f.grant(t, reader.ID, target.ID, access.ViewOnly)
 	_, token := f.login(t, reader.Username)
-	handler := promotionHandler(t, f)
+	handler := userHandler(t, f)
 	path := fmt.Sprintf("/explorer?db=%d&schema=public&table=employees&tab=rows-panel", target.ID)
 	get := func() *httptest.ResponseRecorder {
 		t.Helper()

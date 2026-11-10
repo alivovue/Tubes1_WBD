@@ -40,9 +40,9 @@ func TestIT07ViewOnlyUserCannotAnalyzeOrExecuteMigration(t *testing.T) {
 	user := f.user(t, "it.reader")
 	target := f.register(t)
 	f.grant(t, user.ID, target.ID, access.ViewOnly)
-	f.grant(t, f.admin, target.ID, access.ViewEdit)
+	f.grant(t, f.editor, target.ID, access.ViewEdit)
 	sql := "CREATE TABLE public.forbidden_change(id INTEGER)"
-	review, err := f.migrations.Analyze(f.ctx, f.admin, target.ID, sql)
+	review, err := f.migrations.Analyze(f.ctx, f.editor, target.ID, sql)
 	must(t, err)
 	before, err := f.databases.Fingerprint(f.ctx, user.ID, target.ID)
 	must(t, err)

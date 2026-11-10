@@ -3,6 +3,7 @@ package access
 import (
 	"context"
 	"errors"
+	"sync"
 
 	"tubes1_wbd/database/dao"
 
@@ -16,10 +17,17 @@ type Grant = dao.Grant
 type Database = dao.Database
 type AdminData = dao.AdminData
 
+// A missing-account comparison needs the same bcrypt cost in both domains.
+// This immutable dummy hash is shared; real account hashes always use new salts.
+var dummyPasswordHash = sync.OnceValues(func() ([]byte, error) {
+	return bcrypt.GenerateFromPassword([]byte("dummy-password-not-an-account"), 12)
+})
+
 type Service struct {
 	store     *dao.Store
 	config    Config
 	dummyHash []byte
+	authority AdminAuthorizer
 }
 
 func NewService(store *dao.Store, config Config) (*Service, error) {
@@ -30,15 +38,35 @@ func NewService(store *dao.Store, config Config) (*Service, error) {
 		return nil, err
 	}
 	config.Key = append([]byte(nil), config.Key...)
-	dummy, err := bcrypt.GenerateFromPassword([]byte("dummy-password-not-an-account"), 12)
+	dummy, err := dummyPasswordHash()
 	if err != nil {
 		return nil, err
 	}
 	return &Service{store: store, config: config, dummyHash: dummy}, nil
 }
 
+// AdminAuthorizer validates actors in the independent administrator domain.
+type AdminAuthorizer interface {
+	RequireAdmin(context.Context, int64) error
+}
+
+// NewAdministrationService manages platform metadata but never authenticates an
+// administrator against platform users, even when numeric IDs happen to match.
+func NewAdministrationService(store *dao.Store, authority AdminAuthorizer, config Config) (*Service, error) {
+	if authority == nil || store == nil || store.AdminAuthentication() {
+		return nil, ErrInvalid
+	}
+	s, err := NewService(store, config)
+	if err == nil {
+		s.authority = authority
+	}
+	return s, err
+}
 func (s *Service) RequireAdmin(ctx context.Context, actor int64) error {
-	if actor < 1 {
+	if s.authority != nil {
+		return s.authority.RequireAdmin(ctx, actor)
+	}
+	if !s.store.AdminAuthentication() || actor < 1 {
 		return ErrForbidden
 	}
 	allowed, err := s.store.IsActiveAdmin(ctx, actor)
@@ -56,12 +84,8 @@ func (s *Service) adminChange(ctx context.Context, actor int64, change func(*dao
 		if err := tx.LockAdministration(ctx); err != nil {
 			return err
 		}
-		allowed, err := tx.IsActiveAdmin(ctx, actor)
-		if err != nil {
+		if err := s.RequireAdmin(ctx, actor); err != nil {
 			return err
-		}
-		if !allowed {
-			return ErrForbidden
 		}
 		return change(tx)
 	})

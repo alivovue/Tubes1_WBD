@@ -16,8 +16,8 @@ import (
 func TestQueryPlanAPIReturnsNestedEstimatesForEachStatementWithoutExecution(t *testing.T) {
 	f := newFixture(t, true)
 	target := f.register(t)
-	f.grant(t, f.admin, target.ID, access.ViewEdit)
-	identity, cookie := f.login(t, "it.admin")
+	f.grant(t, f.editor, target.ID, access.ViewEdit)
+	identity, cookie := f.login(t, "it.editor")
 	csrf, err := f.access.CSRFToken(identity)
 	must(t, err)
 	var before string
@@ -26,7 +26,7 @@ func TestQueryPlanAPIReturnsNestedEstimatesForEachStatementWithoutExecution(t *t
 UPDATE public.employees SET salary=salary+100 RETURNING name;
 ALTER TABLE public.employees ADD COLUMN plan_preview TEXT;
 SELECT not_yet_created FROM public.employees;`
-	response := apiRequest(t, promotionHandler(t, f), http.MethodPost, "/migrations/new", cookie, url.Values{
+	response := apiRequest(t, userHandler(t, f), http.MethodPost, "/migrations/new", cookie, url.Values{
 		"csrf": {csrf}, "db": {fmt.Sprint(target.ID)}, "action": {"analyze"}, "sql": {query}, "description": {"Preview plans only"},
 	})
 	if response.Code != http.StatusOK {
@@ -76,14 +76,14 @@ SELECT not_yet_created FROM public.employees;`
 	if after != before {
 		t.Fatal("plan analysis executed UPDATE")
 	}
-	table, err := f.databases.DescribeTable(f.ctx, f.admin, target.ID, "public", "employees")
+	table, err := f.databases.DescribeTable(f.ctx, f.editor, target.ID, "public", "employees")
 	must(t, err)
 	for _, column := range table.Columns {
 		if column.Name == "plan_preview" {
 			t.Fatal("plan analysis executed ALTER TABLE")
 		}
 	}
-	history, err := f.migrations.History(f.ctx, f.admin, target.ID, 50, 0)
+	history, err := f.migrations.History(f.ctx, f.editor, target.ID, 50, 0)
 	must(t, err)
 	if len(history) != 0 {
 		t.Fatal("plan analysis created an execution attempt")

@@ -16,10 +16,6 @@ import (
 
 func main() {
 	if err := run(); err != nil {
-		if errors.Is(err, backend.ErrAdminSetupRequired) {
-			log.Print(err)
-			os.Exit(3)
-		}
 		log.Print(err)
 		os.Exit(1)
 	}
