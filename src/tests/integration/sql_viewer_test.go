@@ -9,10 +9,10 @@ import (
 	"strings"
 	"testing"
 
+	fixtures "schakker_tests/fixtures/setup"
 	"tubes1_wbd/backend"
 	"tubes1_wbd/backend/access"
 	"tubes1_wbd/backend/dbmanagement"
-	fixtures "tubes1_wbd/test/data"
 )
 
 func TestSQLViewerReadsWithoutWritingOrRecordingHistory(t *testing.T) {

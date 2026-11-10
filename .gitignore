@@ -7,8 +7,8 @@ node_modules/
 /src/src/.test-postgres/
 /src/src/.test-postgres.log
 /src/src/.schakker/
-/src/src/test/output/*
-!/src/src/test/output/.gitkeep
+/src/tests/output/*
+!/src/tests/output/.gitkeep
 /src/src/frontend/public/*
 !/src/src/frontend/public/sc logo.png
 /.gitattributes
@@ -16,5 +16,4 @@ node_modules/
 /src/src-admin/frontend/dist/
 /src/src-admin/bin/
 
-/src/src-admin/test/output/
 !/src/src-admin/.env.example

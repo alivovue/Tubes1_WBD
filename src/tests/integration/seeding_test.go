@@ -2,9 +2,6 @@ package integration_test
 
 import (
 	"context"
-	"database/sql"
-	"os"
-	"path/filepath"
 	"time"
 
 	"tubes1_wbd/backend/dbmanagement"
@@ -12,55 +9,6 @@ import (
 	"tubes1_wbd_admin/backend/connectionconfig"
 	"tubes1_wbd_admin/database/dao"
 )
-
-func populateWebsite(ctx context.Context, website *sql.DB, store *dao.Store, auth *access.Service, password string, admin int64) error {
-	if err := auth.RequireAdmin(ctx, admin); err != nil {
-		return err
-	}
-	for _, entry := range []struct{ name, description string }{{"Mock Editors", "Sample editors"}, {"Mock Readers", "Sample readers"}} {
-		groups, err := store.Groups(ctx)
-		if err != nil {
-			return err
-		}
-		exists := false
-		for _, group := range groups {
-			if group.Name == entry.name {
-				exists = true
-				break
-			}
-		}
-		if !exists {
-			if err := auth.SaveGroup(ctx, admin, 0, entry.name, entry.description); err != nil {
-				return err
-			}
-		}
-	}
-	if password != "" {
-		writer, err := access.HashPassword(password)
-		if err != nil {
-			return err
-		}
-		reader, err := access.HashPassword(password)
-		if err != nil {
-			return err
-		}
-		accounts, readErr := os.ReadFile(filepath.Join(filepath.Join("..", ".."), "src", "test", "data", "website", "accounts.sql"))
-		if readErr != nil {
-			return readErr
-		}
-		_, err = website.ExecContext(ctx, string(accounts), writer, reader, admin)
-		if err != nil {
-			return err
-		}
-		memberships, readErr := os.ReadFile(filepath.Join(filepath.Join("..", ".."), "src", "test", "data", "website", "memberships.sql"))
-		if readErr != nil {
-			return readErr
-		}
-		_, err = website.ExecContext(ctx, string(memberships))
-		return err
-	}
-	return nil
-}
 
 // attachManaged seeds only explicitly selected local development fixtures using
 // the initializer connection. It never creates an administrator or authenticates

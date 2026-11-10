@@ -87,13 +87,14 @@ trap cleanup_fixtures EXIT
 report_directory=''
 failures=0
 if [[ "$run_unit_tests" == yes || "$run_integration_tests" == yes ]]; then
-    mkdir -p test/output
-    report_directory="$(mktemp -d "test/output/$(date -u +%Y%m%dT%H%M%SZ).XXXXXX")"
+    report_base="$project_directory/tests/output/$application_mode"
+    mkdir -p "$report_base"
+    report_directory="$(mktemp -d "$report_base/$(date -u +%Y%m%dT%H%M%SZ).XXXXXX")"
     printf 'Schakker automated tests\n' > "$report_directory/summary.txt"
     printf 'Test reports: %s\n' "$report_directory"
 fi
 run_suite() {
-    local name="$1" package="$2" directory="${3:-$application_directory}" timeout=5m
+    local name="$1" package="$2" directory="${3:-$project_directory/tests}" timeout=5m
     if [[ "$name" == integration ]]; then timeout=10m; fi
     if GOWORK=off go -C "$directory" test -count=1 -timeout="$timeout" -v "$package" 2>&1 | tee "$report_directory/$name.log"; then
         printf 'PASS %s\n' "$name" >> "$report_directory/summary.txt"
@@ -103,17 +104,16 @@ run_suite() {
     fi
 }
 if [[ "$run_unit_tests" == yes ]]; then
-    run_suite shared ./... "$project_directory/shared/backend"
+    run_suite shared ./unit/shared/...
     if [[ "$application_mode" == admin ]]; then
-        run_suite unit ./...
+        run_suite unit ./unit/src-admin/...
     else
-        run_suite unit ./test/unit/...
-        run_suite authority ./backend/controlplane/...
+        run_suite unit ./unit/src/...
     fi
 fi
 if [[ "$run_integration_tests" == yes ]]; then
     fixture_state="$(mktemp -d "${TMPDIR:-/tmp}/schakker-tests.XXXXXXXX")"
-    SCHAKKER_TEST_STATE="$fixture_state" run_suite integration ./... "$project_directory/tests/integration"
+    SCHAKKER_TEST_STATE="$fixture_state" run_suite integration ./integration/...
     cleanup_fixtures
     fixture_state=''
 fi

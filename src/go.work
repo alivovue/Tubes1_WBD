@@ -6,5 +6,5 @@ use (
 	./shared/backend
 	./src
 	./src-admin
-	./tests/integration
+	./tests
 )

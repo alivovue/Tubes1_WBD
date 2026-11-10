@@ -13,10 +13,10 @@ import (
 
 	"github.com/go-sql-driver/mysql"
 
+	fixtures "schakker_tests/fixtures/setup"
 	"tubes1_wbd/backend/access"
 	"tubes1_wbd/backend/dbmanagement"
 	"tubes1_wbd/database/dao"
-	fixtures "tubes1_wbd/test/data"
 )
 
 func requireMariaDBTools(t *testing.T) {

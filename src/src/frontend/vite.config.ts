@@ -1,4 +1,4 @@
-import { defineConfig } from "vitest/config";
+import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
 export default defineConfig({
@@ -12,5 +12,4 @@ export default defineConfig({
       "/public": "http://127.0.0.1:3000",
     },
   },
-  test: { environment: "jsdom", setupFiles: ["./app/test-setup.ts"] },
 });

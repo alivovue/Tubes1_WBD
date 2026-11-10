@@ -117,7 +117,7 @@ function Remove-TemporaryFixtures {
     }
 }
 
-function Invoke-TestSuite([string]$Name, [string]$Package, [string]$Directory = $applicationDirectory) {
+function Invoke-TestSuite([string]$Name, [string]$Package, [string]$Directory = $testDirectory) {
     $log = Join-Path $reportDirectory ($Name + '.log')
     $timeout = if ($Name -eq 'integration') { '10m' } else { '5m' }
     $encoding = New-Object Text.UTF8Encoding -ArgumentList $false
@@ -143,6 +143,7 @@ function Invoke-TestSuite([string]$Name, [string]$Package, [string]$Directory = 
 
 try {
     $sourceDirectory = Join-Path $PSScriptRoot 'src'
+    $testDirectory = Join-Path $sourceDirectory 'tests'
     $applicationDirectory = if ($Admin) { Join-Path $sourceDirectory 'src-admin' } else { Join-Path $sourceDirectory 'src' }
     Set-Location -LiteralPath $applicationDirectory
     Import-LaunchEnvironment (Join-Path $applicationDirectory '.env')
@@ -168,26 +169,27 @@ try {
     $reportDirectory = ''
     $failures = 0
     if ($runUnitTests -or $runIntegrationTests) {
-        $reportDirectory = Join-Path (Get-Location).Path ('test\output\' + [DateTime]::UtcNow.ToString('yyyyMMddTHHmmssZ') + '.' + [Guid]::NewGuid().ToString('N').Substring(0, 6))
+        $reportMode = if ($Admin) { 'admin' } else { 'user' }
+        $reportBase = Join-Path $testDirectory ('output\' + $reportMode)
+        $reportDirectory = Join-Path $reportBase ([DateTime]::UtcNow.ToString('yyyyMMddTHHmmssZ') + '.' + [Guid]::NewGuid().ToString('N').Substring(0, 6))
         [void][IO.Directory]::CreateDirectory($reportDirectory)
         [IO.File]::WriteAllText((Join-Path $reportDirectory 'summary.txt'), "Schakker automated tests`r`n")
         Write-Host "Test reports: $reportDirectory"
     }
     if ($runUnitTests) {
         Set-LaunchEnvironment 'GOWORK' 'off'
-        if (-not (Invoke-TestSuite 'shared' './...' (Join-Path $sourceDirectory 'shared/backend'))) { $failures++ }
+        if (-not (Invoke-TestSuite 'shared' './unit/shared/...')) { $failures++ }
         if ($Admin) {
-            if (-not (Invoke-TestSuite 'unit' './...')) { $failures++ }
+            if (-not (Invoke-TestSuite 'unit' './unit/src-admin/...')) { $failures++ }
         } else {
-            if (-not (Invoke-TestSuite 'unit' './test/unit/...')) { $failures++ }
-            if (-not (Invoke-TestSuite 'authority' './backend/controlplane/...')) { $failures++ }
+            if (-not (Invoke-TestSuite 'unit' './unit/src/...')) { $failures++ }
         }
     }
     if ($runIntegrationTests) {
         Set-LaunchEnvironment 'GOWORK' 'off'
         $fixtureState = New-FixtureDirectory
         Set-LaunchEnvironment 'SCHAKKER_TEST_STATE' $fixtureState
-        if (-not (Invoke-TestSuite 'integration' './...' (Join-Path $sourceDirectory 'tests/integration'))) { $failures++ }
+        if (-not (Invoke-TestSuite 'integration' './integration/...')) { $failures++ }
         Remove-TemporaryFixtures
         $fixtureState = ''
         Set-LaunchEnvironment 'SCHAKKER_TEST_STATE' $null

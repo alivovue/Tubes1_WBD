@@ -11,10 +11,6 @@
     "build": "npm run build --workspaces --if-present",
     "build:user": "npm run build --workspace=schakker-frontend",
     "build:admin": "npm run build --workspace=schakker-admin-frontend",
-    "test": "npm run test --workspaces --if-present",
-    "test:user": "npm test --workspace=schakker-frontend",
-    "test:admin": "npm test --workspace=schakker-admin-frontend",
-    "test:shared": "npm test --workspace=@schakker/ui",
     "typecheck:shared": "npm run typecheck --workspace=@schakker/ui"
   },
   "engines": {

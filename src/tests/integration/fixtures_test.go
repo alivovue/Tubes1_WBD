@@ -16,12 +16,13 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	adminfixtures "schakker_tests/fixtures/admin"
+	fixtures "schakker_tests/fixtures/setup"
 	"tubes1_wbd/backend/access"
 	"tubes1_wbd/backend/controlplane"
 	"tubes1_wbd/backend/dbmanagement"
 	"tubes1_wbd/backend/migration"
 	"tubes1_wbd/database/dao"
-	fixtures "tubes1_wbd/test/data"
 	adminaccess "tubes1_wbd_admin/backend/access"
 	"tubes1_wbd_admin/backend/connectionconfig"
 	"tubes1_wbd_admin/backend/internalapi"
@@ -117,7 +118,7 @@ func newFixture(t *testing.T, admin bool) *fixture {
 			t.Error(err)
 		}
 	})
-	must(t, fixtures.InitializeControlPlane(ctx, adminDB))
+	must(t, adminfixtures.Initialize(ctx, adminDB))
 	_, err = adminDB.ExecContext(ctx, `ALTER SEQUENCE admin_users_id_seq RESTART WITH 1000`)
 	must(t, err)
 	adminStore, err := admindao.New(adminDB)

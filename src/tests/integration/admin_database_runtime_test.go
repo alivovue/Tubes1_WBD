@@ -20,9 +20,9 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"schakker_tests/fixtures/setup"
 	"tubes1_wbd/backend"
 	userauth "tubes1_wbd/backend/api/auth"
-	"tubes1_wbd/test/data/setup"
 	adminbackend "tubes1_wbd_admin/backend"
 	adminaccess "tubes1_wbd_admin/backend/access"
 )
