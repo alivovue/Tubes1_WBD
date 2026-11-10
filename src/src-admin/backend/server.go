@@ -41,7 +41,7 @@ func NewHandlerWithServices(root string, services Services) (http.Handler, error
 	}
 	entry, err := os.ReadFile(filepath.Join(root, "frontend", "dist", "index.html"))
 	if err != nil {
-		return nil, fmt.Errorf("run npm ci and npm run build --workspace=schakker-admin-frontend from the repository root: %w", err)
+		return nil, fmt.Errorf("run npm ci and npm run build --workspace=schakker-admin-frontend from the source workspace root (src/): %w", err)
 	}
 	app := &application{api: api.NewHandler(services.Authentication, services.Access, services.Connections, services.Production), entry: entry,
 		assets: http.StripPrefix("/assets/", http.FileServer(http.Dir(filepath.Join(root, "frontend", "dist", "assets")))),

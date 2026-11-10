@@ -49,7 +49,7 @@ func NewHandlerWithServices(root string, services Services) (http.Handler, error
 	}
 	entryHTML, err := os.ReadFile(filepath.Join(root, "frontend", "dist", "index.html"))
 	if err != nil {
-		return nil, fmt.Errorf("run npm ci and npm run build --workspace=schakker-frontend from the repository root: %w", err)
+		return nil, fmt.Errorf("run npm ci and npm run build --workspace=schakker-frontend from the source workspace root (src/): %w", err)
 	}
 	products, err := os.ReadFile(filepath.Join(root, "backend", "Products.json"))
 	if err != nil || !json.Valid(products) {

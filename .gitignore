@@ -1,20 +1,20 @@
 node_modules/
-/src/frontend/dist/
-/src/bin/
+/src/src/frontend/dist/
+/src/src/bin/
 .env
 .env.*
-!/src/.env.example
-/src/.test-postgres/
-/src/.test-postgres.log
-/src/.schakker/
-/src/test/output/*
-!/src/test/output/.gitkeep
-/src/frontend/public/*
-!/src/frontend/public/sc logo.png
+!/src/src/.env.example
+/src/src/.test-postgres/
+/src/src/.test-postgres.log
+/src/src/.schakker/
+/src/src/test/output/*
+!/src/src/test/output/.gitkeep
+/src/src/frontend/public/*
+!/src/src/frontend/public/sc logo.png
 /.gitattributes
 
-/src-admin/frontend/dist/
-/src-admin/bin/
+/src/src-admin/frontend/dist/
+/src/src-admin/bin/
 
-/src-admin/test/output/
-!/src-admin/.env.example
+/src/src-admin/test/output/
+!/src/src-admin/.env.example

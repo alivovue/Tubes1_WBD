@@ -9,7 +9,8 @@ case "${1:-}" in
     *) printf '%s\n' 'Usage: bash ./run.sh [--admin]' >&2; exit 2 ;;
 esac
 
-project_directory="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+repository_directory="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+project_directory="$repository_directory/src"
 application_directory="$project_directory/src"
 if [[ "$application_mode" == admin ]]; then application_directory="$project_directory/src-admin"; fi
 cd "$application_directory"

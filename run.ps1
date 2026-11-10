@@ -142,7 +142,8 @@ function Invoke-TestSuite([string]$Name, [string]$Package, [string]$Directory = 
 }
 
 try {
-    $applicationDirectory = if ($Admin) { Join-Path $PSScriptRoot 'src-admin' } else { Join-Path $PSScriptRoot 'src' }
+    $sourceDirectory = Join-Path $PSScriptRoot 'src'
+    $applicationDirectory = if ($Admin) { Join-Path $sourceDirectory 'src-admin' } else { Join-Path $sourceDirectory 'src' }
     Set-Location -LiteralPath $applicationDirectory
     Import-LaunchEnvironment (Join-Path $applicationDirectory '.env')
     if (-not $Admin -and $env:SCHAKKER_STATE_DIR -and -not [IO.Path]::IsPathRooted($env:SCHAKKER_STATE_DIR)) {
@@ -154,7 +155,7 @@ try {
     $npm = Get-Command npm.cmd -CommandType Application -ErrorAction SilentlyContinue
     if (-not $npm) { throw 'Install Node.js 22.12+ (with npm) before starting Schakker.' }
     $frontendWorkspace = if ($Admin) { 'schakker-admin-frontend' } else { 'schakker-frontend' }
-    Push-Location -LiteralPath $PSScriptRoot
+    Push-Location -LiteralPath $sourceDirectory
     try {
         & $npm.Source ci "--workspace=$frontendWorkspace" '--workspace=@schakker/ui' --no-audit --no-fund
         if ($LASTEXITCODE -ne 0) { throw 'Frontend dependency installation failed.' }
@@ -174,7 +175,7 @@ try {
     }
     if ($runUnitTests) {
         Set-LaunchEnvironment 'GOWORK' 'off'
-        if (-not (Invoke-TestSuite 'shared' './...' (Join-Path $PSScriptRoot 'shared/backend'))) { $failures++ }
+        if (-not (Invoke-TestSuite 'shared' './...' (Join-Path $sourceDirectory 'shared/backend'))) { $failures++ }
         if ($Admin) {
             if (-not (Invoke-TestSuite 'unit' './...')) { $failures++ }
         } else {
@@ -186,13 +187,13 @@ try {
         Set-LaunchEnvironment 'GOWORK' 'off'
         $fixtureState = New-FixtureDirectory
         Set-LaunchEnvironment 'SCHAKKER_TEST_STATE' $fixtureState
-        if (-not (Invoke-TestSuite 'integration' './...' (Join-Path $PSScriptRoot 'tests/integration'))) { $failures++ }
+        if (-not (Invoke-TestSuite 'integration' './...' (Join-Path $sourceDirectory 'tests/integration'))) { $failures++ }
         Remove-TemporaryFixtures
         $fixtureState = ''
         Set-LaunchEnvironment 'SCHAKKER_TEST_STATE' $null
     }
     if ($failures -gt 0) { throw "Automated tests failed. Reports: $reportDirectory" }
-    $binaryDirectory = if ($Admin) { Join-Path $PSScriptRoot 'src-admin\bin' } else { Join-Path $PSScriptRoot 'src\bin' }
+    $binaryDirectory = Join-Path $applicationDirectory 'bin'
     [void][IO.Directory]::CreateDirectory($binaryDirectory)
     $binaryName = if ($Admin) { 'admin-server.exe' } else { 'user-server.exe' }
     $binary = Join-Path $binaryDirectory $binaryName
