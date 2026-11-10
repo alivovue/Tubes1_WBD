@@ -30,11 +30,14 @@ func TestPostgreSQLQueryPlanParsesNativeTreeWithoutExecutingSQL(t *testing.T) {
 	if len(plans) != 2 || !plans[0].Available || plans[1].Available || plans[1].Message == "" {
 		t.Fatalf("incorrect plan availability: %#v", plans)
 	}
+	if plans[0].UnavailableReason != "" || plans[1].UnavailableReason != "unsupported_statement" {
+		t.Fatal("unsupported PostgreSQL statement reason missing")
+	}
 	root := plans[0].Nodes[0]
 	if root.Operation != "Nested Loop" || root.JoinType != "Inner" || len(root.Children) != 2 || root.Children[0].Index != "people_pkey" {
 		t.Fatalf("native plan tree not preserved: %#v", root)
 	}
-	if root.EstimatedRows == nil || *root.EstimatedRows != 4 || root.TotalCost == nil || *root.TotalCost != 12.4 {
+	if root.EstimatedRows == nil || *root.EstimatedRows != 4 || root.StartupCost == nil || *root.StartupCost != 0.2 || root.TotalCost == nil || *root.TotalCost != 12.4 {
 		t.Fatal("native estimates missing")
 	}
 	if string(plans[0].JSON) != raw {
@@ -48,7 +51,7 @@ func TestPostgreSQLUnavailablePlanRecoversSavepoint(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if plans[0].Available || !strings.Contains(plans[0].Message, "current schema") {
+		if plans[0].Available || plans[0].UnavailableReason != "explain_unavailable" || !strings.Contains(plans[0].Message, "current schema") {
 			t.Fatal("failed EXPLAIN fabricated a plan")
 		}
 	}
@@ -67,6 +70,9 @@ func TestMariaDBQueryPlanParsesNativeJoinAndIndex(t *testing.T) {
 	if len(plans) != 2 || !plans[0].Available || plans[1].Available {
 		t.Fatalf("incorrect native availability: %#v", plans)
 	}
+	if plans[0].UnavailableReason != "" || plans[1].UnavailableReason != "unsupported_statement" {
+		t.Fatal("unsupported MariaDB statement reason missing")
+	}
 	root := plans[0].Nodes[0]
 	if root.Operation != "Nested Loop" || len(root.Children) != 2 || root.Children[0].Index != "people_name_idx" || root.Children[1].JoinType != "BNL" {
 		t.Fatalf("native MariaDB plan not parsed: %#v", root)
@@ -81,7 +87,7 @@ func TestMariaDBUnavailableAndOptimizedPlans(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if plans[0].Available || plans[0].Message == "" {
+	if plans[0].Available || plans[0].UnavailableReason != "explain_unavailable" || plans[0].Message == "" {
 		t.Fatal("unavailable MariaDB plan not reported")
 	}
 	db, _, _ = newSQLStub(t, scalarStep("EXPLAIN FORMAT=JSON", `{"query_block":{"message":"No tables used"}}`))

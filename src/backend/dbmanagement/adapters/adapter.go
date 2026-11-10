@@ -132,12 +132,13 @@ type PlanNode struct {
 	Children        []PlanNode
 }
 type Plan struct {
-	Statement string
-	DBMS      string
-	Available bool
-	JSON      json.RawMessage
-	Message   string
-	Nodes     []PlanNode
+	Statement         string
+	DBMS              string
+	Available         bool
+	UnavailableReason string `json:",omitempty"`
+	JSON              json.RawMessage
+	Message           string
+	Nodes             []PlanNode
 }
 type Token struct {
 	Value   string

@@ -1,4 +1,11 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { MemoryRouter, useNavigate } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { App } from "./App";
@@ -280,6 +287,110 @@ describe("SPA workflows", () => {
     expect(execute).toBeDisabled();
     expect(screen.getByRole("alert")).toHaveTextContent("Analyze again");
     expect(actions).toEqual(["analyze"]);
+  });
+
+  it("connects query-plan loading, errors, review data, and stale SQL to analysis requests", async () => {
+    const sql = "SELECT * FROM employees;";
+    const review: Review = {
+      SQL: sql,
+      BaseVersion: 0,
+      Mode: "transactional",
+      Transactional: true,
+      Warnings: [],
+      SchemaDiffAvailable: false,
+      SchemaDiffMessage: "Preview unavailable.",
+      SchemaDiff: null,
+      Plans: [
+        {
+          Statement: sql,
+          DBMS: "postgresql",
+          Available: true,
+          Message: "",
+          JSON: [{ Plan: { "Node Type": "Nested Loop" } }],
+          Nodes: [
+            {
+              Operation: "Nested Loop",
+              Relation: "",
+              Index: "",
+              JoinType: "Inner",
+              EstimatedRows: 2,
+              StartupCost: 0,
+              TotalCost: 2.5,
+              Children: [
+                {
+                  Operation: "Seq Scan",
+                  Relation: "employees",
+                  Index: "",
+                  JoinType: "",
+                  EstimatedRows: 2,
+                  StartupCost: 0,
+                  TotalCost: 1.5,
+                  Children: null,
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    let completeAnalysis!: (result: Response) => void;
+    let attempts = 0;
+    const requests = mockAPI((path, init) => {
+      if (path === "/api/session") return response(identity);
+      if (init?.method === "POST") {
+        if (attempts++ === 0)
+          return new Promise((resolve) => {
+            completeAnalysis = resolve;
+          });
+        return response(
+          page("SQL Migration", {
+            SQL: sql,
+            Description: "Preview",
+            Review: review,
+          }),
+        );
+      }
+      return response(page("SQL Migration"));
+    });
+    open("/migrations/new?db=7");
+    await screen.findByRole("heading", { name: "Create migration" });
+    const plan = screen.getByRole("region", { name: "Query Plan" });
+    expect(screen.getByRole("link", { name: "Query Plan" })).toHaveAttribute(
+      "href",
+      "#query-plan",
+    );
+    fireEvent.change(screen.getByLabelText("Description / draft title"), {
+      target: { value: "Preview" },
+    });
+    fireEvent.change(screen.getByLabelText("SQL migration"), {
+      target: { value: sql },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Analyze migration" }));
+    expect(await within(plan).findByRole("status")).toHaveTextContent(
+      "Analyzing query plans",
+    );
+    await act(async () =>
+      completeAnalysis(
+        response({ error: "Cannot connect to the target database." }, 502),
+      ),
+    );
+    expect(within(plan).getByRole("alert")).toHaveTextContent(
+      "Query-plan analysis failed",
+    );
+    expect(screen.getByLabelText("SQL migration")).toHaveValue(sql);
+    fireEvent.click(screen.getByRole("button", { name: "Analyze migration" }));
+    expect(await within(plan).findByText("Seq Scan")).toBeVisible();
+    const requestCount = requests.mock.calls.length;
+    fireEvent.click(
+      within(plan).getByRole("button", { name: "Collapse Nested Loop" }),
+    );
+    expect(within(plan).getByText("Seq Scan")).not.toBeVisible();
+    expect(requests.mock.calls).toHaveLength(requestCount);
+    fireEvent.change(screen.getByLabelText("SQL migration"), {
+      target: { value: "SELECT 1;" },
+    });
+    expect(within(plan).getByRole("status")).toHaveTextContent("SQL changed");
+    expect(within(plan).queryByText("Seq Scan")).not.toBeInTheDocument();
   });
 
   it("builds and reorders visual operations before generating migration SQL", async () => {

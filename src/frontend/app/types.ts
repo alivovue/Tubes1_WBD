@@ -93,8 +93,19 @@ export type PlanNode = {
   Index: string;
   JoinType: string;
   EstimatedRows: number | null;
+  StartupCost: number | null;
   TotalCost: number | null;
+  FilteredPercent?: number | null;
   Children: PlanNode[] | null;
+};
+export type StatementPlan = {
+  Statement: string;
+  DBMS: string;
+  Available: boolean;
+  UnavailableReason?: "unsupported_statement" | "explain_unavailable";
+  Nodes: PlanNode[] | null;
+  JSON: unknown;
+  Message: string;
 };
 export type Review = {
   SQL: string;
@@ -102,15 +113,7 @@ export type Review = {
   Mode: string;
   Transactional: boolean;
   Warnings: string[] | null;
-  Plans:
-    | {
-        Statement: string;
-        Available: boolean;
-        Nodes: PlanNode[] | null;
-        JSON: unknown;
-        Message: string;
-      }[]
-    | null;
+  Plans: StatementPlan[] | null;
   SchemaDiffAvailable: boolean;
   SchemaDiffMessage: string;
   SchemaDiff: {

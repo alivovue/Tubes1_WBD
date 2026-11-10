@@ -12,11 +12,12 @@ import (
 func Analyze(ctx context.Context, q adapters.Querier, statements []adapters.Statement) ([]adapters.Plan, error) {
 	result := make([]adapters.Plan, 0, len(statements))
 	for _, statement := range statements {
-		plan := adapters.Plan{Statement: statement.SQL, DBMS: "mariadb", Message: "Plan unavailable for this statement"}
+		plan := adapters.Plan{Statement: statement.SQL, DBMS: "mariadb", Message: "Plan unavailable for this statement", UnavailableReason: "unsupported_statement"}
 		if statement.Explainable && statement.Command != "MERGE" {
 			var raw []byte
 			if err := q.QueryRowContext(ctx, `EXPLAIN FORMAT=JSON `+statement.SQL).Scan(&raw); err == nil && json.Valid(raw) {
 				plan.Available = true
+				plan.UnavailableReason = ""
 				plan.JSON = append([]byte(nil), raw...)
 				plan.Message = ""
 				var parsed any
@@ -24,6 +25,7 @@ func Analyze(ctx context.Context, q adapters.Querier, statements []adapters.Stat
 					plan.Nodes = nodes(parsed)
 				}
 			} else {
+				plan.UnavailableReason = "explain_unavailable"
 				plan.Message = "Plan unavailable against the current schema; dependent changes may need execution first"
 			}
 		}

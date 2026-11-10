@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { VisualBuilder } from "./VisualBuilder";
-import type { DiffCell, PlanNode } from "./types";
+import { QueryPlan } from "./QueryPlan";
+import type { DiffCell } from "./types";
 import {
   Button,
   DatabasePicker,
@@ -18,7 +19,7 @@ import {
 } from "./ui";
 
 export function MigrationEditor() {
-  const { data } = usePage();
+  const { data, analysisState } = usePage();
   const [sql, setSQL] = useState(data.SQL);
   const [description, setDescription] = useState(data.Description);
   const [confirmed, setConfirmed] = useState(false);
@@ -36,6 +37,11 @@ export function MigrationEditor() {
         title="Create migration"
         text="Compose → Analyze → Review → Execute. Only Execute applies changes."
       >
+        {!!data.Database.ID && (
+          <a className="button button--secondary" href="#query-plan">
+            Query Plan
+          </a>
+        )}
         {!!data.Database.ID && (
           <Link
             className="button button--secondary"
@@ -198,6 +204,12 @@ export function MigrationEditor() {
             </aside>
           </div>
           {data.Review && !stale && <Analysis />}
+          <QueryPlan
+            plans={data.Review ? data.Review.Plans || [] : undefined}
+            loading={analysisState.loading}
+            error={analysisState.error}
+            stale={stale}
+          />
         </>
       ) : (
         <>
@@ -321,25 +333,6 @@ function Analysis() {
           ) : (
             <p>{review.SchemaDiffMessage}</p>
           )}
-          <h3>Query execution plans</h3>
-          {review.Plans?.map((plan, i) => (
-            <article className="plan-entry" key={i}>
-              <pre>{plan.Statement}</pre>
-              {plan.Available ? (
-                <>
-                  {plan.Nodes?.map((node, j) => (
-                    <ExistingPlanNode key={j} node={node} />
-                  ))}
-                  <details>
-                    <summary>Native EXPLAIN JSON</summary>
-                    <pre>{pretty(plan.JSON)}</pre>
-                  </details>
-                </>
-              ) : (
-                <p>{plan.Message}</p>
-              )}
-            </article>
-          ))}
         </div>
       </Panel>
     </div>
@@ -354,23 +347,6 @@ function DiffLine({ cell }: { cell: DiffCell }) {
       <span className="schema-diff-view__line-number">{cell.Line || ""}</span>
       <span className="schema-diff-view__line-marker">{cell.Marker}</span>
       <code>{cell.Text}</code>
-    </div>
-  );
-}
-
-// Port of the existing inline plan summary; a dedicated plan UI is deferred.
-function ExistingPlanNode({ node }: { node: PlanNode }) {
-  return (
-    <div className="plan-node">
-      <strong>{node.Operation}</strong>
-      {node.Relation && ` · ${node.Relation}`}
-      {node.Index && ` · index ${node.Index}`}
-      {node.JoinType && ` · ${node.JoinType}`}
-      {node.EstimatedRows != null && ` · estimated rows ${node.EstimatedRows}`}
-      {node.TotalCost != null && ` · cost ${node.TotalCost}`}
-      {node.Children?.map((child, i) => (
-        <ExistingPlanNode key={i} node={child} />
-      ))}
     </div>
   );
 }

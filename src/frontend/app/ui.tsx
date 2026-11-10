@@ -12,6 +12,7 @@ import type { Database, Fields, PageData, Rows } from "./types";
 export const PageContext = createContext<{
   data: PageData;
   busy: boolean;
+  analysisState: { loading: boolean; error: string };
   submit: (fields: Fields) => Promise<boolean>;
   refresh: () => void;
 } | null>(null);

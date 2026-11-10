@@ -423,6 +423,10 @@ function Page() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [revision, setRevision] = useState(0);
+  const [analysisState, setAnalysisState] = useState({
+    loading: false,
+    error: "",
+  });
   const currentPath = location.pathname + location.search;
   const apiParams = new URLSearchParams(location.search);
   apiParams.delete("tab");
@@ -436,6 +440,7 @@ function Page() {
     setLoading(true);
     setError("");
     setData(null);
+    setAnalysisState({ loading: false, error: "" });
     api(requestPath, undefined, undefined, controller.signal)
       .then((result) => {
         if (result.location) {
@@ -468,6 +473,10 @@ function Page() {
     if (busy || !data) return false;
     setBusy(true);
     setError("");
+    const analyzing =
+      typeof fields.action === "string" &&
+      ["analyze", "analyze_visual", "analyze_desired"].includes(fields.action);
+    setAnalysisState({ loading: analyzing, error: "" });
     const submittedPath = currentPath;
     try {
       const result = await api(location.pathname, fields, data.CSRF);
@@ -484,9 +493,13 @@ function Page() {
       if (activePath.current !== submittedPath) return false;
       if (problem instanceof APIError && problem.status === 401) expire();
       else setError((problem as Error).message);
+      if (analyzing)
+        setAnalysisState({ loading: false, error: (problem as Error).message });
       return false;
     } finally {
       setBusy(false);
+      if (analyzing)
+        setAnalysisState((current) => ({ ...current, loading: false }));
     }
   }
   if (loading)
@@ -533,7 +546,9 @@ function Page() {
       break;
   }
   return (
-    <PageContext.Provider value={{ data, busy, submit, refresh }}>
+    <PageContext.Provider
+      value={{ data, busy, submit, refresh, analysisState }}
+    >
       <div aria-busy={busy}>
         {error && <Notice error>{error}</Notice>}
         {data.Message && <Notice>{data.Message}</Notice>}
