@@ -18,7 +18,6 @@ import (
 	"time"
 
 	"tubes1_wbd/backend/dbmanagement"
-	"tubes1_wbd/database/dao"
 )
 
 const MariaDBName = "schakker_mock_mariadb"
@@ -123,10 +122,6 @@ func (m *MariaDB) Close() {
 
 func (m *MariaDB) Connection() dbmanagement.ConnectionInput {
 	return dbmanagement.ConnectionInput{DBMS: "mariadb", Name: "Mock MariaDB Database " + m.id, Host: "127.0.0.1", Port: m.Port, DatabaseName: m.DatabaseName, Username: managedRole, Password: m.password, SSLMode: "disable", Active: true}
-}
-
-func (m *MariaDB) AttachManaged(ctx context.Context, store *dao.Store, key []byte) error {
-	return attachManaged(ctx, store, key, m.Connection())
 }
 
 func mariaDBPassword(directory, dataDirectory string) (string, error) {

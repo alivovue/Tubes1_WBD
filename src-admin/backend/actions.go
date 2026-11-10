@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"tubes1_wbd/backend/access"
-	"tubes1_wbd/backend/connectionconfig"
+	"tubes1_wbd_admin/backend/access"
+	"tubes1_wbd_admin/backend/connectionconfig"
 )
 
 func (app *application) adminAction(w http.ResponseWriter, r *http.Request, data *pageData) (bool, error) {
@@ -31,9 +31,9 @@ func (app *application) adminAction(w http.ResponseWriter, r *http.Request, data
 		}
 		switch form.Get("action") {
 		case "create_user":
-			err = app.services.Access.CreateUser(r.Context(), actor, form.Get("username"), form.Get("display"), form.Get("password"), form.Get("admin") == "on")
+			err = app.services.Access.CreateUser(r.Context(), actor, form.Get("username"), form.Get("display"), form.Get("password"))
 		case "update_user":
-			err = app.services.Access.UpdateUser(r.Context(), actor, id, form.Get("display"), form.Get("admin") == "on", form.Get("active") == "on", form.Get("password"))
+			err = app.services.Access.UpdateUser(r.Context(), actor, id, form.Get("display"), form.Get("active") == "on", form.Get("password"))
 		default:
 			return false, access.ErrInvalid
 		}
@@ -94,12 +94,6 @@ func (app *application) adminAction(w http.ResponseWriter, r *http.Request, data
 			switch form.Get("action") {
 			case "save_connection":
 				_, err = app.services.Connections.SaveConnection(r.Context(), actor, id, input)
-			case "test_connection":
-				err = app.services.Connections.TestConnection(r.Context(), actor, id, input)
-				if err == nil {
-					data.Message = "Connection verified"
-					return false, nil
-				}
 			default:
 				return false, access.ErrInvalid
 			}

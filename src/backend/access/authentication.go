@@ -6,8 +6,6 @@ import (
 	"time"
 
 	"tubes1_wbd/database/dao"
-
-	"golang.org/x/crypto/bcrypt"
 )
 
 const CookieName = "schakker_session"
@@ -19,53 +17,27 @@ type Identity struct {
 }
 
 func (s *Service) Login(ctx context.Context, username, password, oldToken string) (Identity, string, error) {
-	return s.login(ctx, username, password, oldToken, nil)
-}
-
-// LoginForRole rejects the wrong application role before replacing an existing
-// session. The role is rechecked under the credentials lock before any mutation.
-func (s *Service) LoginForRole(ctx context.Context, username, password, oldToken string, admin bool) (Identity, string, error) {
-	return s.login(ctx, username, password, oldToken, &admin)
-}
-func (s *Service) login(ctx context.Context, username, password, oldToken string, admin *bool) (Identity, string, error) {
 	if len(username) > 100 || len(password) > 72 {
 		return Identity{}, "", ErrUnauthenticated
 	}
-	credentials, err := s.store.Credentials(ctx, username)
-	if err != nil && !errors.Is(err, ErrNotFound) {
+	user, err := s.authority.AuthenticateUser(ctx, username, password)
+	if err != nil {
 		return Identity{}, "", err
 	}
-	compare := []byte(credentials.PasswordHash)
-	if err != nil {
-		compare = s.dummyHash
-	}
-	valid := bcrypt.CompareHashAndPassword(compare, []byte(password)) == nil
-	if !valid || err != nil || !credentials.Active || credentials.IsAdmin != s.store.AdminAuthentication() {
+	if !user.Active || user.ID < 1 || user.Version < 1 {
 		return Identity{}, "", ErrUnauthenticated
 	}
-	if admin != nil && credentials.IsAdmin != *admin {
-		return Identity{}, "", ErrForbidden
-	}
+
 	raw, err := randomToken()
 	if err != nil {
 		return Identity{}, "", err
 	}
 	var identity Identity
 	err = s.store.Transaction(ctx, func(tx *dao.Store) error {
-		valid, err := tx.LockCredentials(ctx, credentials.ID, credentials.PasswordHash)
-		if err != nil {
+		if err := tx.RememberUser(ctx, user); err != nil {
 			return err
 		}
-		if !valid {
-			return ErrUnauthenticated
-		}
-		user, err := tx.User(ctx, credentials.ID)
-		if err != nil {
-			return err
-		}
-		if admin != nil && user.IsAdmin != *admin {
-			return ErrForbidden
-		}
+
 		now := s.config.Now()
 		absolute := now.Add(s.config.AbsoluteLifetime)
 		if oldToken != "" {
@@ -73,7 +45,7 @@ func (s *Service) login(ctx context.Context, username, password, oldToken string
 				return err
 			}
 		}
-		id, err := tx.CreateSession(ctx, user.ID, now, minTime(now.Add(s.config.IdleTimeout), absolute), absolute)
+		id, err := tx.CreateSession(ctx, user.ID, now, minTime(now.Add(s.config.IdleTimeout), absolute), absolute, user.Version, user.Rotation)
 		if err != nil {
 			return err
 		}
@@ -95,11 +67,14 @@ func (s *Service) Authenticate(ctx context.Context, raw string) (Identity, strin
 	}
 	var identity Identity
 	var replacement string
+	var sessionID string
+	var invalidate bool
 	err := s.store.Transaction(ctx, func(tx *dao.Store) error {
 		session, err := tx.LockSession(ctx, tokenHash(raw))
 		if err != nil {
 			return authenticationError(err)
 		}
+		sessionID = session.ID
 		now := s.config.Now()
 		token, err := tx.SessionToken(ctx, tokenHash(raw))
 		if err != nil {
@@ -108,14 +83,16 @@ func (s *Service) Authenticate(ctx context.Context, raw string) (Identity, strin
 		if session.Revoked || !now.Before(session.IdleExpires) || !now.Before(session.AbsoluteExpires) || (token.ReplacedAt != nil && (token.GraceExpiresAt == nil || !now.Before(*token.GraceExpiresAt))) {
 			return ErrUnauthenticated
 		}
-		user, err := tx.User(ctx, session.UserID)
+		user, err := s.authority.User(ctx, session.UserID)
 		if err != nil {
+			invalidate = errors.Is(err, ErrNotFound) || errors.Is(err, ErrForbidden)
 			return authenticationError(err)
 		}
-		if !user.Active || user.IsAdmin != s.store.AdminAuthentication() {
+		if !user.Active || user.ID != session.UserID || user.Version != session.Version {
+			invalidate = true
 			return ErrUnauthenticated
 		}
-		if token.ReplacedAt == nil && !now.Before(token.IssuedAt.Add(s.config.RotationInterval)) {
+		if token.ReplacedAt == nil && (!now.Before(token.IssuedAt.Add(s.config.RotationInterval)) || user.Rotation != session.Rotation) {
 			replacement, err = s.rotateSession(ctx, tx, session, tokenHash(raw), now)
 		} else if token.ReplacedAt != nil {
 			replacement, err = s.replacementForGraceToken(ctx, tx, session.ID, tokenHash(raw), now)
@@ -123,6 +100,16 @@ func (s *Service) Authenticate(ctx context.Context, raw string) (Identity, strin
 		if err != nil {
 			return err
 		}
+		if user.Rotation != session.Rotation {
+			// A grace token delivers the current token first; the next use of that
+			// current token performs any pending privilege-change rotation.
+			if token.ReplacedAt == nil {
+				if err := tx.SessionRotationVersion(ctx, session.ID, user.Rotation); err != nil {
+					return err
+				}
+			}
+		}
+
 		if err := tx.TouchSession(ctx, session.ID, now, minTime(now.Add(s.config.IdleTimeout), session.AbsoluteExpires)); err != nil {
 			return err
 		}
@@ -133,6 +120,11 @@ func (s *Service) Authenticate(ctx context.Context, raw string) (Identity, strin
 		return nil
 	})
 	if err != nil {
+		if invalidate && sessionID != "" {
+			if revokeErr := s.store.RevokeSession(ctx, sessionID, s.config.Now()); revokeErr != nil {
+				return Identity{}, "", revokeErr
+			}
+		}
 		return Identity{}, "", err
 	}
 	return identity, replacement, nil
@@ -146,7 +138,7 @@ func (s *Service) Logout(ctx context.Context, sessionID string) error {
 }
 
 func authenticationError(err error) error {
-	if errors.Is(err, ErrNotFound) {
+	if errors.Is(err, ErrNotFound) || errors.Is(err, ErrForbidden) {
 		return ErrUnauthenticated
 	}
 	return err

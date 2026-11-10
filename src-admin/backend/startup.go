@@ -3,93 +3,82 @@ package backend
 import (
 	"context"
 	"database/sql"
+	"encoding/base64"
+	"encoding/hex"
 	"errors"
+	"net/http"
 	"os"
-	"path/filepath"
+	"strings"
 	"time"
 
-	"tubes1_wbd/backend/access"
-	"tubes1_wbd/backend/connectionconfig"
-	"tubes1_wbd/database/dao"
-	"tubes1_wbd/database/platform"
-	"tubes1_wbd/database/setup"
-	adminaccess "tubes1_wbd_admin/backend/access"
-	admindao "tubes1_wbd_admin/database/dao"
-	adminsetup "tubes1_wbd_admin/database/setup"
+	"tubes1_wbd_admin/backend/access"
+	"tubes1_wbd_admin/backend/connectionconfig"
+	"tubes1_wbd_admin/backend/internalapi"
+	"tubes1_wbd_admin/database/dao"
+	"tubes1_wbd_admin/database/setup"
 )
 
-type runtime struct{ platform, admin *sql.DB }
-
-func (r *runtime) Close() error {
-	first := r.admin.Close()
-	second := r.platform.Close()
-	if first != nil {
-		return first
-	}
-	return second
+type runtime struct {
+	db       *sql.DB
+	internal http.Handler
 }
 
+func (r *runtime) Close() error                         { return r.db.Close() }
+func (h *managedHandler) InternalHandler() http.Handler { return h.runtime.internal }
+
 func servicesFromEnvironment(root string) (Services, *runtime, error) {
-	platformURL, adminURL := platform.DatabaseURL(), os.Getenv("SCHAKKER_ADMIN_DATABASE_URL")
-	if platformURL == "" || adminURL == "" {
-		return Services{}, nil, errors.New("SCHAKKER_PLATFORM_DATABASE_URL and SCHAKKER_ADMIN_DATABASE_URL are required; provision both databases and the initial administrator outside the application")
+	dsn := strings.TrimSpace(os.Getenv("SCHAKKER_ADMIN_DATABASE_URL"))
+	if dsn == "" {
+		return Services{}, nil, errors.New("SCHAKKER_ADMIN_DATABASE_URL is required; provision the database and initial administrator externally")
 	}
-	production := os.Getenv("SCHAKKER_ENV") == "production"
-	key, err := platform.MasterKey(platform.StateDirectory(filepath.Join(root, "..", "src")), production)
+	key, err := adminMasterKey()
 	if err != nil {
 		return Services{}, nil, err
 	}
+	token := os.Getenv("SCHAKKER_INTERNAL_TOKEN")
+	if len(token) < 32 {
+		return Services{}, nil, errors.New("SCHAKKER_INTERNAL_TOKEN must contain at least 32 bytes")
+	}
+	production := os.Getenv("SCHAKKER_ADMIN_ENV") == "production"
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	state := &runtime{}
-	fail := func(err error) (Services, *runtime, error) {
-		if state.admin != nil {
-			state.admin.Close()
-		}
-		if state.platform != nil {
-			state.platform.Close()
-		}
+	db, err := setup.Open(ctx, dsn)
+	if err != nil {
 		return Services{}, nil, err
 	}
-	state.platform, err = setup.Open(ctx, platformURL)
+	fail := func(err error) (Services, *runtime, error) { db.Close(); return Services{}, nil, err }
+	if err := setup.ValidateRuntimeRole(ctx, db); err != nil {
+		return fail(err)
+	}
+	if err := setup.ValidateSchema(ctx, db); err != nil {
+		return fail(err)
+	}
+	store, err := dao.New(db)
 	if err != nil {
 		return fail(err)
 	}
-	if err := setup.ValidateRuntimeRole(ctx, state.platform); err != nil {
-		return fail(err)
-	}
-	if err := setup.ValidateSchema(ctx, state.platform); err != nil {
-		return fail(err)
-	}
-	state.admin, err = setup.Open(ctx, adminURL)
+	auth, err := access.NewService(store, access.DefaultConfig(key))
 	if err != nil {
 		return fail(err)
 	}
-	if err := setup.ValidateRuntimeRole(ctx, state.admin); err != nil {
-		return fail(err)
-	}
-	if err := adminsetup.ValidateSchema(ctx, state.admin); err != nil {
-		return fail(err)
-	}
-	adminStore, err := admindao.New(state.admin)
+	connections, err := connectionconfig.NewService(store, auth, connectionconfig.DefaultConfig(key, production))
 	if err != nil {
 		return fail(err)
 	}
-	auth, err := adminaccess.NewService(adminStore, access.DefaultConfig(key))
+	internal, err := internalapi.NewHandler(store, key, token)
 	if err != nil {
 		return fail(err)
 	}
-	store, err := dao.New(state.platform)
-	if err != nil {
-		return fail(err)
+	return Services{Authentication: auth, Access: auth, Connections: connections, Production: production}, &runtime{db: db, internal: internal}, nil
+}
+func adminMasterKey() ([]byte, error) {
+	encoded := strings.TrimSpace(os.Getenv("SCHAKKER_ADMIN_MASTER_KEY"))
+	key, err := hex.DecodeString(encoded)
+	if err != nil || len(key) != 32 {
+		key, err = base64.StdEncoding.DecodeString(encoded)
 	}
-	administration, err := access.NewAdministrationService(store, auth, access.DefaultConfig(key))
-	if err != nil {
-		return fail(err)
+	if err != nil || len(key) != 32 {
+		return nil, errors.New("SCHAKKER_ADMIN_MASTER_KEY must contain an existing 32-byte key encoded as hex or base64")
 	}
-	connections, err := connectionconfig.NewService(store, administration, connectionconfig.DefaultConfig(key, production))
-	if err != nil {
-		return fail(err)
-	}
-	return Services{Authentication: auth, Access: administration, Connections: connections, Production: production}, state, nil
+	return key, nil
 }

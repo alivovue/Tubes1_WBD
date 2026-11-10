@@ -90,60 +90,8 @@ func (s *Service) Reconcile(ctx context.Context, actor, database int64) error {
 	})
 }
 func (s *Service) ResolveOutcome(ctx context.Context, actor, database, id int64, applied bool, reason string) error {
-	if err := s.access.RequireAdmin(ctx, actor); err != nil {
-		return err
-	}
-	if err := s.access.RequirePermission(ctx, actor, database, access.ViewEdit); err != nil {
-		return err
-	}
-	if strings.TrimSpace(reason) == "" || len(reason) > 2000 {
-		return ErrInvalid
-	}
-	return s.store.WithDatabaseLock(ctx, database, func(store *dao.Store) error {
-		execution, err := store.Execution(ctx, database, id)
-		if err != nil {
-			return err
-		}
-		if execution.Status != "running" || execution.Mode != engines.NonAtomic {
-			return ErrInvalid
-		}
-		target, err := s.databases.OpenMigrationTarget(ctx, actor, database)
-		if err != nil {
-			return err
-		}
-		defer target.DB.Close()
-		engine, err := s.engines.Select(target.Adapter.Name())
-		if err != nil {
-			return err
-		}
-		session, err := engine.Open(ctx, target.DB, target.Adapter, engines.Reconcile)
-		if err != nil {
-			return err
-		}
-		defer session.Close()
-		candidate, err := namespaceCandidate()
-		if err != nil {
-			return err
-		}
-		namespace, err := store.DatabaseNamespace(ctx, database, candidate)
-		if err != nil {
-			return err
-		}
-		receipt, err := session.Receipt(ctx, namespace, id)
-		if err != nil {
-			return err
-		}
-		if receipt.Status != "prepared" || receipt.SQLHash != SQLHash(execution.SQL) {
-			return ErrInvalid
-		}
-		if err := store.RecordResolution(ctx, database, id, actor, reason); err != nil {
-			return err
-		}
-		if err := session.Resolve(ctx, receipt, applied); err != nil {
-			return err
-		}
-		return s.reconcileLocked(ctx, store, session, database, namespace)
-	})
+	// Uncertain non-atomic outcomes require an operator recovery procedure.
+	return ErrForbidden
 }
 func (s *Service) Execute(ctx context.Context, actor, database int64, input ExecuteInput) (dao.MigrationExecution, error) {
 	if err := s.access.RequirePermission(ctx, actor, database, access.ViewEdit); err != nil {

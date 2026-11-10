@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"tubes1_wbd/backend/access"
+	"tubes1_wbd/backend/controlplane"
 	"tubes1_wbd/database/dao"
 	"tubes1_wbd/database/setup"
 )
@@ -54,7 +55,13 @@ func Open(root string) (*Runtime, error) {
 	if err != nil {
 		return fail(err)
 	}
-	auth, err := access.NewService(store, access.DefaultConfig(key))
+	authority, err := controlplane.New(os.Getenv("SCHAKKER_CONTROL_PLANE_URL"), os.Getenv("SCHAKKER_INTERNAL_TOKEN"), production)
+	if err != nil {
+		return fail(err)
+	}
+	config := access.DefaultConfig(key)
+	config.Authority = authority
+	auth, err := access.NewService(store, config)
 	if err != nil {
 		return fail(err)
 	}

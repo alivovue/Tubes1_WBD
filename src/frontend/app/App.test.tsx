@@ -15,7 +15,6 @@ const user = {
   ID: 1,
   Username: "reader",
   DisplayName: "Test Employee",
-  IsAdmin: false,
   Active: true,
 };
 const database = {

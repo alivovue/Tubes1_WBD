@@ -13,7 +13,6 @@ import (
 
 	"tubes1_wbd/backend"
 	"tubes1_wbd/backend/access"
-	"tubes1_wbd/backend/connectionconfig"
 	adminbackend "tubes1_wbd_admin/backend"
 )
 
@@ -22,12 +21,11 @@ func rotationClock(t *testing.T, f *fixture) *time.Time {
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	config := access.DefaultConfig(bytes.Repeat([]byte{21}, 32))
 	config.Now = func() time.Time { return now }
-	service, err := access.NewService(f.store, config)
+	config.Authority = f.authority
+	service, err := access.NewService(f.runtimeStore, config)
 	must(t, err)
 	f.userAccess = service
-	administration, err := access.NewAdministrationService(f.store, f.adminAuth, config)
-	must(t, err)
-	f.access = administration
+	f.access.Service = service
 	return &now
 }
 func currentHash(t *testing.T, f *fixture, session string) []byte {
@@ -48,9 +46,7 @@ func adminHandler(t *testing.T, f *fixture) http.Handler {
 	t.Helper()
 	root, err := filepath.Abs(filepath.Join("..", "..", "..", "src-admin"))
 	must(t, err)
-	connections, err := connectionconfig.NewService(f.store, f.access, connectionconfig.DefaultConfig(bytes.Repeat([]byte{21}, 32), false))
-	must(t, err)
-	handler, err := adminbackend.NewHandlerWithServices(root, adminbackend.Services{Authentication: f.adminAuth, Access: f.access, Connections: connections})
+	handler, err := adminbackend.NewHandlerWithServices(root, adminbackend.Services{Authentication: f.adminAuth, Access: f.adminAuth, Connections: f.connections})
 	must(t, err)
 	return handler
 }
@@ -69,8 +65,8 @@ func TestMembershipIncreaseRotatesAllActiveSessionsAndDeliversCookie(t *testing.
 	*now = now.Add(3 * time.Second)
 	groupForIncrease := f.group(t, "Session rotation group")
 	must(t, f.access.SetMembership(f.ctx, f.admin, user.ID, groupForIncrease.ID, true))
-	if bytes.Equal(currentHash(t, f, first.SessionID), firstHash) || bytes.Equal(currentHash(t, f, second.SessionID), secondHash) {
-		t.Fatal("membership increase did not immediately rotate every active session")
+	if !bytes.Equal(currentHash(t, f, first.SessionID), firstHash) || !bytes.Equal(currentHash(t, f, second.SessionID), secondHash) {
+		t.Fatal("control plane wrote into runtime sessions")
 	}
 	if !bytes.Equal(currentHash(t, f, expired.SessionID), expiredHash) {
 		t.Fatal("membership increase rotated an expired session")
@@ -108,7 +104,7 @@ func TestMembershipIncreaseRotatesAllActiveSessionsAndDeliversCookie(t *testing.
 	}
 	identity, newSecond, err := f.access.Authenticate(f.ctx, oldSecond)
 	must(t, err)
-	if identity.User.IsAdmin || newSecond == "" || newSecond == oldSecond || !identity.AbsoluteExpires.Equal(second.AbsoluteExpires) {
+	if newSecond == "" || newSecond == oldSecond || !identity.AbsoluteExpires.Equal(second.AbsoluteExpires) {
 		t.Fatal("second browser did not receive its replacement session")
 	}
 	_, _, err = f.access.Authenticate(f.ctx, oldExpired)
@@ -133,6 +129,8 @@ func TestPrivilegeRotationsRecoverLatestTokenForConcurrentGraceRequests(t *testi
 	target := f.register(t)
 	group := f.grant(t, user.ID, target.ID, access.ViewOnly)
 	must(t, f.access.SetGrant(f.ctx, f.admin, group.ID, target.ID, access.ViewEdit))
+	_, _, err := f.access.Authenticate(f.ctx, old)
+	must(t, err)
 	expected := currentHash(t, f, identity.SessionID)
 	var before time.Time
 	oldHash := sha256.Sum256([]byte(old))
@@ -150,7 +148,7 @@ func TestPrivilegeRotationsRecoverLatestTokenForConcurrentGraceRequests(t *testi
 				return
 			}
 			hash := sha256.Sum256([]byte(replacement))
-			if !bytes.Equal(hash[:], expected) || current.User.IsAdmin || !current.AbsoluteExpires.Equal(identity.AbsoluteExpires) {
+			if !bytes.Equal(hash[:], expected) || !current.AbsoluteExpires.Equal(identity.AbsoluteExpires) {
 				failures <- errors.New("parallel request did not recover the latest token")
 				return
 			}
@@ -174,7 +172,7 @@ func TestPrivilegeRotationsRecoverLatestTokenForConcurrentGraceRequests(t *testi
 		t.Fatal("parallel requests created multiple current tokens")
 	}
 	*now = before
-	_, _, err := f.access.Authenticate(f.ctx, old)
+	_, _, err = f.access.Authenticate(f.ctx, old)
 	wantError(t, err, access.ErrUnauthenticated)
 	for replacement := range replacements {
 		_, _, err := f.access.Authenticate(f.ctx, replacement)
@@ -187,23 +185,23 @@ func TestPrivilegeRotationFailureRollsBackMembershipAndTokens(t *testing.T) {
 	user := f.user(t, "rollback.employee")
 	identity, old := f.login(t, user.Username)
 	before := currentHash(t, f, identity.SessionID)
-	_, err := f.dbs.Website.ExecContext(f.ctx, `CREATE FUNCTION reject_rotation() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'simulated token storage failure'; END $$; CREATE TRIGGER reject_rotation BEFORE INSERT ON session_tokens FOR EACH ROW EXECUTE FUNCTION reject_rotation()`)
+	_, err := f.adminDB.ExecContext(f.ctx, `CREATE FUNCTION reject_rotation() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.rotation_version<>OLD.rotation_version THEN RAISE EXCEPTION 'simulated version storage failure';END IF;RETURN NEW; END $$; CREATE TRIGGER reject_rotation BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION reject_rotation()`)
 	must(t, err)
 	groupForIncrease := f.group(t, "Rollback rotation group")
 	if err := f.access.SetMembership(f.ctx, f.admin, user.ID, groupForIncrease.ID, true); err == nil {
 		t.Fatal("membership increase succeeded despite a failed token rotation")
 	}
-	saved, err := f.store.User(f.ctx, user.ID)
-	must(t, err)
-	if saved.IsAdmin {
-		t.Fatal("failed rotation committed the increased privilege")
+	var membership bool
+	must(t, f.adminDB.QueryRowContext(f.ctx, `SELECT EXISTS(SELECT 1 FROM user_groups WHERE user_id=$1 AND group_id=$2)`, user.ID, groupForIncrease.ID).Scan(&membership))
+	if membership {
+		t.Fatal("failed version update committed membership")
 	}
 	if !bytes.Equal(before, currentHash(t, f, identity.SessionID)) {
 		t.Fatal("failed membership increase committed a replacement token")
 	}
-	current, replacement, err := f.access.Authenticate(f.ctx, old)
+	_, replacement, err := f.access.Authenticate(f.ctx, old)
 	must(t, err)
-	if current.User.IsAdmin || replacement != "" {
+	if replacement != "" {
 		t.Fatal("rolled-back membership increase changed the existing session")
 	}
 }
@@ -217,13 +215,15 @@ func TestPrivilegeRotationGraceDoesNotOutliveAbsoluteExpiration(t *testing.T) {
 	*now = identity.AbsoluteExpires.Add(-5 * time.Second)
 	groupForIncrease := f.group(t, "Session rotation group")
 	must(t, f.access.SetMembership(f.ctx, f.admin, user.ID, groupForIncrease.ID, true))
+	current, replacement, err := f.access.Authenticate(f.ctx, old)
+	must(t, err)
 	hash := sha256.Sum256([]byte(old))
 	var grace time.Time
 	must(t, f.dbs.Website.QueryRowContext(f.ctx, `SELECT grace_expires_at FROM session_tokens WHERE token_hash=$1`, hash[:]).Scan(&grace))
 	if !grace.Equal(identity.AbsoluteExpires) {
 		t.Fatal("membership rotation grace period exceeded the absolute expiration")
 	}
-	current, replacement, err := f.access.Authenticate(f.ctx, old)
+	current, replacement, err = f.access.Authenticate(f.ctx, old)
 	must(t, err)
 	if replacement == "" || !current.AbsoluteExpires.Equal(identity.AbsoluteExpires) {
 		t.Fatal("rotation changed the absolute expiration")

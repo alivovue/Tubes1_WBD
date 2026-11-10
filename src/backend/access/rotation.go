@@ -22,34 +22,6 @@ func (s *Service) rotateSession(ctx context.Context, store *dao.Store, session d
 	}
 	return replacement, nil
 }
-func (s *Service) rotateSessions(ctx context.Context, store *dao.Store, sessions []dao.Session, now time.Time) error {
-	for _, session := range sessions {
-		hash, err := store.CurrentSessionTokenHash(ctx, session.ID)
-		if err != nil {
-			return err
-		}
-		if _, err := s.rotateSession(ctx, store, session, hash, now); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-func (s *Service) rotateUserSessions(ctx context.Context, store *dao.Store, user int64) error {
-	now := s.config.Now()
-	sessions, err := store.LockUserSessions(ctx, user, now)
-	if err != nil {
-		return err
-	}
-	return s.rotateSessions(ctx, store, sessions, now)
-}
-func (s *Service) rotateGroupSessions(ctx context.Context, store *dao.Store, group int64) error {
-	now := s.config.Now()
-	sessions, err := store.LockGroupSessions(ctx, group, now)
-	if err != nil {
-		return err
-	}
-	return s.rotateSessions(ctx, store, sessions, now)
-}
 func (s *Service) replacementForGraceToken(ctx context.Context, store *dao.Store, sessionID string, hash []byte, now time.Time) (string, error) {
 	for range 64 {
 		replacement := s.rotationToken(hash)
@@ -69,7 +41,4 @@ func (s *Service) replacementForGraceToken(ctx context.Context, store *dao.Store
 		}
 	}
 	return "", ErrUnauthenticated
-}
-func permissionIncreased(previous, next Permission) bool {
-	return previous == NoAccess && (next == ViewOnly || next == ViewEdit) || previous == ViewOnly && next == ViewEdit
 }

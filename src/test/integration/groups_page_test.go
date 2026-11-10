@@ -9,10 +9,11 @@ import (
 
 	"tubes1_wbd/backend/access"
 	"tubes1_wbd/database/dao"
+	admindao "tubes1_wbd_admin/database/dao"
 )
 
 type apiGroup struct {
-	dao.Group
+	admindao.Group
 	Members []dao.User
 	Grants  []struct {
 		Database   dao.Database
@@ -42,7 +43,7 @@ func TestGroupsPageManagesMembersAndDatabasePermissions(t *testing.T) {
 	employee := f.user(t, "groups.reader")
 	target := f.register(t)
 	identity, cookie := f.login(t, "it.admin")
-	csrf, err := f.adminAuth.CSRFToken(identity)
+	csrf, err := f.adminAuth.CSRFToken(toAdminIdentity(identity))
 	must(t, err)
 	handler := adminHandler(t, f)
 	request := func(method, path string, form url.Values) *httptest.ResponseRecorder {
@@ -55,7 +56,7 @@ func TestGroupsPageManagesMembersAndDatabasePermissions(t *testing.T) {
 	}
 	groups, err := f.store.Groups(f.ctx)
 	must(t, err)
-	var group dao.Group
+	var group admindao.Group
 	for _, saved := range groups {
 		if saved.Name == "Merged Analysts" {
 			group = saved
@@ -64,9 +65,9 @@ func TestGroupsPageManagesMembersAndDatabasePermissions(t *testing.T) {
 	if group.ID == 0 {
 		t.Fatal("created group was not persisted")
 	}
-	level, err := f.store.GroupPermission(f.ctx, group.ID, target.ID)
+	rawLevel, err := f.store.GroupPermission(f.ctx, group.ID, target.ID)
 	must(t, err)
-	if level != access.NoAccess {
+	if rawLevel != admindao.NoAccess {
 		t.Fatal("new group gained access without a grant")
 	}
 	if groupFromResponse(t, request(http.MethodGet, "/admin/groups", nil), group.ID).Editor != "" {
@@ -93,7 +94,7 @@ func TestGroupsPageManagesMembersAndDatabasePermissions(t *testing.T) {
 	grant := url.Values{"csrf": {csrf}, "action": {"set_grant"}, "id": {fmt.Sprint(group.ID)}, "db": {fmt.Sprint(target.ID)}, "permission": {string(access.ViewOnly)}}
 	response = request(http.MethodPost, "/admin/groups", grant)
 	location = apiLocation(t, response)
-	level, err = f.access.EffectivePermission(f.ctx, employee.ID, target.ID)
+	level, err := f.access.EffectivePermission(f.ctx, employee.ID, target.ID)
 	must(t, err)
 	if level != access.ViewOnly {
 		t.Fatalf("permission: %s", level)
@@ -145,10 +146,10 @@ func TestGroupsBatchAccessSaveIsAtomic(t *testing.T) {
 	other := newFixture(t, false)
 	input := other.dbs.Connection()
 	input.Name = "Second batch target"
-	second, err := f.databases.SaveConnection(f.ctx, f.admin, 0, input)
+	second, err := f.saveConnection(f.ctx, f.admin, 0, input)
 	must(t, err)
 	identity, cookie := f.login(t, "it.admin")
-	csrf, err := f.adminAuth.CSRFToken(identity)
+	csrf, err := f.adminAuth.CSRFToken(toAdminIdentity(identity))
 	must(t, err)
 	handler := adminHandler(t, f)
 	request := func(method, path string, form url.Values) *httptest.ResponseRecorder {

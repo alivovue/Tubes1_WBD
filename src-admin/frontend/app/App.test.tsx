@@ -7,7 +7,6 @@ const user = {
   ID: 1,
   Username: "admin",
   DisplayName: "Platform Admin",
-  IsAdmin: true,
   Active: true,
 };
 const identity = {
@@ -61,7 +60,7 @@ function open(path: string) {
 
 describe("Admin application", () => {
   it("submits all group grants in one JSON action with a CSRF header", async () => {
-    const admin = { ...user, IsAdmin: true };
+    const admin = { ...user };
     let submitted: RequestInit | undefined;
     mockAPI((path, init) => {
       if (path === "/api/session")
@@ -155,7 +154,6 @@ describe("Admin application", () => {
                 ID: 2,
                 Username: "ordinary",
                 DisplayName: "Ordinary employee",
-                IsAdmin: false,
               },
             ],
             Groups: [],

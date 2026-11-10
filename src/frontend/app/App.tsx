@@ -341,9 +341,7 @@ function Layout() {
             </div>
             <div className="user-summary">
               <strong>{session.User!.DisplayName}</strong>
-              <span>
-                {session.User?.IsAdmin ? "Platform Admin" : "Employee"}
-              </span>
+              <span>Employee</span>
             </div>
             <button
               className="icon-button"
@@ -373,11 +371,7 @@ function Layout() {
                 <Icon name="menu" />
               </button>
               <nav className="breadcrumb" aria-label="Breadcrumb">
-                <span>
-                  {location.pathname.startsWith("/admin")
-                    ? "Administration"
-                    : "Workspace"}
-                </span>
+                <span>Workspace</span>
                 <strong>
                   {session.Title ||
                     location.pathname.split("/").filter(Boolean).at(-1)}

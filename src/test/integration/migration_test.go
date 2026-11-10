@@ -70,7 +70,7 @@ func TestIT13FailedMigrationRollsBackAndDoesNotAdvanceVersion(t *testing.T) {
 	if len(history) != 1 || history[0].Status != "failed" || history[0].AppliedVersion != nil || history[0].AttemptedVersion != 1 || history[0].CompletedStatements != 0 || !strings.Contains(history[0].ErrorMessage, "rolled back") {
 		t.Fatalf("failed attempt was recorded incorrectly: %#v", history)
 	}
-	version, err := f.store.MigrationVersion(f.ctx, target.ID)
+	version, err := f.runtimeStore.MigrationVersion(f.ctx, target.ID)
 	must(t, err)
 	if version != 0 {
 		t.Fatal("failed attempt advanced successful version")

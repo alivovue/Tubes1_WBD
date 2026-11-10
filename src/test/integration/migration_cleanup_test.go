@@ -57,7 +57,7 @@ func TestDeletingExecutedDraftPreservesSuccessfulAndFailedHistory(t *testing.T) 
 			t.Fatalf("deleting the draft changed execution history: got %#v, want %#v", entry, expected)
 		}
 	}
-	version, err := f.store.MigrationVersion(f.ctx, target.ID)
+	version, err := f.runtimeStore.MigrationVersion(f.ctx, target.ID)
 	must(t, err)
 	if version != 1 {
 		t.Fatal("deleting the draft changed the migration version")

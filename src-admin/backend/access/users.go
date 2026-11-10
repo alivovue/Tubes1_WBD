@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"strings"
 
-	"tubes1_wbd/database/dao"
+	"tubes1_wbd_admin/database/dao"
 )
 
-func (s *Service) CreateUser(ctx context.Context, actor int64, username, display, password string, admin bool) error {
-	if admin || s.store.AdminAuthentication() || !usernamePattern.MatchString(username) || !cleanName(display, 150) {
+func (s *Service) CreateUser(ctx context.Context, actor int64, username, display, password string) error {
+	if !usernamePattern.MatchString(username) || !cleanName(display, 150) {
 		return ErrInvalid
 	}
 	hash, err := HashPassword(password)
@@ -17,12 +17,12 @@ func (s *Service) CreateUser(ctx context.Context, actor int64, username, display
 		return err
 	}
 	return s.adminChange(ctx, actor, func(tx *dao.Store) error {
-		return tx.CreateUser(ctx, username, strings.TrimSpace(display), hash, admin, &actor)
+		return tx.CreateUser(ctx, username, strings.TrimSpace(display), hash, &actor)
 	})
 }
 
-func (s *Service) UpdateUser(ctx context.Context, actor, id int64, display string, admin, active bool, password string) error {
-	if admin || s.store.AdminAuthentication() || id < 1 || !cleanName(display, 150) {
+func (s *Service) UpdateUser(ctx context.Context, actor, id int64, display string, active bool, password string) error {
+	if id < 1 || !cleanName(display, 150) {
 		return ErrInvalid
 	}
 	var hash string
@@ -34,22 +34,12 @@ func (s *Service) UpdateUser(ctx context.Context, actor, id int64, display strin
 		}
 	}
 	return s.adminChange(ctx, actor, func(tx *dao.Store) error {
-		previous, err := tx.User(ctx, id)
-		if err != nil {
-			return err
-		}
-		if err := tx.UpdateUser(ctx, id, strings.TrimSpace(display), admin, active, hash); err != nil {
-			return err
-		}
-		if previous.Active != active || !active || hash != "" {
-			return tx.RevokeUserSessions(ctx, id, s.config.Now())
-		}
-		return nil
+		return tx.UpdateUser(ctx, id, strings.TrimSpace(display), active, hash)
 	})
 }
 
 func (s *Service) CreateAdmin(ctx context.Context, actor int64, username, display, password string) error {
-	if !s.store.AdminAuthentication() || !usernamePattern.MatchString(username) || !cleanName(display, 150) {
+	if !usernamePattern.MatchString(username) || !cleanName(display, 150) {
 		return ErrInvalid
 	}
 	hash, err := HashPassword(password)
@@ -57,11 +47,11 @@ func (s *Service) CreateAdmin(ctx context.Context, actor int64, username, displa
 		return err
 	}
 	return s.adminChange(ctx, actor, func(tx *dao.Store) error {
-		return tx.CreateUser(ctx, username, strings.TrimSpace(display), hash, true, nil)
+		return tx.CreateAdmin(ctx, username, strings.TrimSpace(display), hash)
 	})
 }
 func (s *Service) UpdateAdmin(ctx context.Context, actor, id int64, display string, active bool, password string) error {
-	if !s.store.AdminAuthentication() || id < 1 || !cleanName(display, 150) {
+	if id < 1 || !cleanName(display, 150) {
 		return ErrInvalid
 	}
 	hash := ""
@@ -73,7 +63,7 @@ func (s *Service) UpdateAdmin(ctx context.Context, actor, id int64, display stri
 		}
 	}
 	return s.adminChange(ctx, actor, func(tx *dao.Store) error {
-		previous, err := tx.User(ctx, id)
+		previous, err := tx.Admin(ctx, id)
 		if err != nil {
 			return err
 		}
@@ -86,7 +76,7 @@ func (s *Service) UpdateAdmin(ctx context.Context, actor, id int64, display stri
 				return fmt.Errorf("%w: at least one administrator must remain active", ErrInvalid)
 			}
 		}
-		if err := tx.UpdateUser(ctx, id, strings.TrimSpace(display), true, active, hash); err != nil {
+		if err := tx.UpdateAdmin(ctx, id, strings.TrimSpace(display), active, hash); err != nil {
 			return err
 		}
 		if previous.Active != active || !active || hash != "" {
@@ -96,11 +86,8 @@ func (s *Service) UpdateAdmin(ctx context.Context, actor, id int64, display stri
 	})
 }
 func (s *Service) Administrators(ctx context.Context, actor int64) ([]User, error) {
-	if !s.store.AdminAuthentication() {
-		return nil, ErrForbidden
-	}
 	if err := s.RequireAdmin(ctx, actor); err != nil {
 		return nil, err
 	}
-	return s.store.Users(ctx)
+	return s.store.Administrators(ctx)
 }

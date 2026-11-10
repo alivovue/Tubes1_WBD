@@ -6,10 +6,16 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
+	"tubes1_wbd/backend/controlplane"
+	"tubes1_wbd_admin/backend/connectionconfig"
+	"tubes1_wbd_admin/backend/internalapi"
+	admindao "tubes1_wbd_admin/database/dao"
 
 	"github.com/jackc/pgx/v5"
 	"tubes1_wbd/backend/access"
@@ -17,7 +23,6 @@ import (
 	"tubes1_wbd/backend/migration"
 	"tubes1_wbd/database/dao"
 	fixtures "tubes1_wbd/test/data"
-	adminsetup "tubes1_wbd/test/data/adminsetup"
 	adminaccess "tubes1_wbd_admin/backend/access"
 )
 
@@ -26,18 +31,22 @@ var factory *fixtures.Factory
 const password = "Integration-password-123"
 
 type fixture struct {
-	ctx        context.Context
-	dbs        *fixtures.Databases
-	store      *dao.Store
-	access     *access.Service
-	userAccess *access.Service
-	adminAuth  *access.Service
-	adminStore *dao.Store
-	adminDB    *sql.DB
-	databases  *dbmanagement.Service
-	migrations *migration.Service
-	admin      int64
-	editor     int64
+	ctx          context.Context
+	dbs          *fixtures.Databases
+	store        *admindao.Store
+	runtimeStore *dao.Store
+	access       *testAccess
+	userAccess   *access.Service
+	adminAuth    *adminaccess.Service
+	adminStore   *admindao.Store
+	adminDB      *sql.DB
+	databases    *dbmanagement.Service
+	connections  *connectionconfig.Service
+	authority    *controlplane.Client
+	private      *httptest.Server
+	migrations   *migration.Service
+	admin        int64
+	editor       int64
 }
 
 func TestMain(m *testing.M) { os.Exit(runIntegration(m)) }
@@ -87,10 +96,6 @@ func newFixture(t *testing.T, admin bool) *fixture {
 		t.Fatal(err)
 	}
 	key := bytes.Repeat([]byte{21}, 32)
-	auth, err := access.NewService(store, access.DefaultConfig(key))
-	if err != nil {
-		t.Fatal(err)
-	}
 	adminName := databases.WebsiteName + "_admin"
 	_, err = factory.Cluster.EnsureDatabase(ctx, adminName, "", "")
 	must(t, err)
@@ -110,29 +115,42 @@ func newFixture(t *testing.T, admin bool) *fixture {
 			t.Error(err)
 		}
 	})
-	must(t, adminsetup.EnsureInitialized(ctx, adminDB))
+	must(t, fixtures.InitializeControlPlane(ctx, adminDB))
 	_, err = adminDB.ExecContext(ctx, `ALTER SEQUENCE admin_users_id_seq RESTART WITH 1000`)
 	must(t, err)
-	adminStore, err := dao.NewAdminAuthentication(adminDB)
+	adminStore, err := admindao.New(adminDB)
 	must(t, err)
-	adminAuth, err := adminaccess.NewService(adminStore, access.DefaultConfig(key))
+	adminAuth, err := adminaccess.NewService(adminStore, adminaccess.DefaultConfig(key))
 	must(t, err)
-	administration, err := access.NewAdministrationService(store, adminAuth, access.DefaultConfig(key))
+	privateHandler, err := internalapi.NewHandler(adminStore, key, strings.Repeat("private-service-token-", 3))
 	must(t, err)
-	management, err := dbmanagement.NewService(store, administration, dbmanagement.DefaultConfig(key, false))
+	private := httptest.NewServer(privateHandler)
+	t.Cleanup(private.Close)
+	authority, err := controlplane.New(private.URL, strings.Repeat("private-service-token-", 3), false)
+	must(t, err)
+	config := access.DefaultConfig(key)
+	config.Authority = authority
+	auth, err := access.NewService(store, config)
+	must(t, err)
+	management, err := dbmanagement.NewService(store, auth, dbmanagement.DefaultConfig(key, false))
+	must(t, err)
+	connections, err := connectionconfig.NewService(adminStore, adminAuth, connectionconfig.DefaultConfig(key, false))
 	must(t, err)
 	migrations, err := migration.NewService(store, auth, management)
 	must(t, err)
-	f := &fixture{ctx: ctx, dbs: databases, store: store, access: administration, userAccess: auth, adminAuth: adminAuth, adminStore: adminStore, adminDB: adminDB, databases: management, migrations: migrations}
+	f := &fixture{ctx: ctx, dbs: databases, store: adminStore, runtimeStore: store, userAccess: auth, adminAuth: adminAuth, adminStore: adminStore, adminDB: adminDB, databases: management, migrations: migrations, connections: connections, authority: authority, private: private}
+	f.access = &testAccess{Service: auth, admin: adminAuth}
+
 	if admin {
-		must(t, fixtures.BootstrapAdmin(ctx, adminStore, "it.admin", "Integration Admin", password))
-		credentials, err := adminStore.Credentials(ctx, "it.admin")
+		must(t, bootstrapAdmin(ctx, adminStore, "it.admin", "Integration Admin", password))
+		credentials, err := adminStore.AdminCredentials(ctx, "it.admin")
 		must(t, err)
 		f.admin = credentials.ID
-		must(t, administration.CreateUser(ctx, f.admin, "it.editor", "Integration Editor", password, false))
-		editor, err := store.Credentials(ctx, "it.editor")
+		must(t, adminAuth.CreateUser(ctx, f.admin, "it.editor", "Integration Editor", password))
+		editor, err := adminStore.Credentials(ctx, "it.editor")
 		must(t, err)
 		f.editor = editor.ID
+		must(t, store.RememberUser(ctx, toUser(editor.User)))
 	}
 	return f
 }
@@ -141,9 +159,10 @@ func (f *fixture) user(t *testing.T, username string) dao.User {
 	must(t, f.access.CreateUser(f.ctx, f.admin, username, username, password, false))
 	credentials, err := f.store.Credentials(f.ctx, username)
 	must(t, err)
-	return credentials.User
+	must(t, f.runtimeStore.RememberUser(f.ctx, toUser(credentials.User)))
+	return toUser(credentials.User)
 }
-func (f *fixture) group(t *testing.T, name string) dao.Group {
+func (f *fixture) group(t *testing.T, name string) admindao.Group {
 	t.Helper()
 	must(t, f.access.SaveGroup(f.ctx, f.admin, 0, name, "Integration permission group"))
 	groups, err := f.store.Groups(f.ctx)
@@ -154,15 +173,15 @@ func (f *fixture) group(t *testing.T, name string) dao.Group {
 		}
 	}
 	t.Fatal("group was not persisted")
-	return dao.Group{}
+	return admindao.Group{}
 }
 func (f *fixture) register(t *testing.T) dao.Database {
 	t.Helper()
-	saved, err := f.databases.SaveConnection(f.ctx, f.admin, 0, f.dbs.Connection())
+	saved, err := f.saveConnection(f.ctx, f.admin, 0, f.dbs.Connection())
 	must(t, err)
 	return saved
 }
-func (f *fixture) grant(t *testing.T, user, database int64, permission access.Permission) dao.Group {
+func (f *fixture) grant(t *testing.T, user, database int64, permission access.Permission) admindao.Group {
 	t.Helper()
 	group := f.group(t, fmt.Sprintf("IT group %d", user))
 	must(t, f.access.SetMembership(f.ctx, f.admin, user, group.ID, true))
@@ -171,11 +190,12 @@ func (f *fixture) grant(t *testing.T, user, database int64, permission access.Pe
 }
 func (f *fixture) login(t *testing.T, username string) (access.Identity, string) {
 	t.Helper()
-	service := f.userAccess
 	if username == "it.admin" {
-		service = f.adminAuth
+		identity, raw, err := f.adminAuth.Login(f.ctx, username, password, "")
+		must(t, err)
+		return access.Identity{User: toUser(identity.User), SessionID: identity.SessionID, AbsoluteExpires: identity.AbsoluteExpires}, raw
 	}
-	identity, raw, err := service.Login(f.ctx, username, password, "")
+	identity, raw, err := f.userAccess.Login(f.ctx, username, password, "")
 	must(t, err)
 	return identity, raw
 }
@@ -187,13 +207,69 @@ func must(t *testing.T, err error) {
 }
 func wantError(t *testing.T, err, want error) {
 	t.Helper()
-	if !errors.Is(err, want) {
-		t.Fatalf("error = %v; want %v", err, want)
+	if errors.Is(err, want) {
+		return
 	}
+	if want != nil {
+		for current := err; current != nil; current = errors.Unwrap(current) {
+			if current.Error() == want.Error() {
+				return
+			}
+		}
+	}
+	t.Fatalf("error = %v; want %v", err, want)
 }
 func (f *fixture) tableExists(t *testing.T, name string) bool {
 	t.Helper()
 	var exists bool
 	must(t, f.dbs.Managed.QueryRowContext(f.ctx, `SELECT EXISTS(SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name=$1)`, name).Scan(&exists))
 	return exists
+}
+
+// Test-only adapters keep administrative setup distinct from runtime services.
+type testAccess struct {
+	*access.Service
+	admin *adminaccess.Service
+}
+
+func (s *testAccess) CreateUser(ctx context.Context, actor int64, name, display, password string, admin bool) error {
+	if admin {
+		return access.ErrInvalid
+	}
+	return s.admin.CreateUser(ctx, actor, name, display, password)
+}
+func (s *testAccess) UpdateUser(ctx context.Context, actor, id int64, display string, admin, active bool, password string) error {
+	if admin {
+		return access.ErrInvalid
+	}
+	return s.admin.UpdateUser(ctx, actor, id, display, active, password)
+}
+func (s *testAccess) SaveGroup(ctx context.Context, actor, id int64, name, description string) error {
+	return s.admin.SaveGroup(ctx, actor, id, name, description)
+}
+func (s *testAccess) DeleteGroup(ctx context.Context, actor, id int64) error {
+	return s.admin.DeleteGroup(ctx, actor, id)
+}
+func (s *testAccess) SetMembership(ctx context.Context, actor, user, group int64, member bool) error {
+	return s.admin.SetMembership(ctx, actor, user, group, member)
+}
+func (s *testAccess) SetGrant(ctx context.Context, actor, group, database int64, p access.Permission) error {
+	return s.admin.SetGrant(ctx, actor, group, database, admindao.Permission(p))
+}
+func toUser(u admindao.User) dao.User {
+	return dao.User{ID: u.ID, Username: u.Username, DisplayName: u.DisplayName, Active: u.Active, Version: u.Version, Rotation: u.Rotation}
+}
+func toDatabase(d admindao.Database) dao.Database {
+	return dao.Database{ID: d.ID, DBMS: d.DBMS, Name: d.Name, Host: d.Host, Port: d.Port, DatabaseName: d.DatabaseName, SSLMode: d.SSLMode, Active: d.Active, Permission: dao.Permission(d.Permission)}
+}
+func (f *fixture) saveConnection(ctx context.Context, actor, id int64, in dbmanagement.ConnectionInput) (dao.Database, error) {
+	result, err := f.connections.SaveConnection(ctx, actor, id, connectionconfig.ConnectionInput{DBMS: in.DBMS, Name: in.Name, Host: in.Host, Port: in.Port, DatabaseName: in.DatabaseName, Username: in.Username, Password: in.Password, SSLMode: in.SSLMode, Active: in.Active})
+	if err == nil {
+		err = f.runtimeStore.RememberDatabase(ctx, result.ID)
+	}
+	return toDatabase(result), err
+}
+
+func toAdminIdentity(i access.Identity) adminaccess.Identity {
+	return adminaccess.Identity{User: admindao.User{ID: i.User.ID, Username: i.User.Username, DisplayName: i.User.DisplayName, Active: i.User.Active}, SessionID: i.SessionID, AbsoluteExpires: i.AbsoluteExpires}
 }

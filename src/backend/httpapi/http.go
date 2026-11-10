@@ -1,5 +1,4 @@
-// Package httpapi provides shared JSON, cookie, and CSRF handling for the two
-// HTTP applications. Each server supplies its own cookie names and role boundary.
+// Package httpapi provides JSON, cookie, and CSRF helpers owned by the ordinary user application.
 package httpapi
 
 import (

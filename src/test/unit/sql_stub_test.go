@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"errors"
+	"golang.org/x/crypto/bcrypt"
 	"io"
 	"reflect"
 	"strings"
@@ -157,15 +158,8 @@ func newAccess(t *testing.T, store *dao.Store, clock func() time.Time) *access.S
 	}
 	config.Now = clock
 	db, _ := testDatabases.Load(store)
-	adminStore, err := dao.NewAdminAuthentication(db.(*sql.DB))
-	if err != nil {
-		t.Fatal(err)
-	}
-	authority, err := access.NewService(adminStore, config)
-	if err != nil {
-		t.Fatal(err)
-	}
-	service, err := access.NewAdministrationService(store, authority, config)
+	config.Authority = stubAuthority{db: db.(*sql.DB)}
+	service, err := access.NewService(store, config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -200,7 +194,7 @@ func wantArg(t *testing.T, args []driver.NamedValue, index int, want any) {
 	}
 }
 func userStep(admin, active bool) sqlStep {
-	return queryStep("FROM users WHERE id=", []string{"id", "username", "display_name", "is_admin_domain", "is_active"}, []driver.Value{int64(7), "employee", "Employee", admin, active})
+	return queryStep("FROM users WHERE id=", []string{"id", "username", "display_name", "is_active", "version", "rotation"}, []driver.Value{int64(7), "employee", "Employee", active, int64(1), int64(1)})
 }
 func permissionStep(permission dao.Permission) sqlStep {
 	level := int64(0)
@@ -221,17 +215,48 @@ func hashArgument(t *testing.T, value driver.Value) []byte {
 	return hash
 }
 
-func newAdminAccess(t *testing.T, store *dao.Store) *access.Service {
-	db, _ := testDatabases.Load(store)
-	adminStore, err := dao.NewAdminAuthentication(db.(*sql.DB))
-	if err != nil {
-		t.Fatal(err)
+type stubAuthority struct{ db *sql.DB }
+
+func (s stubAuthority) AuthenticateUser(ctx context.Context, name, password string) (dao.User, error) {
+	var u dao.User
+	var hash string
+	err := s.db.QueryRowContext(ctx, `SELECT id,username,display_name,is_active,auth_version,rotation_version,password_hash FROM authority_users WHERE lower(username)=lower($1)`, name).Scan(&u.ID, &u.Username, &u.DisplayName, &u.Active, &u.Version, &u.Rotation, &hash)
+	if err != nil || !u.Active || bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) != nil {
+		return dao.User{}, access.ErrUnauthenticated
 	}
-	config := access.DefaultConfig(testKey)
-	config.Now = func() time.Time { return testTime }
-	service, err := access.NewService(adminStore, config)
+	return u, nil
+}
+func (s stubAuthority) User(ctx context.Context, id int64) (dao.User, error) {
+	var u dao.User
+	err := s.db.QueryRowContext(ctx, `SELECT id,username,display_name,is_active,auth_version,rotation_version FROM users WHERE id=$1`, id).Scan(&u.ID, &u.Username, &u.DisplayName, &u.Active, &u.Version, &u.Rotation)
+	return u, err
+}
+func (s stubAuthority) EffectivePermission(ctx context.Context, user, database int64) (dao.Permission, error) {
+	var n int
+	err := s.db.QueryRowContext(ctx, `SELECT effective_permission FROM group_database_permissions WHERE user_id=$1 AND database_id=$2`, user, database).Scan(&n)
 	if err != nil {
-		t.Fatal(err)
+		return dao.NoAccess, err
 	}
-	return service
+	return []dao.Permission{dao.NoAccess, dao.ViewOnly, dao.ViewEdit}[n], nil
+}
+func (s stubAuthority) AccessibleDatabases(ctx context.Context, user int64) ([]dao.Database, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT id,name,dbms,permission FROM managed_databases WHERE user_id=$1`, user)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []dao.Database{}
+	for rows.Next() {
+		var d dao.Database
+		if err := rows.Scan(&d.ID, &d.Name, &d.DBMS, &d.Permission); err != nil {
+			return nil, err
+		}
+		out = append(out, d)
+	}
+	return out, rows.Err()
+}
+func (s stubAuthority) Connection(ctx context.Context, user, database int64, p dao.Permission) (dao.DatabaseMetadata, error) {
+	var m dao.DatabaseMetadata
+	err := s.db.QueryRowContext(ctx, `SELECT metadata FROM managed_databases WHERE id=$1`, database).Scan(&m.ID, &m.Name, &m.DBMS, &m.Host, &m.Port, &m.DatabaseName, &m.Active, &m.SSLMode, &m.Username, &m.Password)
+	return m, err
 }

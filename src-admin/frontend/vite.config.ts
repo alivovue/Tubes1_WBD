@@ -7,7 +7,6 @@ export default defineConfig({
   publicDir: false,
   server: {
     port: 5174,
-    fs: { allow: [".", "../../src/frontend"] },
     proxy: {
       "/api": "http://127.0.0.1:3001",
       "/public": "http://127.0.0.1:3001",

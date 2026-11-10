@@ -11,10 +11,10 @@ import (
 	"strings"
 	"time"
 
-	"tubes1_wbd/backend/access"
-	"tubes1_wbd/backend/connectionconfig"
-	"tubes1_wbd/backend/httpapi"
-	"tubes1_wbd/database/dao"
+	"tubes1_wbd_admin/backend/access"
+	"tubes1_wbd_admin/backend/connectionconfig"
+	"tubes1_wbd_admin/backend/httpapi"
+	"tubes1_wbd_admin/database/dao"
 )
 
 type Services struct {
@@ -85,12 +85,12 @@ func NewHandlerWithServices(root string, services Services) (http.Handler, error
 	}
 	app := &application{services: services, entry: entry,
 		assets: http.StripPrefix("/assets/", http.FileServer(http.Dir(filepath.Join(root, "frontend", "dist", "assets")))),
-		public: http.StripPrefix("/public/", http.FileServer(http.Dir(filepath.Join(root, "..", "src", "frontend", "public")))),
+		public: http.StripPrefix("/public/", http.FileServer(http.Dir(filepath.Join(root, "frontend", "public")))),
 	}
 	return http.HandlerFunc(app.serveHTTP), nil
 }
 func (app *application) authHTTP() httpapi.Auth {
-	return httpapi.Auth{Access: app.services.Authentication, Production: app.services.Production, Admin: true, SessionCookie: httpapi.AdminCookieName, LoginCookie: httpapi.AdminLoginCookieName, Home: "/admin/users"}
+	return httpapi.Auth{Access: app.services.Authentication, Production: app.services.Production, SessionCookie: httpapi.AdminCookieName, LoginCookie: httpapi.AdminLoginCookieName, Home: "/admin/users"}
 }
 func (app *application) serveHTTP(w http.ResponseWriter, r *http.Request) {
 	httpapi.SecurityHeaders(w)

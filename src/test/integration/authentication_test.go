@@ -7,7 +7,6 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 	"tubes1_wbd/backend/access"
-	fixtures "tubes1_wbd/test/data"
 )
 
 func TestIT01CreateAdminAndLogin(t *testing.T) {
@@ -17,10 +16,10 @@ func TestIT01CreateAdminAndLogin(t *testing.T) {
 	if before != 0 {
 		t.Fatal("website fixture already contains users")
 	}
-	must(t, fixtures.BootstrapAdmin(f.ctx, f.adminStore, "it.admin", "Integration Admin", password))
-	credentials, err := f.adminStore.Credentials(f.ctx, "it.admin")
+	must(t, bootstrapAdmin(f.ctx, f.adminStore, "it.admin", "Integration Admin", password))
+	credentials, err := f.adminStore.AdminCredentials(f.ctx, "it.admin")
 	must(t, err)
-	if !credentials.IsAdmin || !credentials.Active || credentials.PasswordHash == password {
+	if !credentials.Active || credentials.PasswordHash == password {
 		t.Fatal("persisted admin or password storage is invalid")
 	}
 	must(t, bcrypt.CompareHashAndPassword([]byte(credentials.PasswordHash), []byte(password)))
@@ -101,9 +100,9 @@ func TestIT04DeactivateUserInvalidatesSessions(t *testing.T) {
 func TestIT05LastActiveAdminCannotBeRemoved(t *testing.T) {
 	f := newFixture(t, true)
 	wantError(t, f.adminAuth.UpdateAdmin(f.ctx, f.admin, f.admin, "Integration Admin", false, ""), access.ErrInvalid)
-	saved, err := f.adminStore.User(f.ctx, f.admin)
+	saved, err := f.adminStore.Admin(f.ctx, f.admin)
 	must(t, err)
-	if !saved.Active || !saved.IsAdmin {
+	if !saved.Active {
 		t.Fatal("last active admin was disabled")
 	}
 	f.login(t, "it.admin")

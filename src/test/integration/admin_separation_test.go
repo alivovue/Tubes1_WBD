@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	adminhttp "tubes1_wbd_admin/backend/httpapi"
 
 	"tubes1_wbd/backend/access"
 	"tubes1_wbd/backend/dbmanagement"
@@ -30,7 +31,7 @@ func TestSeparatedApplicationsEnforceAuthenticationDomainsAndManagedEndpointBoun
 		t.Fatal("administrator can list accessible managed databases")
 	}
 	adminIdentity, adminCookie := f.login(t, "it.admin")
-	adminCSRF, err := f.adminAuth.CSRFToken(adminIdentity)
+	adminCSRF, err := f.adminAuth.CSRFToken(toAdminIdentity(adminIdentity))
 	must(t, err)
 	editorIdentity, editorCookie := f.login(t, "it.editor")
 	editorCSRF, err := f.access.CSRFToken(editorIdentity)
@@ -42,7 +43,7 @@ func TestSeparatedApplicationsEnforceAuthenticationDomainsAndManagedEndpointBoun
 			if response.Code != http.StatusUnauthorized {
 				t.Fatalf("user server allowed admin %s %s: %d", method, route, response.Code)
 			}
-			denied := apiRequest(t, adminServer, method, route, adminCookie, nil, httpapi.AdminCookieName)
+			denied := apiRequest(t, adminServer, method, route, adminCookie, nil, adminhttp.AdminCookieName)
 			if denied.Code != http.StatusNotFound {
 				t.Fatalf("admin server exposes %s %s: %d", method, route, denied.Code)
 			}
@@ -54,7 +55,7 @@ func TestSeparatedApplicationsEnforceAuthenticationDomainsAndManagedEndpointBoun
 			if removed.Code != 404 {
 				t.Fatalf("administrative route survived on user server: %s %d", route, removed.Code)
 			}
-			denied := apiRequest(t, adminServer, method, route, editorCookie, url.Values{"csrf": {editorCSRF}, "action": {"save_group"}, "name": {"forbidden"}}, httpapi.AdminCookieName)
+			denied := apiRequest(t, adminServer, method, route, editorCookie, url.Values{"csrf": {editorCSRF}, "action": {"save_group"}, "name": {"forbidden"}}, adminhttp.AdminCookieName)
 			if denied.Code != 401 {
 				t.Fatalf("ordinary editor accessed administration: %s %d", route, denied.Code)
 			}
@@ -113,8 +114,8 @@ func TestSeparatedApplicationsEnforceAuthenticationDomainsAndManagedEndpointBoun
 	validation := apiRequest(t, adminServer, http.MethodPost, "/admin/connections", adminCookie, url.Values{
 		"csrf": {adminCSRF}, "action": {"test_connection"}, "id": {fmt.Sprint(target.ID)}, "name": {input.Name}, "dbms": {input.DBMS}, "host": {input.Host}, "port": {fmt.Sprint(input.Port)}, "database_name": {input.DatabaseName}, "sslmode": {input.SSLMode}, "sql": {"DELETE FROM public.employees"},
 	})
-	if validation.Code != 200 {
-		t.Fatalf("connection validation failed: %d %s", validation.Code, validation.Body.String())
+	if validation.Code != 400 {
+		t.Fatalf("removed connection test endpoint returned: %d %s", validation.Code, validation.Body.String())
 	}
 	var count int
 	must(t, f.dbs.Managed.QueryRowContext(f.ctx, "SELECT count(*) FROM public.employees").Scan(&count))
@@ -166,11 +167,11 @@ func TestSeparatedLoginsCookiesCSRFAndLogout(t *testing.T) {
 		return nil
 	}
 	login(userServer, "it.admin", httpapi.UserLoginCookieName, access.CookieName, 401)
-	login(adminServer, "it.editor", httpapi.AdminLoginCookieName, httpapi.AdminCookieName, 401)
+	login(adminServer, "it.editor", adminhttp.AdminLoginCookieName, adminhttp.AdminCookieName, 401)
 	ordinary := login(userServer, "it.editor", httpapi.UserLoginCookieName, access.CookieName, 200)
-	administrator := login(adminServer, "it.admin", httpapi.AdminLoginCookieName, httpapi.AdminCookieName, 200)
+	administrator := login(adminServer, "it.admin", adminhttp.AdminLoginCookieName, adminhttp.AdminCookieName, 200)
 	login(userServer, "it.admin", httpapi.UserLoginCookieName, access.CookieName, 401, ordinary)
-	login(adminServer, "it.editor", httpapi.AdminLoginCookieName, httpapi.AdminCookieName, 401, administrator)
+	login(adminServer, "it.editor", adminhttp.AdminLoginCookieName, adminhttp.AdminCookieName, 401, administrator)
 	if ordinary.Name == administrator.Name || ordinary.Value == administrator.Value {
 		t.Fatal("applications share a cookie namespace or session")
 	}
@@ -188,7 +189,7 @@ func TestSeparatedLoginsCookiesCSRFAndLogout(t *testing.T) {
 			t.Fatal("one application consumed the other's session cookie")
 		}
 	}
-	session := apiRequest(t, adminServer, http.MethodGet, "/session", administrator.Value, nil, httpapi.AdminCookieName)
+	session := apiRequest(t, adminServer, http.MethodGet, "/session", administrator.Value, nil, adminhttp.AdminCookieName)
 	csrf := decodeAPI[struct{ CSRF string }](t, session).CSRF
 	if denied := apiRequest(t, adminServer, http.MethodPost, "/admin/groups", administrator.Value, url.Values{"action": {"save_group"}, "name": {"No CSRF"}}); denied.Code != 403 {
 		t.Fatal("admin accepted an action without CSRF")
@@ -203,7 +204,7 @@ func TestSeparatedLoginsCookiesCSRFAndLogout(t *testing.T) {
 	if rejected.Code != 403 {
 		t.Fatal("admin accepted a cross-origin action")
 	}
-	logout := apiRequest(t, adminServer, http.MethodPost, "/logout", administrator.Value, url.Values{"csrf": {csrf}}, httpapi.AdminCookieName)
+	logout := apiRequest(t, adminServer, http.MethodPost, "/logout", administrator.Value, url.Values{"csrf": {csrf}}, adminhttp.AdminCookieName)
 	if logout.Code != 200 {
 		t.Fatalf("admin logout failed: %d", logout.Code)
 	}

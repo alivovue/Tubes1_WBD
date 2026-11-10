@@ -5,8 +5,7 @@ import (
 	"net"
 	"strings"
 
-	"tubes1_wbd/backend/dbmanagement/adapters"
-	"tubes1_wbd/database/dao"
+	"tubes1_wbd_admin/database/dao"
 )
 
 func (s *Service) requireUniqueConnection(ctx context.Context, store *dao.Store, id int64, input ConnectionInput) error {
@@ -17,7 +16,7 @@ func (s *Service) requireUniqueConnection(ctx context.Context, store *dao.Store,
 	host := connectionHost(input.Host)
 	candidates := make([]dao.Database, 0)
 	for _, database := range databases {
-		if database.ID == id || adapters.Normalize(database.DBMS) != input.DBMS || database.Port != input.Port || database.DatabaseName != input.DatabaseName {
+		if database.ID == id || normalize(database.DBMS) != input.DBMS || database.Port != input.Port || database.DatabaseName != input.DatabaseName {
 			continue
 		}
 		if connectionHost(database.Host) == host {

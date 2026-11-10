@@ -1,116 +1,101 @@
-# Administrator authentication databases
+# Independent Milestone 1 applications
 
-The application uses two externally provisioned PostgreSQL databases, which may
-share one PostgreSQL instance:
+`src-admin/` is a standalone control plane. `src/` is the ordinary database-management application. The public applications have independent Go modules, React projects, dependencies, assets, configuration, session cookies, and database connections. There is no shared application package or runtime directory. `go.work` is only a development/test convenience; either server builds with `GOWORK=off` from its own directory.
 
-| Database | Contents | Application connection |
-| --- | --- | --- |
-| `schakker_platform` | Ordinary accounts, sessions/tokens, groups, memberships, grants, registered connections, migration drafts/history | Both servers, using separate restricted roles |
-| `schakker_admin` | Administrator accounts and admin sessions/tokens | Admin server only |
-
-The ordinary server never connects to the admin database. Admin identity comes
-from the admin authentication database, and cannot be granted by editing an
-ordinary account. Administrators who need managed-data access use independently
-provisioned ordinary accounts with their own credentials, sessions and grants.
-
-## Provisioning responsibility
-
-Provision both databases and their required schemas, restricted PostgreSQL roles,
-the initial administrator account with a bcrypt password hash, and the shared
-32-byte master key outside the application. Neither server nor launcher includes
-schema initialization, role creation, seed data, administrator bootstrap, data
-upgrade commands, automatic PostgreSQL startup, or key generation.
-
-Startup validates existing schemas and runtime roles without modifying data.
-Missing configuration or schemas produce a startup error. The application does
-not manage the lifecycle of external PostgreSQL processes. Account, session,
-permission and migration writes requested through normal application features
-continue to work.
-
-## Runtime configuration
-
-The ordinary server needs:
-
-```dotenv
-SCHAKKER_PLATFORM_DATABASE_URL='postgres://schakker_user:PRIVATE_PASSWORD@HOST/schakker_platform?sslmode=verify-full'
-SCHAKKER_MASTER_KEY='SHARED_32_BYTE_KEY_ENCODED_AS_HEX_OR_BASE64'
-PORT=3000
+```
+src-admin/
+  main.go                    public and private listeners
+  backend/
+    access/                  admin authentication, accounts, groups, permissions
+    connectionconfig/        metadata validation and credential encryption
+    httpapi/                 admin-only session/CSRF/JSON helpers
+    internalapi/             authenticated ordinary-user authority API
+    startup.go               admin database and owned configuration
+  database/{dao,setup}/       control-plane persistence; read-only startup validation
+  frontend/{app,public}/      independent administration SPA and assets
+  test/unit/                 independent security, session, DAO and registration tests
+src/
+  main.go
+  backend/
+    access/                  ordinary sessions; synchronous authority checks
+    controlplane/            private HTTP client
+    dbmanagement/            existing explorer, SELECT viewer and execution plans
+    migration/               existing migration services, engines and history
+  database/{dao,platform,setup}/  runtime persistence and read-only startup validation
+  frontend/{app,public}/      independent ordinary SPA and assets
+  test/                      ordinary tests, cross-application contract tests and fixtures
 ```
 
-The admin server needs:
+## Database ownership
 
-```dotenv
-SCHAKKER_PLATFORM_DATABASE_URL='postgres://schakker_administration:PRIVATE_PASSWORD@HOST/schakker_platform?sslmode=verify-full'
-SCHAKKER_ADMIN_DATABASE_URL='postgres://schakker_admin_auth:PRIVATE_PASSWORD@HOST/schakker_admin?sslmode=verify-full'
-SCHAKKER_MASTER_KEY='SHARED_32_BYTE_KEY_ENCODED_AS_HEX_OR_BASE64'
-ADMIN_PORT=3001
-```
+| Owner | Authoritative data |
+| --- | --- |
+| `schakker_admin` | `admin_users`, `admin_sessions`, `admin_session_tokens`; ordinary `users` with bcrypt hashes and security versions; `access_groups`, `user_groups`, `group_database_permissions`, `managed_databases` with encrypted credentials and administrative provenance |
+| `schakker_platform` | ordinary `sessions`, `session_tokens`, migration drafts/executions/history, receipt namespaces; identity/display snapshots in `users` and registered database IDs in `managed_databases` solely for local foreign keys |
 
-Both launchers load `src/.env`; admin additionally loads `src-admin/.env` as an
-override. The platform URL may also use the legacy `SCHAKKER_DATABASE_URL` or
-`DATABASE_URL` alias. No alias substitutes for the admin URL.
+The platform `users` table has no password or administrator flag. Its snapshots are never consulted to authenticate or authorize a request. Old historical actors, including previously scrubbed admin identities, remain as inactive identity snapshots so history keeps its original IDs. Administrator credentials exist only in `admin_users`, which is a separate identity domain even when a username or numeric ID matches an ordinary user.
 
-In development, an existing `master.key` may supply the key from `src/.schakker/`
-or `SCHAKKER_STATE_DIR`; startup reads it without creating or changing files.
-Production requires the key in `SCHAKKER_MASTER_KEY`. Keep the existing encryption
-key when connecting to existing encrypted registrations.
+The applications require externally provisioned schemas, restricted PostgreSQL roles, an initial administrator, encryption/signing keys, and a private service token. Startup never creates databases, schemas, roles, accounts, keys, or seed data. See [schema contracts](application-databases.md) and the [existing-installation cutover](control-plane-cutover.md). Historical schema/upgrade helpers remain under `src/test/data/` solely for regression tests.
 
-## Expected schema and access
+## Private API v1
 
-The platform connection expects the ordinary `users`, `sessions`, `session_tokens`,
-`access_groups`, `user_groups`, `group_database_permissions`, `managed_databases`,
-`migration_drafts` and `migration_executions` tables. The admin connection expects
-only the independent `admin_users`, `admin_sessions` and `admin_session_tokens`
-authentication tables.
+Only the separate admin internal listener serves these endpoints. The public admin router and both React apps have no route or proxy to them. Requests require `Authorization: Bearer <SCHAKKER_INTERNAL_TOKEN>` (at least 32 bytes); no browser cookies, Origin-bearing requests, Fetch Metadata browser requests, CORS, redirects, or public login sessions are accepted as service authority.
 
-Platform account/authentication queries exclude `is_legacy_admin` historical rows.
-Admin authentication excludes `migration_pending` rows. Existing provenance and
-historical attribution columns remain compatible with previously provisioned
-schemas, including `created_by_admin_id` and `granted_by_admin_id`. The application
-does not transform or upgrade old rows or schemas.
+| Method and route | Request / response |
+| --- | --- |
+| `POST /internal/v1/authenticate-user` | `{Username, Password}`; returns `{ID, Username, DisplayName, Active, Version, Rotation}` for an ordinary account only |
+| `GET /internal/v1/users/{id}` | Current ordinary identity, active status, revocation version and rotation version |
+| `GET /internal/v1/users/{id}/databases` | Active accessible database IDs, names, DBMS and effective permission; no connection secret |
+| `GET /internal/v1/users/{id}/databases/{db}/permission` | `{Permission: "" / "view_only" / "view_edit"}` calculated across all current memberships; highest grant wins |
+| `GET /internal/v1/users/{id}/databases/{db}/connection?required=view_only\|view_edit` | Current permitted connection metadata, username and decrypted target password; available only after checking that ordinary user's effective permission |
 
-Use restricted, non-owner runtime roles without superuser, CREATEDB, CREATEROLE,
-replication, BYPASSRLS or inherited elevated privileges. The ordinary role needs
-platform reads, session and migration writes, connection namespace updates, and
-`users.updated_at` update permission for PostgreSQL's login row lock. It must not
-connect to the admin database or administer accounts/groups/grants.
+Admin accounts, admin sessions, admin password hashes, and ordinary password hashes are never returned. Connection passwords cross only the private service transport, are kept in user-backend memory, and are excluded from public JSON. Admin storage uses AES-256-GCM with the existing `schakker/target-password/v1` format. Both sides use bounded request bodies and deadlines; private responses are `no-store` and errors omit driver details and secrets.
 
-The platform administration role manages ordinary accounts, groups, memberships,
-grants, connection metadata, and affected ordinary session tokens. It needs no
-ordinary password-hash reads or migration-SQL access. Its execution-history access
-is limited to checking database IDs before repointing a connection. The admin-auth
-role accesses admin account/session tables in the admin database only. Role and
-ACL provisioning is external to the application.
+Use verified HTTPS for production or remote calls. The admin process requires a certificate/key in production or on a non-loopback internal address; the user client rejects HTTP in production and permits development HTTP only to literal loopback IPs. Supply a trusted certificate for the exact configured hostname/IP; the client never disables certificate verification. Restrict the internal port to the user server with deployment networking/firewall rules. Do not reverse-proxy `/internal/` onto the public origin. The loopback development listener defaults to `127.0.0.1:3002`.
 
-## Account management and sessions
+## Consistency and availability
 
-Existing administrators manage admin accounts at `/admin/administrators` and
-ordinary accounts at `/admin/users`. Admin account management requires an existing
-authenticated administrator; startup never creates the first account. At least one
-administrator must remain active when changing account status through the UI.
+Authentication, active-account checks, effective permissions, and connections are fetched synchronously without an authorization cache. An unavailable or malformed authority response fails closed; local snapshots cannot authorize operations. The control plane is therefore required for user login and protected requests. Existing migration execution continues to recheck permissions before statements and commit as before. A request already authorized may complete while a concurrent revocation commits; subsequent checks observe the committed revocation. No distributed transaction is implied.
 
-| Domain | Cookie | Authentication tables |
-| --- | --- | --- |
-| Ordinary | `schakker_session` | `users`, `sessions`, `session_tokens` |
-| Admin | `schakker_admin_session` | `admin_users`, `admin_sessions`, `admin_session_tokens` |
+Ordinary sessions store the authority's `auth_version` and `rotation_version`. Password changes, deactivation, group removals, permission reductions and connection edits/disables increment affected users' revocation versions atomically with metadata changes. The user app rejects older sessions on the next request. Privilege increases increment a rotation version, causing token replacement on each affected session's next authentication. Session expiration, bounded grace handoff and absolute lifetime remain enforced locally. A failed runtime token rotation leaves the authority's committed change intact and retries on a later request; it does not require a cross-database rollback.
 
-Matching usernames or numeric IDs do not make credentials or tokens interchangeable.
-Login challenges have separate HttpOnly cookies; admin CSRF and rotation keys have
-an independent derivation domain. Idle timeout, absolute expiry, rotation, grace,
-logout and revocation continue to apply within each database.
+## Configuration and independent startup
 
-## Testing
+Copy and fill in each application's own `.env.example`. The launcher reads only the selected application's `.env`; direct Go binaries consume environment variables and do not source files.
 
-Database initialization, local PostgreSQL lifecycle helpers, fixture seeding,
-bootstrap helpers and archived upgrade scenarios are retained exclusively under
-`src/test/data/`. Test schemas are embedded by test fixture packages. Their package
-paths are absent from both server dependency graphs.
+| Admin only | Meaning |
+| --- | --- |
+| `SCHAKKER_ADMIN_DATABASE_URL` | Restricted connection to `schakker_admin` only |
+| `SCHAKKER_ADMIN_MASTER_KEY` | Existing 32-byte key, hex/base64; no fallback to the user key or filesystem |
+| `SCHAKKER_ADMIN_ENV` | `production` enables secure cookies and production TLS requirements |
+| `SCHAKKER_ADMIN_PORT` | Public port, default `3001` |
+| `SCHAKKER_ADMIN_INTERNAL_ADDR` | Private listen address, default `127.0.0.1:3002` |
+| `SCHAKKER_ADMIN_INTERNAL_TLS_CERT`, `SCHAKKER_ADMIN_INTERNAL_TLS_KEY` | Certificate and key for internal HTTPS |
+| `SCHAKKER_INTERNAL_TOKEN` | Provisioned private service credential shared with the user server |
 
-Unit and integration tests retain isolated setup. Runtime integration tests verify
-that missing schemas remain empty, bootstrap environment variables create no
-accounts, existing provisioned accounts still authenticate, and startup creates no
-local state or key files. Normal authorization, administration, session and SQL
-migration coverage remains in place.
+| User only | Meaning |
+| --- | --- |
+| `SCHAKKER_PLATFORM_DATABASE_URL` | Restricted connection to `schakker_platform` only; legacy `SCHAKKER_DATABASE_URL` / `DATABASE_URL` aliases still work |
+| `SCHAKKER_MASTER_KEY` | Existing user-session and review-signing key |
+| `SCHAKKER_ENV`, `PORT` | User deployment mode and public port (default `3000`) |
+| `SCHAKKER_CONTROL_PLANE_URL` | Verified internal API origin, e.g. `https://authority.internal:3002` |
+| `SCHAKKER_INTERNAL_TOKEN` | Same provisioned private service credential |
+| `SCHAKKER_STATE_DIR` | Optional user-owned directory to read an existing `master.key` in development |
 
-Launchers can run the tests before starting the application, then clean up the
-temporary test cluster. They do not retain fixtures as application data.
+From each application directory, build its own frontend with `npm ci` and `npm run build` in `frontend/`, then run `GOWORK=off go build -o bin/server .` and execute that binary from the application directory with its environment supplied. Start admin before ordinary users need authentication/authorization. Root wrappers remain `bash ./run.sh --admin` and `bash ./run.sh`, or `run-admin.bat` / `run.bat` on Windows. Each wrapper builds only its selected frontend and server. Vite development ports remain `5174` (admin) and `5173` (user), proxying only their respective public API/static paths.
+
+Admin pages remain `/admin/users`, `/admin/administrators`, `/admin/groups`, `/admin/connections`, with `/admin/access` as the existing group-page alias. Ordinary explorer, SQL viewer, query plans and migration pages retain their routes and UI. No Milestone 2 feature is added.
+
+## Connection registration and operational limits
+
+Registration validates and encrypts configuration without opening a target database. The former admin connectivity-test action is removed from UI and backend. The admin build contains no managed-database adapter, catalog reader, SQL executor, query-plan or migration engine. Authorized ordinary operations establish and validate target connections.
+
+An existing registration's DBMS, host, port and database name are immutable, even before its first migration. The independent admin cannot inspect platform history to decide whether retargeting is safe. Correct a target identity by disabling the old registration and registering a distinct target; credentials, TLS settings, display name and active status remain editable. Duplicate targets, including disabled registrations and hostname aliases, remain rejected. No destructive registration deletion is exposed.
+
+Uncertain non-atomic migration outcomes continue to require operator recovery. The former application action required an administrator with ordinary database-edit privileges, a combination the separated identity domains do not grant; the action remains denied. No recovery engine or rollback/forward workflow is redesigned.
+
+## Verification
+
+Run `GOWORK=off go test ./...` from `src-admin/` after building its frontend. From the repository workspace, run `go test ./src/test/unit/... ./src/backend/controlplane/...` and `go test -timeout=10m ./src/test/integration/...`. The cross-application integration harness imports both implementations only for fixture construction and verifies communication through the real private HTTP API. Neither production dependency graph imports the other module. Integration tests include an isolated admin binary launched without a sibling `src/` directory and with workspace support disabled.
+
+Run `npm test` independently in both frontend directories. Database creation, historical upgrade simulations, role provisioning and seed accounts exist only in test support.

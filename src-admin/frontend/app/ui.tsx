@@ -5,7 +5,7 @@ import {
   type ReactNode,
 } from "react";
 import { formFields } from "./api";
-import icons from "../../../src/frontend/app/icons.svg?no-inline";
+import icons from "./icons.svg?no-inline";
 import type { Fields, PageData } from "./types";
 
 export const PageContext = createContext<{

@@ -1,5 +1,6 @@
-export type { User, Database, Group } from "../../../src/frontend/app/types";
-import type { User, Database, Group } from "../../../src/frontend/app/types";
+export type User = { ID: number; Username: string; DisplayName: string; Active: boolean; };
+export type Group = { ID: number; Name: string; Description: string; };
+export type Database = { ID:number; DBMS:string; Name:string; Host:string; Port:number; DatabaseName:string; SSLMode:string; Active:boolean; Permission:string; };
 export type PageData = {
   Title: string;
   Active: string;

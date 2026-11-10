@@ -8,23 +8,14 @@ import (
 	"tubes1_wbd/backend/access"
 )
 
-const AdminCookieName = "schakker_admin_session"
-const AdminLoginCookieName = "schakker_admin_login_csrf"
 const UserLoginCookieName = "schakker_login_csrf"
 
 type Auth struct {
 	Access                           *access.Service
 	Production                       bool
-	Admin                            bool
 	SessionCookie, LoginCookie, Home string
 }
 
-func (a Auth) roleError() string {
-	if a.Admin {
-		return "Only platform administrators can sign in to this application."
-	}
-	return "Platform administrators must use the administration application."
-}
 func (a Auth) setCookie(w http.ResponseWriter, r *http.Request, name, value string, expires time.Time) {
 	http.SetCookie(w, &http.Cookie{Name: name, Value: value, Path: "/", Expires: expires, HttpOnly: true, Secure: a.Production || r.TLS != nil, SameSite: http.SameSiteLaxMode})
 }
@@ -46,24 +37,15 @@ func (a Auth) Login(w http.ResponseWriter, r *http.Request) {
 		a.Challenge(w, r, "The login form expired. Please try again.", http.StatusForbidden)
 		return
 	}
-	identity, raw, err := a.Access.LoginForRole(r.Context(), r.PostForm.Get("username"), r.PostForm.Get("password"), CookieValue(r, a.SessionCookie), a.Admin)
+	identity, raw, err := a.Access.Login(r.Context(), r.PostForm.Get("username"), r.PostForm.Get("password"), CookieValue(r, a.SessionCookie))
 	if err != nil {
 		if errors.Is(err, access.ErrForbidden) {
-			a.Challenge(w, r, a.roleError(), http.StatusForbidden)
+			a.Challenge(w, r, "Sign in is unavailable.", http.StatusForbidden)
 		} else if errors.Is(err, access.ErrUnauthenticated) {
 			a.Challenge(w, r, "Incorrect username or password, or the account is disabled.", http.StatusUnauthorized)
 		} else {
 			a.Challenge(w, r, "Login is temporarily unavailable. Please retry.", http.StatusServiceUnavailable)
 		}
-		return
-	}
-	if identity.User.IsAdmin != a.Admin {
-		if err := a.Access.Logout(r.Context(), identity.SessionID); err != nil {
-			Error(w, r, "Login is temporarily unavailable. Please retry.", http.StatusServiceUnavailable)
-			return
-		}
-		a.clearCookie(w, r, a.SessionCookie)
-		a.Challenge(w, r, a.roleError(), http.StatusForbidden)
 		return
 	}
 	a.setCookie(w, r, a.SessionCookie, raw, identity.AbsoluteExpires)
@@ -83,13 +65,6 @@ func (a Auth) Authenticate(w http.ResponseWriter, r *http.Request, sessionBootst
 		} else {
 			Error(w, r, "Authentication is unavailable. Please retry.", http.StatusServiceUnavailable)
 		}
-		return access.Identity{}, "", false
-	}
-	// Logout remains available after a role change; every data endpoint and
-	// session bootstrap enforces the current role loaded by Authenticate.
-	if identity.User.IsAdmin != a.Admin && (a.Admin || r.URL.Path != "/logout") {
-		a.clearCookie(w, r, a.SessionCookie)
-		Error(w, r, a.roleError(), http.StatusForbidden)
 		return access.Identity{}, "", false
 	}
 	if replacement != "" {

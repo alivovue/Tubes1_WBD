@@ -1,5 +1,5 @@
-// Package connectionconfig manages registered connection metadata. Its only target
-// database operation is connection validation; it exposes no query or catalog API.
+// Package connectionconfig manages registered connection metadata. Its
+// operations validate/encrypt metadata; it has no managed database driver or query API.
 package connectionconfig
 
 import (
@@ -7,23 +7,20 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"time"
-	"tubes1_wbd/backend/access"
-	"tubes1_wbd/backend/dbmanagement/adapters"
-	"tubes1_wbd/backend/dbmanagement/adapters/mariadb"
-	"tubes1_wbd/backend/dbmanagement/adapters/postgres"
-	"tubes1_wbd/database/dao"
+	"tubes1_wbd_admin/backend/access"
+	"tubes1_wbd_admin/database/dao"
 )
 
 var (
-	ErrConnection          = adapters.ErrConnection
-	ErrQuery               = adapters.ErrQuery
+	ErrConnection          = errors.New("connection configuration unavailable")
 	ErrInvalid             = access.ErrInvalid
 	ErrForbidden           = access.ErrForbidden
 	ErrConflict            = access.ErrConflict
 	ErrNotFound            = access.ErrNotFound
-	ErrUnsupported         = adapters.ErrUnsupported
+	ErrUnsupported         = errors.New("unsupported database type")
 	ErrDuplicateConnection = fmt.Errorf("%w: target database is already registered", ErrConflict)
 )
 
@@ -31,32 +28,26 @@ type Config struct {
 	Key            []byte
 	Production     bool
 	ConnectTimeout time.Duration
-	QueryTimeout   time.Duration
 }
 
 func DefaultConfig(key []byte, production bool) Config {
-	return Config{Key: key, Production: production, ConnectTimeout: 5 * time.Second, QueryTimeout: 30 * time.Second}
+	return Config{Key: key, Production: production, ConnectTimeout: 5 * time.Second}
 }
 
 type Service struct {
-	store    *dao.Store
-	access   *access.Service
-	config   Config
-	registry *adapters.Registry
+	store  *dao.Store
+	access *access.Service
+	config Config
 }
 
 func NewService(store *dao.Store, auth *access.Service, config Config) (*Service, error) {
-	if store == nil || auth == nil || len(config.Key) != 32 || config.ConnectTimeout <= 0 || config.QueryTimeout <= 0 {
+	if store == nil || auth == nil || len(config.Key) != 32 || config.ConnectTimeout <= 0 {
 		return nil, ErrInvalid
 	}
 	config.Key = append([]byte(nil), config.Key...)
-	registry, err := adapters.NewRegistry(postgres.New(), mariadb.New())
-	if err != nil {
-		return nil, err
-	}
-	return &Service{store: store, access: auth, config: config, registry: registry}, nil
+	return &Service{store: store, access: auth, config: config}, nil
 }
-func (s *Service) SupportedDBMS() []string { return s.registry.Supported() }
+func (s *Service) SupportedDBMS() []string { return []string{"mariadb", "postgresql"} }
 func (s *Service) Connections(ctx context.Context, actor int64) ([]dao.Database, error) {
 	if err := s.access.RequireAdmin(ctx, actor); err != nil {
 		return nil, err

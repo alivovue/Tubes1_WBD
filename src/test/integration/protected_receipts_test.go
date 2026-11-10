@@ -111,7 +111,7 @@ func TestHiddenReceiptDeletionRollsBackTheWholeMigration(t *testing.T) {
 	if rows != 0 {
 		t.Fatal("metadata rejection committed the earlier row change")
 	}
-	version, err := f.store.MigrationVersion(f.ctx, target.ID)
+	version, err := f.runtimeStore.MigrationVersion(f.ctx, target.ID)
 	must(t, err)
 	if version != 1 {
 		t.Fatal("metadata tampering advanced the migration version")

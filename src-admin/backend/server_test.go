@@ -15,11 +15,11 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"tubes1_wbd/backend/access"
-	"tubes1_wbd/backend/connectionconfig"
-	"tubes1_wbd/backend/httpapi"
-	"tubes1_wbd/database/dao"
 	admin "tubes1_wbd_admin/backend"
+	"tubes1_wbd_admin/backend/access"
+	"tubes1_wbd_admin/backend/connectionconfig"
+	"tubes1_wbd_admin/backend/httpapi"
+	"tubes1_wbd_admin/database/dao"
 )
 
 type noSQLDriver struct{}
@@ -54,14 +54,7 @@ func handler(t *testing.T, production bool) http.Handler {
 	if err != nil {
 		t.Fatal(err)
 	}
-	adminStore, err := dao.NewAdminAuthentication(db)
-	if err != nil {
-		t.Fatal(err)
-	}
-	authentication, err := access.NewService(adminStore, access.DefaultConfig(key))
-	if err != nil {
-		t.Fatal(err)
-	}
+	authentication := auth
 	connections, err := connectionconfig.NewService(store, auth, connectionconfig.DefaultConfig(key, production))
 	if err != nil {
 		t.Fatal(err)
@@ -94,7 +87,7 @@ func TestAdminOnlyRoutesAndJSONAuthentication(t *testing.T) {
 	for _, route := range []string{"/api/admin/users", "/api/admin/groups", "/api/admin/connections"} {
 		for _, method := range []string{http.MethodGet, http.MethodPost} {
 			request := httptest.NewRequest(method, route, strings.NewReader(`{}`))
-			request.AddCookie(&http.Cookie{Name: access.CookieName, Value: strings.Repeat("a", 43)})
+			request.AddCookie(&http.Cookie{Name: "schakker_session", Value: strings.Repeat("a", 43)})
 			response := httptest.NewRecorder()
 			app.ServeHTTP(response, request)
 			if response.Code != 401 || !strings.HasPrefix(response.Header().Get("Content-Type"), "application/json") {

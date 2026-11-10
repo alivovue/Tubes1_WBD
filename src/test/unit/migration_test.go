@@ -76,7 +76,7 @@ func TestMigrationHistoryAllowsReaders(t *testing.T) {
 func TestDraftSaveAndOptimisticUpdate(t *testing.T) {
 	_, store, stub := newSQLStub(t)
 	_, _, service := newServices(t, store)
-	stub.append(permissionStep(access.ViewEdit), permissionStep(access.ViewEdit), metadataStep(), draftStep("INSERT INTO migration_drafts"))
+	stub.append(permissionStep(access.ViewEdit), permissionStep(access.ViewEdit), metadataStep(), execStep("INSERT INTO managed_databases"), draftStep("INSERT INTO migration_drafts"))
 	saved, err := service.SaveDraft(context.Background(), 7, 3, migration.DraftInput{Title: "A draft", SQL: "SELECT 1"})
 	if err != nil {
 		t.Fatal(err)
@@ -84,19 +84,19 @@ func TestDraftSaveAndOptimisticUpdate(t *testing.T) {
 	if saved.ID != 4 || saved.SQL != "SELECT 1" {
 		t.Fatal("created draft content not returned")
 	}
-	stub.append(permissionStep(access.ViewEdit), permissionStep(access.ViewEdit), metadataStep(), draftStep("UPDATE migration_drafts SET"))
+	stub.append(permissionStep(access.ViewEdit), permissionStep(access.ViewEdit), metadataStep(), execStep("INSERT INTO managed_databases"), draftStep("UPDATE migration_drafts SET"))
 	_, err = service.SaveDraft(context.Background(), 7, 3, migration.DraftInput{ID: 4, Title: "A draft", SQL: "SELECT 1", ExpectedUpdatedAt: testTime})
 	if err != nil {
 		t.Fatal(err)
 	}
-	stub.append(permissionStep(access.ViewEdit), permissionStep(access.ViewEdit), metadataStep())
+	stub.append(permissionStep(access.ViewEdit), permissionStep(access.ViewEdit), metadataStep(), execStep("INSERT INTO managed_databases"))
 	_, err = service.SaveDraft(context.Background(), 7, 3, migration.DraftInput{ID: 4, Title: "A draft", SQL: "SELECT 1"})
 	wantError(t, err, access.ErrInvalid)
 }
 func TestDraftOptimisticConflictAndDeletion(t *testing.T) {
 	_, store, stub := newSQLStub(t)
 	_, _, service := newServices(t, store)
-	stub.append(permissionStep(access.ViewEdit), permissionStep(access.ViewEdit), metadataStep(), queryStep("UPDATE migration_drafts SET", []string{"id"}), draftStep("FROM migration_drafts WHERE"))
+	stub.append(permissionStep(access.ViewEdit), permissionStep(access.ViewEdit), metadataStep(), execStep("INSERT INTO managed_databases"), queryStep("UPDATE migration_drafts SET", []string{"id"}), draftStep("FROM migration_drafts WHERE"))
 	_, err := service.SaveDraft(context.Background(), 7, 3, migration.DraftInput{ID: 4, Title: "A draft", SQL: "SELECT 1", ExpectedUpdatedAt: testTime})
 	wantError(t, err, access.ErrConflict)
 	stub.append(permissionStep(access.ViewEdit), sqlStep{kind: "begin"}, scalarStep("FROM migration_drafts WHERE database_id=$1 AND id=$2 FOR UPDATE", int64(4)), execStep("UPDATE migration_executions SET draft_id=NULL"), execStep("DELETE FROM migration_drafts"), sqlStep{kind: "commit"})
@@ -192,13 +192,8 @@ func TestSQLHashBindsExactText(t *testing.T) {
 	}
 }
 
-func TestManualOutcomeResolutionRequiresAdminAndDatabaseEdit(t *testing.T) {
-	_, store, stub := newSQLStub(t)
+func TestManualOutcomeResolutionRemainsOperatorOnly(t *testing.T) {
+	_, store, _ := newSQLStub(t)
 	_, _, service := newServices(t, store)
-	stub.append(scalarStep("admin_users", false))
 	wantError(t, service.ResolveOutcome(context.Background(), 7, 3, 1, true, "Verified target state"), access.ErrForbidden)
-	stub.append(scalarStep("admin_users", true), permissionStep(access.ViewOnly))
-	wantError(t, service.ResolveOutcome(context.Background(), 7, 3, 1, true, "Verified target state"), access.ErrForbidden)
-	stub.append(scalarStep("admin_users", true), permissionStep(access.ViewEdit))
-	wantError(t, service.ResolveOutcome(context.Background(), 7, 3, 1, true, "  "), access.ErrInvalid)
 }

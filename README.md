@@ -1,152 +1,74 @@
 # Schakker
 
-Schakker terdiri dari aplikasi pengguna dan aplikasi administrasi yang berjalan
-sebagai dua server Go dengan dua React SPA.
+Schakker memiliki dua aplikasi Milestone 1 yang independen: server Go dan React SPA untuk pengguna di `src/`, serta server dan SPA administrasi di `src-admin/`.
 
-| Aplikasi | Source | Port HTTP | Port Vite | Launcher |
-| --- | --- | --- | --- | --- |
-| Pengguna | `src/` | `PORT=3000` | `5173` | `bash ./run.sh` / `run.bat` |
-| Administrasi | `src-admin/` | `ADMIN_PORT=3001` | `5174` | `bash ./run-admin.sh` / `run-admin.bat` |
+| Aplikasi | Port Go | Port Vite | Launcher |
+| --- | --- | --- | --- |
+| Pengguna | `PORT=3000` | `5173` | `bash ./run.sh` / `run.bat` |
+| Admin | `SCHAKKER_ADMIN_PORT=3001` | `5174` | `bash ./run-admin.sh` / `run-admin.bat` |
 
-Aplikasi pengguna menyediakan explorer, SQL viewer, query plan, serta migrasi SQL
-untuk pengguna yang memiliki grant. Aplikasi admin mengelola akun, grup,
-keanggotaan, permission, serta konfigurasi koneksi. Validasi koneksi admin tidak
-menyediakan eksekusi SQL atau akses isi database target.
+Pengguna memiliki explorer, SQL viewer, query plan dan migrasi sesuai permission. Admin mengelola akun, grup, keanggotaan, permission dan registrasi koneksi terenkripsi. Server admin tidak memiliki adapter target, explorer, eksekusi SQL atau mesin migrasi. Registrasi hanya menyimpan konfigurasi; pengujian koneksi admin telah dihapus.
 
-## Database dan konfigurasi
+## Kepemilikan database
 
-Database, schema, role PostgreSQL, akun administrator pertama, serta master key
-harus disediakan melalui pengelolaan database di luar aplikasi. Startup hanya
-membuka koneksi dan memeriksa schema serta role yang sudah ada. Startup tidak
-menjalankan server PostgreSQL, membuat database/tabel/role, mengisi data contoh,
-membuat akun awal, menjalankan upgrade data, atau menghasilkan key file.
+- `schakker_admin`: akun/password/sesi admin, definisi akun pengguna biasa beserta password, grup, membership, permission, registrasi koneksi dan atribusi administrasi.
+- `schakker_platform`: sesi pengguna biasa, draft/eksekusi/riwayat migrasi, namespace receipt, serta snapshot identitas dan ID database untuk foreign key lokal.
 
-- `schakker_platform`: akun dan sesi pengguna biasa, grup, keanggotaan, grant,
-  registrasi koneksi, draft migrasi, dan riwayat eksekusi.
-- `schakker_admin`: akun, sesi, serta token autentikasi administrator.
+Masing-masing server hanya terhubung ke database aplikasinya sendiri. Pengguna memperoleh autentikasi dan permission terkini melalui API internal admin yang dilindungi token layanan dan TLS. Tidak ada cache otorisasi; gangguan authority menolak operasi terlindungi. Snapshot lokal tidak memiliki password, flag administrator atau grant yang dapat diedit.
 
-Server pengguna tidak membuka koneksi ke database admin. Akun dengan ID atau
-username yang sama di kedua database tetap memiliki credential dan sesi terpisah.
-Akun pengguna tidak dapat dipromosikan menjadi admin; akun admin dikelola melalui
-`/admin/administrators`.
+Akun admin dan pengguna biasa adalah identitas terpisah, termasuk bila username atau ID numeriknya sama. Cookie pengguna `schakker_session` dan cookie admin `schakker_admin_session` juga terpisah. Admin tidak mendapatkan akses database target melalui registrasi atau membership.
 
-Panduan koneksi dan kontrak schema ada di
-[pemisahan database admin](docs/admin-auth-database.md).
+## Penyiapan dan konfigurasi
 
-Launcher membaca `src/.env`. Launcher admin juga membaca `src-admin/.env` sebagai
-override. Berkas `.env` tidak disimpan di Git.
+Database, schema, role PostgreSQL terbatas, akun administrator pertama, key yang sudah ada dan token layanan harus disediakan di luar aplikasi. Startup tidak membuat database, schema, role, akun, seed data atau key, dan tidak menjalankan upgrade data.
 
-Contoh `src/.env` untuk aplikasi pengguna, dengan nilai rahasia diganti sesuai
-konfigurasi deployment:
+Panduan lengkap tersedia di:
 
-```dotenv
-SCHAKKER_PLATFORM_DATABASE_URL='postgres://schakker_user:PRIVATE_PASSWORD@HOST/schakker_platform?sslmode=verify-full'
-SCHAKKER_MASTER_KEY='SHARED_32_BYTE_KEY_ENCODED_AS_HEX_OR_BASE64'
-PORT=3000
-```
+- [Arsitektur, struktur direktori, API internal, environment dan batasan](docs/admin-auth-database.md)
+- [Kontrak schema untuk provisioning eksternal](docs/application-databases.md)
+- [Cutover data lama, validasi, retry dan recovery](docs/control-plane-cutover.md)
 
-Contoh `src-admin/.env`:
+Isi `src/.env.example` dan `src-admin/.env.example` ke `.env` masing-masing. Launcher hanya membaca `.env` aplikasi yang dipilih. Binary Go langsung membaca environment, tanpa memuat `.env` otomatis.
 
-```dotenv
-SCHAKKER_PLATFORM_DATABASE_URL='postgres://schakker_administration:PRIVATE_PASSWORD@HOST/schakker_platform?sslmode=verify-full'
-SCHAKKER_ADMIN_DATABASE_URL='postgres://schakker_admin_auth:PRIVATE_PASSWORD@HOST/schakker_admin?sslmode=verify-full'
-ADMIN_PORT=3001
-```
+Aplikasi pengguna memerlukan `SCHAKKER_PLATFORM_DATABASE_URL`, `SCHAKKER_MASTER_KEY`, `SCHAKKER_CONTROL_PLANE_URL` dan `SCHAKKER_INTERNAL_TOKEN`. URL platform masih menerima alias lama `SCHAKKER_DATABASE_URL` / `DATABASE_URL`. Development dapat membaca key pengguna dari berkas `master.key` yang sudah ada dalam `SCHAKKER_STATE_DIR` (default `.schakker`).
 
-Kedua aplikasi memakai master key yang sama. Key berisi 32 byte, dalam bentuk hex
-atau base64. Pada mode development, key juga dapat dibaca dari **berkas yang sudah
-ada** di `src/.schakker/master.key` atau `SCHAKKER_STATE_DIR/master.key`. Aplikasi
-tidak membuat berkas tersebut. Mode production (`SCHAKKER_ENV=production`)
-mewajibkan `SCHAKKER_MASTER_KEY` dari environment.
+Aplikasi admin memerlukan `SCHAKKER_ADMIN_DATABASE_URL`, `SCHAKKER_ADMIN_MASTER_KEY` dan token layanan yang sama. Key admin tidak dibaca dari aplikasi pengguna. Saat cutover, sediakan key enkripsi koneksi lama sebagai key admin agar ciphertext tetap dapat dibaca. Jangan menghasilkan pengganti secara otomatis.
 
-`SCHAKKER_DATABASE_URL` dan `DATABASE_URL` tetap menjadi alias URL platform.
-Server admin selalu membutuhkan `SCHAKKER_ADMIN_DATABASE_URL` tersendiri.
-`SCHAKKER_STATE_DIR` hanya menentukan lokasi pembacaan key yang sudah ada; launcher
-menafsirkan path relatif dari `src/`.
+Listener internal default `127.0.0.1:3002`, dapat diatur dengan `SCHAKKER_ADMIN_INTERNAL_ADDR`. Production (`SCHAKKER_ADMIN_ENV=production`) dan listener non-loopback memerlukan `SCHAKKER_ADMIN_INTERNAL_TLS_CERT` / `SCHAKKER_ADMIN_INTERNAL_TLS_KEY`. Pengguna production (`SCHAKKER_ENV=production`) mewajibkan URL authority HTTPS dengan sertifikat tepercaya. HTTP hanya diizinkan untuk IP loopback pada development. Listener internal tidak diproxy ke browser.
 
-## Dependensi
+## Menjalankan dan mengembangkan
 
-- Go 1.26 atau lebih baru; modul menetapkan toolchain `go1.26.10`.
-- Node.js 22.12 atau lebih baru beserta npm.
-- Bash 4+ di Linux atau Windows PowerShell 5.1+ di Windows.
-- Koneksi ke dua database PostgreSQL yang telah disediakan secara eksternal.
-- PostgreSQL server tools diperlukan untuk integration test lokal. MariaDB server
-  tools bersifat opsional untuk pengujian fixture MariaDB.
+Gunakan Go 1.26+ (toolchain modul `go1.26.10`), Node.js 22.12+ dengan npm, serta Bash 4+ atau Windows PowerShell 5.1+. Kedua database aplikasi harus sudah disediakan.
 
-Go dan npm mengunduh dependensi sesuai `go.mod`, `go.sum`, dan lockfile masing-masing
-frontend. Instal PostgreSQL server tools pada Ubuntu/Debian untuk menjalankan
-integration test:
+Jalankan admin dahulu, kemudian aplikasi pengguna, pada terminal terpisah:
 
 ```bash
-sudo apt install postgresql postgresql-client
-```
-
-`SCHAKKER_POSTGRES_BIN` dapat menunjuk direktori berisi `postgres`, `initdb`, dan
-`pg_ctl` untuk **pengujian**. `SCHAKKER_MARIADB_BIN` menentukan tools fixture
-MariaDB. Database aplikasi tidak dimulai oleh launcher.
-
-## Menjalankan aplikasi
-
-Dari root repositori, gunakan terminal terpisah:
-
-```bash
-bash ./run.sh
 bash ./run-admin.sh
+bash ./run.sh
 ```
 
-Pada Windows gunakan `run.bat` dan `run-admin.bat`. Launcher membangun kedua SPA,
-menawarkan unit/integration test, membangun Go, lalu menjalankan satu server.
-Binary tersimpan di `src/bin/` atau `src-admin/bin/`. Jika schema atau konfigurasi
-belum tersedia, server berhenti dengan pesan konfigurasi; tidak ada penyiapan akun
-atau data otomatis. Ctrl+C menghentikan server HTTP terkait tanpa mengelola proses
-PostgreSQL eksternal.
+Windows menggunakan `run-admin.bat` dan `run.bat`. Setiap launcher membangun frontend dan server aplikasinya sendiri, menawarkan pengujian yang terkait, lalu menjalankan binary dalam `bin/`. Fixture integration test tidak diteruskan ke server.
 
-Pilihan launcher hanya mencakup pengujian. Fixture yang dipakai integration test
-bersifat sementara dan tidak diteruskan ke aplikasi yang dijalankan.
-
-Untuk build manual:
+Kedua aplikasi dapat dibangun sendiri dari folder masing-masing, tanpa aplikasi lain dan tanpa workspace Go:
 
 ```bash
-(cd src/frontend && npm ci && npm run build)
-(cd src-admin/frontend && npm ci && npm run build)
-(cd src && go build -o bin/user-server .)
-(cd src-admin && go build -o bin/admin-server .)
+# Dalam src-admin/ ATAU src/, dengan environment aplikasi terkait sudah tersedia
+(cd frontend && npm ci && npm run build)
+GOWORK=off go build -o bin/server .
+./bin/server
 ```
 
-Jalankan binary dari folder aplikasi terkait agar hasil build frontend ditemukan:
-`cd src && ./bin/user-server` atau `cd src-admin && ./bin/admin-server`.
-
-## Pengembangan frontend
-
-Jalankan server Go pengguna pada port `3000`, kemudian `npm run dev` dari
-`src/frontend/` untuk membuka Vite pada port `5173`. Untuk admin, jalankan server Go
-pada port `3001` dan `npm run dev` dari `src-admin/frontend/` pada port `5174`.
-Proxy Vite meneruskan `/api/` dan `/public/` ke server Go terkait. Sesuaikan
-`vite.config.ts` jika port Go diubah.
-
-API memakai JSON di `/api/session`, `/api/login`, `/api/logout`, dan `/api` diikuti
-route halaman. POST menerima string atau array string dan memerlukan header
-`X-CSRF-Token`. Identifier sesi hanya dikirim lewat cookie HttpOnly.
+Jalankan `npm run dev` dari frontend aplikasi terkait untuk pengembangan Vite. Proxy `/api/` dan `/public/` hanya mengarah ke server publik aplikasi tersebut. Route pengguna dan tampilan explorer/migrasi tetap sama. Route admin: `/admin/users`, `/admin/administrators`, `/admin/groups`, `/admin/connections`; `/admin/access` tetap menjadi alias grup.
 
 ## Sesi dan permission
 
-Cookie pengguna adalah `schakker_session`, sedangkan admin memakai
-`schakker_admin_session`, dengan cookie challenge login yang juga terpisah.
-Cookie menggunakan `HttpOnly`, `SameSite=Lax`, serta `Secure` pada HTTPS atau
-production. Idle timeout 30 menit, absolute lifetime delapan jam, interval rotasi
-15 menit, dan grace period 30 detik tetap berlaku.
-
-Logout, perubahan password, dan penonaktifan akun membatalkan sesi pada domain
-terkait. Pengurangan grant membatalkan sesi pengguna yang terdampak; perubahan
-grant platform tidak membatalkan sesi admin. Permission selalu diperiksa backend.
+Cookie menggunakan HttpOnly, SameSite=Lax, serta Secure pada HTTPS/production. Idle timeout 30 menit, absolute lifetime delapan jam, rotasi berkala 15 menit dan grace period 30 detik tetap berlaku. Password/aktivasi, pengurangan permission dan perubahan koneksi mengubah versi keamanan pengguna secara atomik di authority. Sesi dengan versi lama ditolak pada permintaan berikutnya. Penambahan hak menyebabkan rotasi token saat autentikasi berikutnya. Perubahan permission pengguna tidak membatalkan sesi admin.
 
 ## Pengujian
 
-Setup database, seed data, bootstrap akun, dan skenario upgrade lama tetap tersedia
-khusus untuk pengujian di `src/test/data/`. Kode tersebut tidak menjadi dependensi
-kedua aplikasi server.
+Setup database, seed data, bootstrap akun dan simulasi upgrade hanya ada dalam test support. Server tidak mengimpor paket test.
 
-Bangun kedua frontend sebelum integration test HTTP, lalu jalankan dari root:
+Setelah membangun kedua frontend, jalankan dari root:
 
 ```bash
 go test -count=1 -timeout=10m ./src/... ./src-admin/...
@@ -154,9 +76,9 @@ go test -count=1 -timeout=10m ./src/... ./src-admin/...
 (cd src-admin/frontend && npm test)
 ```
 
-Pengujian PostgreSQL membuat cluster dan database sementara sendiri. Pengujian
-MariaDB dilewati jika tools opsionalnya tidak tersedia. Laporan dari launcher
-tersimpan di `src/test/output/`.
+Admin juga dapat diuji sendiri dari `src-admin/` dengan `GOWORK=off go test ./...`. Cross-application integration test menggunakan workspace hanya untuk menyusun fixture; komunikasi aplikasi tetap melalui API HTTP privat. Tes mencakup menjalankan binary admin terisolasi tanpa folder `src/`, kegagalan authority, pencabutan permission, dan SQL prosedur cutover/recovery yang terdokumentasi.
+
+PostgreSQL server/client tools diperlukan untuk fixture lokal (`SCHAKKER_POSTGRES_BIN` dapat menentukan direktori tools). MariaDB server tools opsional (`SCHAKKER_MARIADB_BIN`). Laporan launcher berada di `test/output/` aplikasi terpilih. Database aplikasi tidak dimulai atau dimigrasikan oleh launcher.
 
 ## Query Plan
 

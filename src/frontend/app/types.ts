@@ -2,7 +2,6 @@ export type User = {
   ID: number;
   Username: string;
   DisplayName: string;
-  IsAdmin: boolean;
   Active: boolean;
 };
 export type Database = {

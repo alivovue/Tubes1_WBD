@@ -9,12 +9,16 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"tubes1_wbd/backend/access"
 	adminmigrate "tubes1_wbd/test/data/adminmigration"
+	adminsetup "tubes1_wbd/test/data/adminsetup"
 	"tubes1_wbd/test/data/setup"
 )
 
 func legacyInstallation(t *testing.T) *fixture {
 	t.Helper()
 	f := newFixture(t, false)
+	_, err := f.adminDB.ExecContext(f.ctx, `DROP SCHEMA public CASCADE;CREATE SCHEMA public`)
+	must(t, err)
+	must(t, adminsetup.Initialize(f.ctx, f.adminDB))
 	schema, err := os.ReadFile(filepath.Join("..", "data", "adminmigration", "legacy_schema_test.sql"))
 	must(t, err)
 	_, err = f.dbs.Website.ExecContext(f.ctx, `DROP SCHEMA public CASCADE; CREATE SCHEMA public`)
@@ -79,17 +83,12 @@ func assertMigratedInstallation(t *testing.T, f *fixture) {
 	if identity.User.ID != 10 {
 		t.Fatal("administrator ID changed")
 	}
-	_, _, err = f.userAccess.Login(f.ctx, "legacy.admin", password, "")
-	wantError(t, err, access.ErrUnauthenticated)
-	_, _, err = f.userAccess.Authenticate(f.ctx, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
-	wantError(t, err, access.ErrUnauthenticated)
-	ordinary, _, err := f.userAccess.Authenticate(f.ctx, "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
-	must(t, err)
-	if ordinary.User.ID != 30 {
-		t.Fatal("ordinary session changed")
+	var ordinaryValid bool
+	must(t, f.dbs.Website.QueryRowContext(f.ctx, `SELECT is_active AND password_hash<>'' FROM users WHERE id=30 AND NOT is_legacy_admin`).Scan(&ordinaryValid))
+	if !ordinaryValid {
+		t.Fatal("historical migration lost ordinary credentials")
 	}
-	_, _, err = f.userAccess.Login(f.ctx, "legacy.employee", password, "")
-	must(t, err)
+
 	_, _, err = f.adminAuth.Login(f.ctx, "disabled.admin", password, "")
 	wantError(t, err, access.ErrUnauthenticated)
 	if _, err := f.dbs.Website.ExecContext(f.ctx, `UPDATE users SET is_active=TRUE WHERE id=10`); err == nil {

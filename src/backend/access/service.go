@@ -3,97 +3,50 @@ package access
 import (
 	"context"
 	"errors"
-	"sync"
-
 	"tubes1_wbd/database/dao"
-
-	"golang.org/x/crypto/bcrypt"
 )
 
 type User = dao.User
-type Group = dao.Group
-type Membership = dao.Membership
-type Grant = dao.Grant
 type Database = dao.Database
-type AdminData = dao.AdminData
 
-// A missing-account comparison needs the same bcrypt cost in both domains.
-// This immutable dummy hash is shared; real account hashes always use new salts.
-var dummyPasswordHash = sync.OnceValues(func() ([]byte, error) {
-	return bcrypt.GenerateFromPassword([]byte("dummy-password-not-an-account"), 12)
-})
-
+// Authority is implemented by the private HTTP client. No administrative
+// operations or password hashes cross this interface.
+type Authority interface {
+	AuthenticateUser(context.Context, string, string) (User, error)
+	User(context.Context, int64) (User, error)
+	EffectivePermission(context.Context, int64, int64) (Permission, error)
+	AccessibleDatabases(context.Context, int64) ([]Database, error)
+	Connection(context.Context, int64, int64, Permission) (dao.DatabaseMetadata, error)
+}
 type Service struct {
 	store     *dao.Store
 	config    Config
-	dummyHash []byte
-	authority AdminAuthorizer
+	authority Authority
 }
 
 func NewService(store *dao.Store, config Config) (*Service, error) {
-	if store == nil {
-		return nil, errors.New("website database DAO is required")
+	if store == nil || config.Authority == nil {
+		return nil, errors.New("runtime store and control-plane authority are required")
 	}
 	if err := config.validate(); err != nil {
 		return nil, err
 	}
 	config.Key = append([]byte(nil), config.Key...)
-	dummy, err := dummyPasswordHash()
+	return &Service{store: store, config: config, authority: config.Authority}, nil
+}
+func (s *Service) DatabaseConnection(ctx context.Context, user, database int64, required Permission) (dao.DatabaseMetadata, error) {
+	if user < 1 || database < 1 || (required != ViewOnly && required != ViewEdit) {
+		return dao.DatabaseMetadata{}, ErrInvalid
+	}
+	m, err := s.authority.Connection(ctx, user, database, required)
 	if err != nil {
-		return nil, err
+		return m, err
 	}
-	return &Service{store: store, config: config, dummyHash: dummy}, nil
-}
-
-// AdminAuthorizer validates actors in the independent administrator domain.
-type AdminAuthorizer interface {
-	RequireAdmin(context.Context, int64) error
-}
-
-// NewAdministrationService manages platform metadata but never authenticates an
-// administrator against platform users, even when numeric IDs happen to match.
-func NewAdministrationService(store *dao.Store, authority AdminAuthorizer, config Config) (*Service, error) {
-	if authority == nil || store == nil || store.AdminAuthentication() {
-		return nil, ErrInvalid
+	if !m.Active || m.ID != database {
+		return dao.DatabaseMetadata{}, ErrForbidden
 	}
-	s, err := NewService(store, config)
-	if err == nil {
-		s.authority = authority
+	if err := s.store.RememberDatabase(ctx, database); err != nil {
+		return dao.DatabaseMetadata{}, err
 	}
-	return s, err
-}
-func (s *Service) RequireAdmin(ctx context.Context, actor int64) error {
-	if s.authority != nil {
-		return s.authority.RequireAdmin(ctx, actor)
-	}
-	if !s.store.AdminAuthentication() || actor < 1 {
-		return ErrForbidden
-	}
-	allowed, err := s.store.IsActiveAdmin(ctx, actor)
-	if err != nil {
-		return err
-	}
-	if !allowed {
-		return ErrForbidden
-	}
-	return nil
-}
-
-func (s *Service) adminChange(ctx context.Context, actor int64, change func(*dao.Store) error) error {
-	return s.store.Transaction(ctx, func(tx *dao.Store) error {
-		if err := tx.LockAdministration(ctx); err != nil {
-			return err
-		}
-		if err := s.RequireAdmin(ctx, actor); err != nil {
-			return err
-		}
-		return change(tx)
-	})
-}
-
-func (s *Service) Administration(ctx context.Context, actor int64) (AdminData, error) {
-	if err := s.RequireAdmin(ctx, actor); err != nil {
-		return AdminData{}, err
-	}
-	return s.store.Administration(ctx)
+	return m, nil
 }

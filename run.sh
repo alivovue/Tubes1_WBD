@@ -10,19 +10,16 @@ case "${1:-}" in
 esac
 
 project_directory="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-cd "$project_directory/src"
+application_directory="$project_directory/src"
+if [[ "$application_mode" == admin ]]; then application_directory="$project_directory/src-admin"; fi
+cd "$application_directory"
 if [[ -f .env ]]; then
     set -a
     source .env
     set +a
 fi
-if [[ "$application_mode" == admin && -f "$project_directory/src-admin/.env" ]]; then
-    set -a
-    source "$project_directory/src-admin/.env"
-    set +a
-fi
-if [[ -n "${SCHAKKER_STATE_DIR:-}" && "$SCHAKKER_STATE_DIR" != /* ]]; then
-    export SCHAKKER_STATE_DIR="$project_directory/src/$SCHAKKER_STATE_DIR"
+if [[ "$application_mode" == user && -n "${SCHAKKER_STATE_DIR:-}" && "$SCHAKKER_STATE_DIR" != /* ]]; then
+    export SCHAKKER_STATE_DIR="$application_directory/$SCHAKKER_STATE_DIR"
 fi
 if ! command -v go >/dev/null 2>&1; then
     printf '%s\n' 'Install Go before starting Schakker.' >&2
@@ -32,13 +29,11 @@ if ! command -v npm >/dev/null 2>&1; then
     printf '%s\n' 'Install Node.js 22.12+ (with npm) before starting Schakker.' >&2
     exit 1
 fi
-for frontend_directory in frontend ../src-admin/frontend; do
-    (
-        cd "$frontend_directory"
-        npm ci --no-audit --no-fund
-        npm run build
-    )
-done
+(
+    cd frontend
+    npm ci --no-audit --no-fund
+    npm run build
+)
 
 ask() {
     local question="$1" default="$2" answer suffix
@@ -57,8 +52,11 @@ ask() {
 }
 ask 'Run unit tests before launching the website?' yes
 run_unit_tests="$reply"
-ask 'Run PostgreSQL integration tests before launching the website?' yes
-run_integration_tests="$reply"
+run_integration_tests=no
+if [[ "$application_mode" == user ]]; then
+    ask 'Run PostgreSQL integration tests before launching the website?' yes
+    run_integration_tests="$reply"
+fi
 
 # Only the selected tests own temporary databases; application startup never does.
 fixture_state=''
@@ -102,8 +100,12 @@ run_suite() {
     fi
 }
 if [[ "$run_unit_tests" == yes ]]; then
-    run_suite unit ./test/unit/...
-    run_suite admin ../src-admin/backend/...
+    if [[ "$application_mode" == admin ]]; then
+        GOWORK=off run_suite unit ./...
+    else
+        run_suite unit ./test/unit/...
+        run_suite authority ./backend/controlplane/...
+    fi
 fi
 if [[ "$run_integration_tests" == yes ]]; then
     fixture_state="$(mktemp -d "${TMPDIR:-/tmp}/schakker-tests.XXXXXXXX")"
@@ -116,14 +118,8 @@ if (( failures > 0 )); then
     exit 1
 fi
 
-if [[ "$application_mode" == admin ]]; then
-    binary="$project_directory/src-admin/bin/admin-server"
-    mkdir -p "$project_directory/src-admin/bin"
-    go build -o "$binary" ../src-admin
-    cd "$project_directory/src-admin"
-else
-    binary="$project_directory/src/bin/user-server"
-    mkdir -p "$project_directory/src/bin"
-    go build -o "$binary" .
-fi
+mkdir -p "$application_directory/bin"
+binary="$application_directory/bin/user-server"
+if [[ "$application_mode" == admin ]]; then binary="$application_directory/bin/admin-server"; fi
+GOWORK=off go build -o "$binary" .
 "$binary"

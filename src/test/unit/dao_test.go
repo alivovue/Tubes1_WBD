@@ -17,11 +17,13 @@ func TestDAOTransactionCommitsAndRollsBack(t *testing.T) {
 		ending  string
 	}{{"success", nil, "commit"}, {"failure", errors.New("mutation failed"), "rollback"}} {
 		t.Run(tc.name, func(t *testing.T) {
-			mutation := execStep("INSERT INTO access_groups")
+			mutation := execStep("INSERT INTO users")
 			mutation.err = tc.failure
 			_, store, _ := newSQLStub(t, sqlStep{kind: "begin"}, mutation, sqlStep{kind: tc.ending})
 			err := store.Transaction(context.Background(), func(tx *dao.Store) error {
-				return tx.Transaction(context.Background(), func(nested *dao.Store) error { return nested.SaveGroup(context.Background(), 0, "Engineering", "") })
+				return tx.Transaction(context.Background(), func(nested *dao.Store) error {
+					return nested.RememberUser(context.Background(), dao.User{ID: 7, Username: "employee", DisplayName: "Employee", Active: true})
+				})
 			})
 			wantError(t, err, tc.failure)
 		})
@@ -45,11 +47,6 @@ func TestDAOClassifiesDatabaseFailures(t *testing.T) {
 	}
 	_, store, _ := newSQLStub(t, queryStep("FROM users WHERE id=", []string{"id", "name", "display", "admin", "active"}))
 	_, err := store.User(context.Background(), 7)
-	wantError(t, err, dao.ErrNotFound)
-}
-func TestDAOZeroAffectedRowsAreNotFound(t *testing.T) {
-	_, store, _ := newSQLStub(t, sqlStep{kind: "exec", query: "UPDATE users SET", affected: 0})
-	err := store.UpdateUser(context.Background(), 7, "Employee", false, true, "")
 	wantError(t, err, dao.ErrNotFound)
 }
 func TestDAODatabaseLockAlwaysReleases(t *testing.T) {
@@ -122,4 +119,9 @@ func TestDraftDeletionRollsBackHistoryDetachmentOnFailure(t *testing.T) {
 		queryStep("FROM migration_drafts WHERE database_id=$1 AND id=$2 FOR UPDATE", []string{"id"}),
 		sqlStep{kind: "rollback"})
 	wantError(t, missing.DeleteDraft(context.Background(), 3, 4), dao.ErrNotFound)
+}
+
+func TestRuntimeIdentitySnapshotRejectsReuseOfAHistoricalID(t *testing.T) {
+	_, store, _ := newSQLStub(t, sqlStep{kind: "exec", query: "WHERE users.username=EXCLUDED.username", affected: 0})
+	wantError(t, store.RememberUser(context.Background(), dao.User{ID: 7, Username: "different.identity", DisplayName: "New account", Active: true}), dao.ErrConflict)
 }

@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	"tubes1_wbd/database/dao"
+	"tubes1_wbd_admin/database/dao"
 )
 
 func (s *Service) SaveGroup(ctx context.Context, actor, id int64, name, description string) error {
@@ -21,7 +21,7 @@ func (s *Service) DeleteGroup(ctx context.Context, actor, id int64) error {
 		return ErrInvalid
 	}
 	return s.adminChange(ctx, actor, func(tx *dao.Store) error {
-		if err := tx.RevokeGroupSessions(ctx, id, s.config.Now()); err != nil {
+		if err := tx.InvalidateGroupUsers(ctx, id); err != nil {
 			return err
 		}
 		return tx.DeleteGroup(ctx, id)
@@ -37,9 +37,9 @@ func (s *Service) SetMembership(ctx context.Context, actor, user, group int64, m
 			return err
 		}
 		if member {
-			return s.rotateUserSessions(ctx, tx, user)
+			return tx.RotateUser(ctx, user)
 		}
-		return tx.RevokeUserSessions(ctx, user, s.config.Now())
+		return tx.InvalidateUser(ctx, user)
 	})
 }
 
@@ -80,10 +80,10 @@ func (s *Service) SetGrants(ctx context.Context, actor, group int64, updates []G
 			}
 		}
 		if reduced {
-			return tx.RevokeGroupSessions(ctx, group, s.config.Now())
+			return tx.InvalidateGroupUsers(ctx, group)
 		}
 		if increased {
-			return s.rotateGroupSessions(ctx, tx, group)
+			return tx.RotateGroupUsers(ctx, group)
 		}
 		return nil
 	})

@@ -48,13 +48,13 @@ func TestMariaDBMockRetainsDataAndRegistersWithPermissions(t *testing.T) {
 		t.Fatal("MariaDB-only fixtures also started PostgreSQL")
 	}
 	input := mocks.MariaDB.Connection()
-	must(t, mocks.MariaDB.AttachManaged(f.ctx, f.store, bytes.Repeat([]byte{21}, 32)))
-	connections, err := f.databases.Connections(f.ctx, f.admin)
+	must(t, attachManaged(f.ctx, f.store, bytes.Repeat([]byte{21}, 32), mocks.MariaDB.Connection()))
+	connections, err := f.connections.Connections(f.ctx, f.admin)
 	must(t, err)
 	var target dao.Database
 	for _, connection := range connections {
 		if connection.DBMS == "mariadb" && connection.DatabaseName == input.DatabaseName {
-			target = connection
+			target = toDatabase(connection)
 		}
 	}
 	if target.ID == 0 || !target.Active || target.Port != input.Port {
@@ -109,8 +109,8 @@ func TestMariaDBMockRetainsDataAndRegistersWithPermissions(t *testing.T) {
 	if mocks.MariaDB.Connection() != input {
 		t.Fatal("reopening changed retained MariaDB connection settings or credentials")
 	}
-	must(t, mocks.MariaDB.AttachManaged(f.ctx, f.store, bytes.Repeat([]byte{21}, 32)))
-	reopened, err := f.databases.Connections(f.ctx, f.admin)
+	must(t, attachManaged(f.ctx, f.store, bytes.Repeat([]byte{21}, 32), mocks.MariaDB.Connection()))
+	reopened, err := f.connections.Connections(f.ctx, f.admin)
 	must(t, err)
 	if len(reopened) != len(connections) {
 		t.Fatal("reopening duplicated the managed MariaDB connection")

@@ -142,18 +142,18 @@ function Invoke-TestSuite([string]$Name, [string]$Package) {
 }
 
 try {
-    Set-Location -LiteralPath (Join-Path $PSScriptRoot 'src')
-    Import-LaunchEnvironment (Join-Path (Get-Location).Path '.env')
-    if ($Admin) { Import-LaunchEnvironment (Join-Path $PSScriptRoot 'src-admin\.env') }
-    if ($env:SCHAKKER_STATE_DIR -and -not [IO.Path]::IsPathRooted($env:SCHAKKER_STATE_DIR)) {
-        Set-LaunchEnvironment 'SCHAKKER_STATE_DIR' ([IO.Path]::GetFullPath((Join-Path (Get-Location).Path $env:SCHAKKER_STATE_DIR)))
+    $applicationDirectory = if ($Admin) { Join-Path $PSScriptRoot 'src-admin' } else { Join-Path $PSScriptRoot 'src' }
+    Set-Location -LiteralPath $applicationDirectory
+    Import-LaunchEnvironment (Join-Path $applicationDirectory '.env')
+    if (-not $Admin -and $env:SCHAKKER_STATE_DIR -and -not [IO.Path]::IsPathRooted($env:SCHAKKER_STATE_DIR)) {
+        Set-LaunchEnvironment 'SCHAKKER_STATE_DIR' ([IO.Path]::GetFullPath((Join-Path $applicationDirectory $env:SCHAKKER_STATE_DIR)))
     }
     $command = Get-Command go -CommandType Application -ErrorAction SilentlyContinue
     if (-not $command) { throw 'Install Go for Windows and reopen the terminal before starting Schakker.' }
     $goCommand = $command.Source
     $npm = Get-Command npm.cmd -CommandType Application -ErrorAction SilentlyContinue
     if (-not $npm) { throw 'Install Node.js 22.12+ (with npm) before starting Schakker.' }
-    foreach ($frontendDirectory in @('frontend','..\src-admin\frontend')) {
+    foreach ($frontendDirectory in @('frontend')) {
         Push-Location -LiteralPath $frontendDirectory
         try {
             & $npm.Source ci --no-audit --no-fund
@@ -163,7 +163,8 @@ try {
         } finally { Pop-Location }
     }
     $runUnitTests = Read-LaunchChoice 'Run unit tests before launching the website?' $true
-    $runIntegrationTests = Read-LaunchChoice 'Run PostgreSQL integration tests before launching the website?' $true
+    $runIntegrationTests = $false
+    if (-not $Admin) { $runIntegrationTests = Read-LaunchChoice 'Run PostgreSQL integration tests before launching the website?' $true }
     $reportDirectory = ''
     $failures = 0
     if ($runUnitTests -or $runIntegrationTests) {
@@ -173,8 +174,13 @@ try {
         Write-Host "Test reports: $reportDirectory"
     }
     if ($runUnitTests) {
-        if (-not (Invoke-TestSuite 'unit' './test/unit/...')) { $failures++ }
-        if (-not (Invoke-TestSuite 'admin' '../src-admin/backend/...')) { $failures++ }
+        if ($Admin) {
+            Set-LaunchEnvironment 'GOWORK' 'off'
+            if (-not (Invoke-TestSuite 'unit' './...')) { $failures++ }
+        } else {
+            if (-not (Invoke-TestSuite 'unit' './test/unit/...')) { $failures++ }
+            if (-not (Invoke-TestSuite 'authority' './backend/controlplane/...')) { $failures++ }
+        }
     }
     if ($runIntegrationTests) {
         $fixtureState = New-FixtureDirectory
@@ -189,10 +195,9 @@ try {
     [void][IO.Directory]::CreateDirectory($binaryDirectory)
     $binaryName = if ($Admin) { 'admin-server.exe' } else { 'user-server.exe' }
     $binary = Join-Path $binaryDirectory $binaryName
-    $buildTarget = if ($Admin) { '../src-admin' } else { '.' }
-    & $goCommand build -o $binary $buildTarget
+    Set-LaunchEnvironment 'GOWORK' 'off'
+    & $goCommand build -o $binary '.'
     if ($LASTEXITCODE -ne 0) { throw 'The website could not be built.' }
-    if ($Admin) { Set-Location -LiteralPath (Join-Path $PSScriptRoot 'src-admin') }
     & $binary
     $launchExitCode = $LASTEXITCODE
 } catch {

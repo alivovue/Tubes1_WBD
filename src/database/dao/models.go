@@ -6,24 +6,9 @@ type User struct {
 	ID          int64
 	Username    string
 	DisplayName string
-	IsAdmin     bool
 	Active      bool
-}
-
-type Credentials struct {
-	User
-	PasswordHash string `json:"-"`
-}
-
-type Group struct {
-	ID          int64
-	Name        string
-	Description string
-}
-
-type Membership struct {
-	UserID  int64
-	GroupID int64
+	Version     int64 `json:"-"`
+	Rotation    int64 `json:"-"`
 }
 
 type Permission string
@@ -36,12 +21,6 @@ const (
 
 func (p Permission) Allows(required Permission) bool {
 	return (required == ViewOnly && (p == ViewOnly || p == ViewEdit)) || (required == ViewEdit && p == ViewEdit)
-}
-
-type Grant struct {
-	GroupID    int64
-	DatabaseID int64
-	Permission Permission
 }
 
 type Database struct {
@@ -58,16 +37,8 @@ type Database struct {
 
 type DatabaseMetadata struct {
 	Database
-	Username          string
-	EncryptedPassword []byte `json:"-"`
-}
-
-type AdminData struct {
-	Users       []User
-	Groups      []Group
-	Memberships []Membership
-	Databases   []Database
-	Grants      []Grant
+	Username string
+	Password string `json:"-"`
 }
 
 type Session struct {
@@ -76,6 +47,8 @@ type Session struct {
 	IdleExpires     time.Time
 	AbsoluteExpires time.Time
 	Revoked         bool
+	Version         int64
+	Rotation        int64
 }
 
 type SessionToken struct {

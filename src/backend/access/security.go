@@ -6,14 +6,9 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"errors"
-	"fmt"
-	"regexp"
-	"strings"
 	"time"
 
 	"tubes1_wbd/database/dao"
-
-	"golang.org/x/crypto/bcrypt"
 )
 
 var (
@@ -22,7 +17,6 @@ var (
 	ErrInvalid         = dao.ErrInvalid
 	ErrConflict        = dao.ErrConflict
 	ErrNotFound        = dao.ErrNotFound
-	usernamePattern    = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]{2,99}$`)
 )
 
 type Permission = dao.Permission
@@ -34,6 +28,7 @@ const (
 )
 
 type Config struct {
+	Authority                                                    Authority
 	Key                                                          []byte
 	IdleTimeout, AbsoluteLifetime, RotationInterval, GracePeriod time.Duration
 	Now                                                          func() time.Time
@@ -54,14 +49,6 @@ func (c *Config) validate() error {
 	return nil
 }
 
-func HashPassword(password string) (string, error) {
-	if len(password) < 12 || len(password) > 72 {
-		return "", fmt.Errorf("%w: password harus 12–72 byte", ErrInvalid)
-	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), 12)
-	return string(hash), err
-}
-
 func randomToken() (string, error) {
 	b := make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {
@@ -77,5 +64,3 @@ func sign(key []byte, purpose, value string) string {
 	m.Write([]byte(purpose + "\x00" + value))
 	return base64.RawURLEncoding.EncodeToString(m.Sum(nil))
 }
-
-func cleanName(s string, max int) bool { return strings.TrimSpace(s) != "" && len(s) <= max }

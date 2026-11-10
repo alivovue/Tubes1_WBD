@@ -2,46 +2,15 @@ package unit_test
 
 import (
 	"bytes"
+	"database/sql"
 	"encoding/base64"
 	"encoding/json"
 	"strings"
 	"testing"
 	"time"
 
-	"golang.org/x/crypto/bcrypt"
 	"tubes1_wbd/backend/access"
 )
-
-func TestPasswordHashing(t *testing.T) {
-	for _, password := range []string{strings.Repeat("a", 12), testPassword, strings.Repeat("a", 72)} {
-		hash, err := access.HashPassword(password)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if hash == password {
-			t.Fatal("password stored as plaintext")
-		}
-		if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)); err != nil {
-			t.Fatalf("correct password rejected: %v", err)
-		}
-		if bcrypt.CompareHashAndPassword([]byte(hash), []byte("incorrect-password")) == nil {
-			t.Fatal("wrong password accepted")
-		}
-		cost, err := bcrypt.Cost([]byte(hash))
-		if err != nil || cost < 12 {
-			t.Fatalf("bcrypt cost = %d: %v", cost, err)
-		}
-	}
-	first, _ := access.HashPassword(testPassword)
-	second, _ := access.HashPassword(testPassword)
-	if first == second {
-		t.Fatal("password hashes reused a salt")
-	}
-	for _, password := range []string{"", strings.Repeat("a", 11), strings.Repeat("a", 73), strings.Repeat("é", 37)} {
-		_, err := access.HashPassword(password)
-		wantError(t, err, access.ErrInvalid)
-	}
-}
 
 func TestAccessConfigurationValidation(t *testing.T) {
 	_, store, _ := newSQLStub(t)
@@ -131,6 +100,8 @@ func TestSessionCSRFIsolationAndExpiration(t *testing.T) {
 	wantError(t, service.ValidateCSRF(identity, challenge.Token), access.ErrForbidden)
 	config := access.DefaultConfig(bytes.Repeat([]byte{4}, 32))
 	config.Now = func() time.Time { return now }
+	db, _ := testDatabases.Load(store)
+	config.Authority = stubAuthority{db: db.(*sql.DB)}
 	otherService, err := access.NewService(store, config)
 	if err != nil {
 		t.Fatal(err)

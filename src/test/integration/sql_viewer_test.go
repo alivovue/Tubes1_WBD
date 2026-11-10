@@ -79,7 +79,7 @@ func TestSQLViewerHTTPReaderPageAndCSRFProtection(t *testing.T) {
 	must(t, err)
 	_, filename, _, _ := runtime.Caller(0)
 	root := filepath.Clean(filepath.Join(filepath.Dir(filename), "..", ".."))
-	handler, err := backend.NewHandlerWithServices(root, backend.Services{Access: f.access, Databases: f.databases, Migrations: f.migrations})
+	handler, err := backend.NewHandlerWithServices(root, backend.Services{Access: f.userAccess, Databases: f.databases, Migrations: f.migrations})
 	must(t, err)
 	request := func(method, route string, form url.Values) *httptest.ResponseRecorder {
 		return apiRequest(t, handler, method, route, cookie, form)
@@ -133,7 +133,7 @@ func TestSQLViewerMariaDBReadOnlyAndVisualQuery(t *testing.T) {
 	must(t, err)
 	t.Cleanup(mocks.Close)
 	input := mocks.MariaDB.Connection()
-	target, err := f.databases.SaveConnection(f.ctx, f.admin, 0, input)
+	target, err := f.saveConnection(f.ctx, f.admin, 0, input)
 	must(t, err)
 	f.grant(t, reader.ID, target.ID, access.ViewOnly)
 	query, err := f.databases.BuildReadQuery(f.ctx, reader.ID, target.ID, dbmanagement.ReadQuerySpec{Schema: input.DatabaseName, Table: "employees", Columns: []string{"name"}, Filters: []dbmanagement.ReadFilter{{Column: "salary", Operator: ">=", Type: "number", Value: "6000"}}, Limit: 10})

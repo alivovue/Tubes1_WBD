@@ -13,18 +13,19 @@ import (
 	"tubes1_wbd/backend/access"
 	"tubes1_wbd/backend/dbmanagement"
 	"tubes1_wbd/backend/migration"
+	"tubes1_wbd_admin/backend/connectionconfig"
 )
 
 func TestIT09ValidateAndRegisterPostgreSQLConnection(t *testing.T) {
 	f := newFixture(t, true)
 	input := f.dbs.Connection()
-	must(t, f.databases.TestConnection(f.ctx, f.admin, 0, input))
+	// Registration has no managed database connectivity or query operation.
 	var count int
 	must(t, f.dbs.Website.QueryRowContext(f.ctx, `SELECT count(*) FROM managed_databases`).Scan(&count))
 	if count != 0 {
 		t.Fatal("connection testing saved metadata")
 	}
-	saved, err := f.databases.SaveConnection(f.ctx, f.admin, 0, input)
+	saved, err := f.saveConnection(f.ctx, f.admin, 0, input)
 	must(t, err)
 	metadata, err := f.store.DatabaseMetadata(f.ctx, saved.ID)
 	must(t, err)
@@ -109,7 +110,7 @@ func TestIT11DisableConnectionRemovesAccessAndRevokesSessions(t *testing.T) {
 	_, raw := f.login(t, user.Username)
 	_, err := f.databases.Schemas(f.ctx, user.ID, target.ID)
 	must(t, err)
-	must(t, f.databases.DisableConnection(f.ctx, f.admin, target.ID))
+	must(t, f.connections.DisableConnection(f.ctx, f.admin, target.ID))
 	metadata, err := f.store.DatabaseMetadata(f.ctx, target.ID)
 	must(t, err)
 	if metadata.Active {
@@ -140,16 +141,16 @@ func TestDuplicateDatabaseRegistrationPreservesExistingHistory(t *testing.T) {
 	must(t, err)
 	duplicate := input
 	duplicate.Name = "Duplicate database under another name"
-	_, err = f.databases.SaveConnection(f.ctx, f.admin, 0, duplicate)
-	wantError(t, err, dbmanagement.ErrDuplicateConnection)
+	_, err = f.saveConnection(f.ctx, f.admin, 0, duplicate)
+	wantError(t, err, connectionconfig.ErrDuplicateConnection)
 	duplicate.Host = "localhost"
-	_, err = f.databases.SaveConnection(f.ctx, f.admin, 0, duplicate)
-	wantError(t, err, dbmanagement.ErrDuplicateConnection)
-	must(t, f.databases.DisableConnection(f.ctx, f.admin, target.ID))
-	_, err = f.databases.SaveConnection(f.ctx, f.admin, 0, duplicate)
-	wantError(t, err, dbmanagement.ErrDuplicateConnection)
+	_, err = f.saveConnection(f.ctx, f.admin, 0, duplicate)
+	wantError(t, err, connectionconfig.ErrDuplicateConnection)
+	must(t, f.connections.DisableConnection(f.ctx, f.admin, target.ID))
+	_, err = f.saveConnection(f.ctx, f.admin, 0, duplicate)
+	wantError(t, err, connectionconfig.ErrDuplicateConnection)
 	input.Name = "Renamed and reactivated database"
-	saved, err := f.databases.SaveConnection(f.ctx, f.admin, target.ID, input)
+	saved, err := f.saveConnection(f.ctx, f.admin, target.ID, input)
 	must(t, err)
 	if saved.ID != target.ID || !saved.Active || saved.Name != input.Name {
 		t.Fatal("editing or reactivating the original connection did not preserve its identity")
@@ -159,7 +160,7 @@ func TestDuplicateDatabaseRegistrationPreservesExistingHistory(t *testing.T) {
 	if len(history) != 1 || history[0].AppliedVersion == nil || *history[0].AppliedVersion != 1 {
 		t.Fatal("rejecting duplicates or reactivating the connection changed migration history")
 	}
-	connections, err := f.databases.Connections(f.ctx, f.admin)
+	connections, err := f.connections.Connections(f.ctx, f.admin)
 	must(t, err)
 	if len(connections) != 1 {
 		t.Fatal("duplicate database registrations were persisted")
@@ -172,11 +173,11 @@ func TestEditingConnectionCannotDuplicateAnotherDatabase(t *testing.T) {
 	first := f.register(t)
 	input := other.dbs.Connection()
 	input.Name = "Different database on the same server"
-	second, err := f.databases.SaveConnection(f.ctx, f.admin, 0, input)
+	second, err := f.saveConnection(f.ctx, f.admin, 0, input)
 	must(t, err)
 	input.DatabaseName = first.DatabaseName
-	_, err = f.databases.SaveConnection(f.ctx, f.admin, second.ID, input)
-	wantError(t, err, dbmanagement.ErrDuplicateConnection)
+	_, err = f.saveConnection(f.ctx, f.admin, second.ID, input)
+	wantError(t, err, connectionconfig.ErrDuplicateConnection)
 	metadata, err := f.store.DatabaseMetadata(f.ctx, second.ID)
 	must(t, err)
 	if metadata.DatabaseName != other.dbs.ManagedName {
@@ -193,7 +194,7 @@ func TestConcurrentDuplicateDatabaseRegistrationsSaveOnlyOne(t *testing.T) {
 		input.Name = fmt.Sprintf("Concurrent connection %d", i)
 		go func(input dbmanagement.ConnectionInput) {
 			<-start
-			_, err := f.databases.SaveConnection(f.ctx, f.admin, 0, input)
+			_, err := f.saveConnection(f.ctx, f.admin, 0, input)
 			results <- err
 		}(input)
 	}
@@ -204,13 +205,13 @@ func TestConcurrentDuplicateDatabaseRegistrationsSaveOnlyOne(t *testing.T) {
 		switch {
 		case err == nil:
 			saved++
-		case errors.Is(err, dbmanagement.ErrDuplicateConnection):
+		case errors.Is(err, connectionconfig.ErrDuplicateConnection):
 			rejected++
 		default:
 			t.Fatalf("unexpected registration error: %v", err)
 		}
 	}
-	connections, err := f.databases.Connections(f.ctx, f.admin)
+	connections, err := f.connections.Connections(f.ctx, f.admin)
 	must(t, err)
 	if saved != 1 || rejected != 1 || len(connections) != 1 {
 		t.Fatalf("concurrent registrations saved %d, rejected %d, persisted %d", saved, rejected, len(connections))
@@ -221,7 +222,7 @@ func TestDuplicateDatabaseRegistrationShowsActionableConflict(t *testing.T) {
 	f := newFixture(t, true)
 	f.register(t)
 	identity, raw := f.login(t, "it.admin")
-	csrf, err := f.adminAuth.CSRFToken(identity)
+	csrf, err := f.adminAuth.CSRFToken(toAdminIdentity(identity))
 	must(t, err)
 	input := f.dbs.Connection()
 	form := url.Values{"csrf": {csrf}, "action": {"save_connection"}, "dbms": {input.DBMS}, "name": {"Duplicate HTTP target"}, "host": {input.Host}, "port": {fmt.Sprint(input.Port)}, "database_name": {input.DatabaseName}, "username": {input.Username}, "password": {input.Password}, "sslmode": {input.SSLMode}, "active": {"on"}}
@@ -243,7 +244,7 @@ func TestConnectionEditsAndDisableRevokeReaderSessionsAndPreserveAdminSessions(t
 			identity, adminToken := f.login(t, "it.admin")
 			_, readerToken := f.login(t, reader.Username)
 			_, unrelatedToken := f.login(t, unrelated.Username)
-			csrf, err := f.adminAuth.CSRFToken(identity)
+			csrf, err := f.adminAuth.CSRFToken(toAdminIdentity(identity))
 			must(t, err)
 			input := f.dbs.Connection()
 			form := url.Values{"csrf": {csrf}, "id": {fmt.Sprint(target.ID)}, "action": {action}, "dbms": {input.DBMS}, "name": {"Renamed connection"}, "host": {input.Host}, "port": {fmt.Sprint(input.Port)}, "database_name": {input.DatabaseName}, "username": {input.Username}, "password": {input.Password}, "sslmode": {input.SSLMode}, "active": {"on"}}

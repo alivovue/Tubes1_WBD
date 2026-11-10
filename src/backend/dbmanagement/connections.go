@@ -9,21 +9,13 @@ import (
 	"strconv"
 
 	"tubes1_wbd/backend/access"
-	"tubes1_wbd/backend/connectionconfig"
 	"tubes1_wbd/backend/dbmanagement/adapters"
-	"tubes1_wbd/database/dao"
 )
 
-type ConnectionInput = connectionconfig.ConnectionInput
-
-func (s *Service) TestConnection(ctx context.Context, actor, id int64, input ConnectionInput) error {
-	return s.connections.TestConnection(ctx, actor, id, input)
-}
-func (s *Service) SaveConnection(ctx context.Context, actor, id int64, input ConnectionInput) (dao.Database, error) {
-	return s.connections.SaveConnection(ctx, actor, id, input)
-}
-func (s *Service) DisableConnection(ctx context.Context, actor, id int64) error {
-	return s.connections.DisableConnection(ctx, actor, id)
+type ConnectionInput struct {
+	DBMS, Name, Host, DatabaseName, Username, Password, SSLMode string
+	Port                                                        int
+	Active                                                      bool
 }
 
 type Target struct {
@@ -42,7 +34,7 @@ func (s *Service) open(ctx context.Context, actor, database int64, permission ac
 	if err := s.access.RequirePermission(ctx, actor, database, permission); err != nil {
 		return Target{}, err
 	}
-	m, err := s.store.DatabaseMetadata(ctx, database)
+	m, err := s.access.DatabaseConnection(ctx, actor, database, permission)
 	if err != nil {
 		return Target{}, err
 	}
@@ -53,14 +45,10 @@ func (s *Service) open(ctx context.Context, actor, database int64, permission ac
 	if err != nil {
 		return Target{}, err
 	}
-	password, err := s.decrypt(m.EncryptedPassword)
-	if err != nil {
-		return Target{}, err
-	}
 	if s.config.Production && m.SSLMode != "verify-full" {
 		return Target{}, ErrConnection
 	}
-	db, err := s.connect(ctx, ConnectionInput{DBMS: m.DBMS, Host: m.Host, Port: m.Port, DatabaseName: m.DatabaseName, Username: m.Username, Password: password, SSLMode: m.SSLMode})
+	db, err := s.connect(ctx, ConnectionInput{DBMS: m.DBMS, Host: m.Host, Port: m.Port, DatabaseName: m.DatabaseName, Username: m.Username, Password: m.Password, SSLMode: m.SSLMode})
 	if err != nil {
 		return Target{}, err
 	}
@@ -77,7 +65,7 @@ func (s *Service) DBMS(ctx context.Context, actor, database int64) (string, erro
 	if err := s.access.RequirePermission(ctx, actor, database, access.ViewOnly); err != nil {
 		return "", err
 	}
-	m, err := s.store.DatabaseMetadata(ctx, database)
+	m, err := s.access.DatabaseConnection(ctx, actor, database, access.ViewOnly)
 	if err != nil {
 		return "", err
 	}
@@ -91,7 +79,7 @@ func (s *Service) ConnectionFingerprint(ctx context.Context, actor, database int
 	if err := s.access.RequirePermission(ctx, actor, database, access.ViewEdit); err != nil {
 		return "", err
 	}
-	m, err := s.store.DatabaseMetadata(ctx, database)
+	m, err := s.access.DatabaseConnection(ctx, actor, database, access.ViewEdit)
 	if err != nil {
 		return "", err
 	}
@@ -100,6 +88,6 @@ func (s *Service) ConnectionFingerprint(ctx context.Context, actor, database int
 		mac.Write([]byte(value))
 		mac.Write([]byte{0})
 	}
-	mac.Write(m.EncryptedPassword)
+	mac.Write([]byte(m.Password))
 	return base64.RawURLEncoding.EncodeToString(mac.Sum(nil)), nil
 }

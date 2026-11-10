@@ -15,7 +15,7 @@ import (
 )
 
 func credentialsStep(hash string, active bool) sqlStep {
-	return queryStep("WHERE lower(username)=lower($1)", []string{"id", "username", "display", "admin", "active", "hash"}, []driver.Value{int64(7), "employee", "Employee", false, active, hash})
+	return queryStep("WHERE lower(username)=lower($1)", []string{"id", "username", "display", "active", "version", "rotation", "hash"}, []driver.Value{int64(7), "employee", "Employee", active, int64(1), int64(1), hash})
 }
 
 func TestLoginRejectsWrongMissingAndDisabledAccounts(t *testing.T) {
@@ -70,7 +70,7 @@ func TestLoginCreatesBoundedSessionAndHashesOpaqueToken(t *testing.T) {
 		storedHash = append([]byte(nil), hashArgument(t, args[1].Value)...)
 		wantArg(t, args, 2, testTime)
 	}
-	_, store, _ := newSQLStub(t, credentialsStep(string(hash), true), sqlStep{kind: "begin"}, scalarStep("FOR SHARE", true), userStep(false, true), revoke, create, insert, sqlStep{kind: "commit"})
+	_, store, _ := newSQLStub(t, credentialsStep(string(hash), true), sqlStep{kind: "begin"}, execStep("INSERT INTO users"), revoke, create, insert, sqlStep{kind: "commit"})
 	service := newAccess(t, store, nil)
 	identity, raw, err := service.Login(context.Background(), "employee", testPassword, "previous-browser-token")
 	if err != nil {
@@ -85,17 +85,6 @@ func TestLoginCreatesBoundedSessionAndHashesOpaqueToken(t *testing.T) {
 	}
 	if identity.SessionID != testSession || identity.User.ID != 7 || !identity.AbsoluteExpires.Equal(testTime.Add(8*time.Hour)) {
 		t.Fatalf("incorrect session identity: %#v", identity)
-	}
-}
-
-func TestLoginCredentialRaceRollsBack(t *testing.T) {
-	hash, _ := bcrypt.GenerateFromPassword([]byte(testPassword), bcrypt.MinCost)
-	_, store, _ := newSQLStub(t, credentialsStep(string(hash), true), sqlStep{kind: "begin"}, scalarStep("FOR SHARE", false), sqlStep{kind: "rollback"})
-	service := newAccess(t, store, nil)
-	_, raw, err := service.Login(context.Background(), "employee", testPassword, "")
-	wantError(t, err, access.ErrUnauthenticated)
-	if raw != "" {
-		t.Fatal("credential race issued a session")
 	}
 }
 
@@ -126,7 +115,7 @@ func TestAuthenticationSessionLifecycle(t *testing.T) {
 				tc.issued = testTime.Add(-time.Minute)
 			}
 			oldHash := sha256.Sum256([]byte(testToken))
-			lock := queryStep("FOR UPDATE OF s", []string{"id", "user", "idle", "absolute", "revoked"}, []driver.Value{testSession, int64(7), tc.idle, tc.absolute, tc.revoked})
+			lock := queryStep("FOR UPDATE OF s", []string{"id", "user", "idle", "absolute", "revoked", "version", "rotation"}, []driver.Value{testSession, int64(7), tc.idle, tc.absolute, tc.revoked, int64(1), int64(1)})
 			lock.check = func(args []driver.NamedValue) { wantArg(t, args, 0, oldHash[:]) }
 			var replaced, grace driver.Value
 			if tc.replaced != nil {
@@ -159,6 +148,9 @@ func TestAuthenticationSessionLifecycle(t *testing.T) {
 			}
 			if tc.reject {
 				steps = append(steps, sqlStep{kind: "rollback"})
+				if tc.disabled {
+					steps = append(steps, execStep("UPDATE sessions SET revoked_at="))
+				}
 			} else {
 				touch := execStep("UPDATE sessions SET last_seen_at=")
 				touch.check = func(args []driver.NamedValue) {

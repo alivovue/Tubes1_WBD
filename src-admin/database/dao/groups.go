@@ -30,7 +30,7 @@ func (d *Store) DeleteGroup(ctx context.Context, id int64) error {
 
 func (d *Store) SetMembership(ctx context.Context, user, group int64, member bool) error {
 	var exists bool
-	if err := d.q.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM users u CROSS JOIN access_groups g WHERE u.id=$1 AND g.id=$2 AND NOT u.is_legacy_admin)`, user, group).Scan(&exists); err != nil {
+	if err := d.q.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM users u CROSS JOIN access_groups g WHERE u.id=$1 AND g.id=$2)`, user, group).Scan(&exists); err != nil {
 		return classify(err)
 	}
 	if !exists {

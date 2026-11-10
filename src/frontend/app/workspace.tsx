@@ -36,7 +36,7 @@ export function Dashboard() {
           ["Editable databases", data.EditableCount, "View + Edit"],
           [
             "Account role",
-            data.User.IsAdmin ? "Platform Admin" : "Employee",
+            "Employee",
             "Database access is granted separately",
           ],
           ["Session expires", stamp(data.Expires), "Idle timeout: 30 minutes"],

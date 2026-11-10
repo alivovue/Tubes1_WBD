@@ -388,11 +388,11 @@ export function Connections() {
     <>
       <Heading
         title="Database Connections"
-        text="Daftarkan target PostgreSQL atau MariaDB. Koneksi diperiksa sebelum disimpan."
+        text="Daftarkan target PostgreSQL atau MariaDB. Konfigurasi disimpan untuk aplikasi pengguna."
       />
       <Panel
         title="Add connection"
-        text="Credentials are encrypted in the website database."
+        text="Credentials are encrypted in the administration database."
       >
         <ConnectionForm />
       </Panel>
@@ -444,6 +444,7 @@ function ConnectionForm({ database }: { database?: Database }) {
   return (
     <Form>
       <Hidden name="id" value={database?.ID || ""} />
+      {database && <Hidden name="dbms" value={database.DBMS} />}
       <div className="form-grid">
         <Field label="Display name">
           <input
@@ -454,7 +455,7 @@ function ConnectionForm({ database }: { database?: Database }) {
           />
         </Field>
         <Field label="DBMS">
-          <select name="dbms" defaultValue={database?.DBMS || "postgresql"}>
+          <select name="dbms" defaultValue={database?.DBMS || "postgresql"} disabled={!!database}>
             {data.DBMS?.map((value) => (
               <option key={value}>{value}</option>
             ))}
@@ -464,6 +465,7 @@ function ConnectionForm({ database }: { database?: Database }) {
           <input
             name="host"
             defaultValue={database?.Host}
+            readOnly={!!database}
             required
             autoComplete="off"
           />
@@ -475,12 +477,14 @@ function ConnectionForm({ database }: { database?: Database }) {
             min="1"
             max="65535"
             defaultValue={database?.Port}
+            readOnly={!!database}
           />
         </Field>
         <Field label="Database name">
           <input
             name="database_name"
             defaultValue={database?.DatabaseName}
+            readOnly={!!database}
             required
           />
         </Field>
@@ -505,13 +509,8 @@ function ConnectionForm({ database }: { database?: Database }) {
         Active
       </Check>
       <div className="heading-actions">
-        {database && (
-          <Button action="test_connection" secondary>
-            Test connection
-          </Button>
-        )}
         <Button action="save_connection">
-          {database ? "Save connection" : "Test & save connection"}
+          {database ? "Save connection" : "Save connection"}
         </Button>
       </div>
     </Form>

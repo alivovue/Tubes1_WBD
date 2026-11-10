@@ -2,11 +2,9 @@ package connectionconfig
 
 import (
 	"context"
-	"database/sql"
 	"strings"
 	"time"
-	"tubes1_wbd/backend/dbmanagement/adapters"
-	"tubes1_wbd/database/dao"
+	"tubes1_wbd_admin/database/dao"
 )
 
 type ConnectionInput struct {
@@ -21,21 +19,6 @@ type ConnectionInput struct {
 	Active       bool
 }
 
-func (s *Service) TestConnection(ctx context.Context, actor, id int64, input ConnectionInput) error {
-	if err := s.access.RequireAdmin(ctx, actor); err != nil {
-		return err
-	}
-	in, err := s.prepare(ctx, s.store, id, input)
-	if err != nil {
-		return err
-	}
-	db, err := s.connect(ctx, in)
-	if err != nil {
-		return err
-	}
-	return db.Close()
-}
-
 func (s *Service) SaveConnection(ctx context.Context, actor, id int64, input ConnectionInput) (dao.Database, error) {
 	if err := s.access.RequireAdmin(ctx, actor); err != nil {
 		return dao.Database{}, err
@@ -47,11 +30,6 @@ func (s *Service) SaveConnection(ctx context.Context, actor, id int64, input Con
 		}
 		if err := s.access.RequireAdmin(ctx, actor); err != nil {
 			return err
-		}
-		if id > 0 {
-			if err := tx.LockDatabase(ctx, id); err != nil {
-				return err
-			}
 		}
 		in, err := s.prepare(ctx, tx, id, input)
 		if err != nil {
@@ -65,19 +43,10 @@ func (s *Service) SaveConnection(ctx context.Context, actor, id int64, input Con
 			if err != nil {
 				return err
 			}
-			hasHistory, err := tx.HasMigrationHistory(ctx, id)
-			if err != nil {
-				return err
-			}
-			if hasHistory && (old.DBMS != in.DBMS || old.Host != in.Host || old.Port != in.Port || old.DatabaseName != in.DatabaseName) {
+			if old.DBMS != in.DBMS || old.Host != in.Host || old.Port != in.Port || old.DatabaseName != in.DatabaseName {
 				return ErrConflict
 			}
 		}
-		db, err := s.connect(ctx, in)
-		if err != nil {
-			return err
-		}
-		db.Close()
 		encrypted, err := s.encrypt(in.Password)
 		if err != nil {
 			return err
@@ -102,9 +71,6 @@ func (s *Service) DisableConnection(ctx context.Context, actor, id int64) error 
 			return err
 		}
 		if err := s.access.RequireAdmin(ctx, actor); err != nil {
-			return err
-		}
-		if err := tx.LockDatabase(ctx, id); err != nil {
 			return err
 		}
 		return tx.DisableDatabaseMetadata(ctx, id, time.Now())
@@ -133,13 +99,15 @@ func (s *Service) prepare(ctx context.Context, store *dao.Store, id int64, in Co
 			}
 		}
 	}
-	in.DBMS = adapters.Normalize(in.DBMS)
-	adapter, err := s.registry.Select(in.DBMS)
-	if err != nil {
-		return in, err
+	in.DBMS = normalize(in.DBMS)
+	if in.DBMS != "postgresql" && in.DBMS != "mariadb" {
+		return in, ErrUnsupported
 	}
 	if in.Port == 0 {
-		in.Port = adapter.DefaultPort()
+		in.Port = 5432
+		if in.DBMS == "mariadb" {
+			in.Port = 3306
+		}
 	}
 	in.Name = strings.TrimSpace(in.Name)
 	in.Host = strings.ToLower(strings.TrimSpace(in.Host))
@@ -157,10 +125,13 @@ func (s *Service) prepare(ctx context.Context, store *dao.Store, id int64, in Co
 	}
 	return in, nil
 }
-func (s *Service) connect(ctx context.Context, in ConnectionInput) (*sql.DB, error) {
-	a, err := s.registry.Select(in.DBMS)
-	if err != nil {
-		return nil, err
+func normalize(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "", "postgres", "postgresql":
+		return "postgresql"
+	case "mysql", "mariadb":
+		return "mariadb"
+	default:
+		return strings.ToLower(strings.TrimSpace(value))
 	}
-	return a.Connect(ctx, adapters.Connection{Host: in.Host, Port: in.Port, DatabaseName: in.DatabaseName, Username: in.Username, Password: in.Password, SSLMode: in.SSLMode, ConnectTimeout: s.config.ConnectTimeout, QueryTimeout: s.config.QueryTimeout})
 }

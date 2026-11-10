@@ -3,7 +3,6 @@ package unit_test
 import (
 	"context"
 	"database/sql/driver"
-	"errors"
 	"testing"
 
 	"tubes1_wbd/backend/access"
@@ -45,25 +44,6 @@ func TestBackendPermissionEnforcement(t *testing.T) {
 		_, err := service.EffectivePermission(context.Background(), ids[0], ids[1])
 		wantError(t, err, access.ErrInvalid)
 	}
-}
-func TestAdminRoleEnforcement(t *testing.T) {
-	_, store, stub := newSQLStub(t)
-	service := newAccess(t, store, nil)
-	wantError(t, service.RequireAdmin(context.Background(), 0), access.ErrForbidden)
-	for _, allowed := range []bool{false, true} {
-		stub.append(scalarStep("admin_users", allowed))
-		err := service.RequireAdmin(context.Background(), 7)
-		if allowed {
-			if err != nil {
-				t.Fatal(err)
-			}
-		} else {
-			wantError(t, err, access.ErrForbidden)
-		}
-	}
-	failure := errors.New("admin storage unavailable")
-	stub.append(sqlStep{kind: "query", query: "admin_users", err: failure})
-	wantError(t, service.RequireAdmin(context.Background(), 7), failure)
 }
 func TestAccessibleDatabasesExposeOnlyPublicConnectionData(t *testing.T) {
 	columns := []string{"id", "name", "dbms", "permission"}

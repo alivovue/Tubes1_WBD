@@ -12,9 +12,9 @@ import (
 	"time"
 	"tubes1_wbd/backend/migration"
 	"tubes1_wbd/database/dao"
+	adminhttp "tubes1_wbd_admin/backend/httpapi"
 
 	"tubes1_wbd/backend/access"
-	"tubes1_wbd/backend/httpapi"
 )
 
 func apiRequest(t *testing.T, handler http.Handler, method, route, cookie string, form url.Values, cookieNames ...string) *httptest.ResponseRecorder {
@@ -27,7 +27,7 @@ func apiRequest(t *testing.T, handler http.Handler, method, route, cookie string
 	if cookie != "" {
 		name := access.CookieName
 		if strings.HasPrefix(route, "/admin/") {
-			name = httpapi.AdminCookieName
+			name = adminhttp.AdminCookieName
 		}
 		if len(cookieNames) > 0 {
 			name = cookieNames[0]

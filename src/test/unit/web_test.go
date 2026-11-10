@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -66,7 +67,7 @@ func TestWebRequiresSessionForProtectedAPIs(t *testing.T) {
 
 func TestLoginAPIIssuesProtectedCSRFChallenge(t *testing.T) {
 	for _, production := range []bool{false, true} {
-		t.Run(debugBool(production), func(t *testing.T) {
+		t.Run(strconv.FormatBool(production), func(t *testing.T) {
 			handler := newWebHandler(t, production)
 			response := httptest.NewRecorder()
 			handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/session", nil))

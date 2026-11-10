@@ -15,3 +15,6 @@ node_modules/
 
 /src-admin/frontend/dist/
 /src-admin/bin/
+
+/src-admin/test/output/
+!/src-admin/.env.example
