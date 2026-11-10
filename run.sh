@@ -33,6 +33,16 @@ ask() {
     done
 }
 
+if ! command -v npm >/dev/null 2>&1; then
+    printf '%s\n' 'Install Node.js 22.12+ (with npm) before starting Schakker.' >&2
+    exit 1
+fi
+(
+    cd frontend
+    npm ci --no-audit --no-fund
+    npm run build
+)
+
 ask 'Run unit tests before launching the website?' yes
 run_unit_tests="$reply"
 ask 'Run PostgreSQL integration tests before launching the website?' yes

@@ -1,4 +1,5 @@
 node_modules/
+/src/frontend/dist/
 /src/bin/
 .env
 .env.*

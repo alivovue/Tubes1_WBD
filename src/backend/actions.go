@@ -78,11 +78,6 @@ func (app *application) action(w http.ResponseWriter, r *http.Request, data *pag
 		}
 		data.Review = &review
 		data.SQL = review.SQL
-		raw, err := json.Marshal(review)
-		if err != nil {
-			return false, err
-		}
-		data.ReviewJSON = string(raw)
 		data.ScrollTarget = "migration-analysis"
 		if form.Get("action") != "analyze" {
 			data.ScrollTarget = "migration-sql-editor"

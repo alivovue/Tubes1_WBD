@@ -1,20 +1,17 @@
 package backend
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"html/template"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
-	"unicode"
 
 	"tubes1_wbd/backend/access"
 	"tubes1_wbd/backend/dbmanagement"
@@ -23,21 +20,21 @@ import (
 	"tubes1_wbd/database/dao"
 )
 
-type page struct{ template, layout, title, active, section string }
+type page struct{ title, active, section string }
 
 var pages = map[string]page{
-	"/":                  {"login.gohtml", "auth_layout", "Masuk", "login", "Authentication"},
-	"/login":             {"login.gohtml", "auth_layout", "Masuk", "login", "Authentication"},
-	"/dashboard":         {"dashboard.gohtml", "app_layout", "Dashboard", "dashboard", "Overview"},
-	"/databases":         {"databases.gohtml", "app_layout", "My Databases", "databases", "Workspace"},
-	"/explorer":          {"explorer.gohtml", "app_layout", "Database Explorer", "databases", "Workspace"},
-	"/sql-viewer":        {"sql_viewer.gohtml", "app_layout", "SQL Viewer", "sql-viewer", "Workspace"},
-	"/migrations/new":    {"migration_editor.gohtml", "app_layout", "SQL Migration", "migration-editor", "Workspace"},
-	"/migrations":        {"migration_history.gohtml", "app_layout", "Changelog", "migration-history", "Workspace"},
-	"/admin/users":       {"admin_users.gohtml", "app_layout", "Employees", "admin-users", "Administration"},
-	"/admin/groups":      {"admin_groups.gohtml", "app_layout", "Groups", "admin-groups", "Administration"},
-	"/admin/connections": {"admin_connections.gohtml", "app_layout", "Database Connections", "admin-connections", "Administration"},
-	"/admin/access":      {"admin_groups.gohtml", "app_layout", "Groups", "admin-groups", "Administration"},
+	"/":                  {"Masuk", "login", "Authentication"},
+	"/login":             {"Masuk", "login", "Authentication"},
+	"/dashboard":         {"Dashboard", "dashboard", "Overview"},
+	"/databases":         {"My Databases", "databases", "Workspace"},
+	"/explorer":          {"Database Explorer", "databases", "Workspace"},
+	"/sql-viewer":        {"SQL Viewer", "sql-viewer", "Workspace"},
+	"/migrations/new":    {"SQL Migration", "migration-editor", "Workspace"},
+	"/migrations":        {"Changelog", "migration-history", "Workspace"},
+	"/admin/users":       {"Employees", "admin-users", "Administration"},
+	"/admin/groups":      {"Groups", "admin-groups", "Administration"},
+	"/admin/connections": {"Database Connections", "admin-connections", "Administration"},
+	"/admin/access":      {"Groups", "admin-groups", "Administration"},
 }
 
 var legacyRoutes = map[string]string{
@@ -54,8 +51,8 @@ type Services struct {
 
 type application struct {
 	services       Services
-	templates      map[string]*template.Template
-	static, public http.Handler
+	entryHTML      []byte
+	assets, public http.Handler
 	productJSON    []byte
 }
 
@@ -102,7 +99,7 @@ type pageData struct {
 	DraftID                                        int64
 	DraftUpdated, Description, SQL, OperationsJSON string
 	Review                                         *migration.Analysis
-	ReviewJSON                                     string
+	SchemaDiff                                     *SchemaDiffView
 	ViewerResult                                   *dbmanagement.ReadResult
 	ViewerSpec                                     dbmanagement.ReadQuerySpec
 	ScrollTarget                                   string
@@ -135,83 +132,19 @@ func NewHandlerWithServices(root string, services Services) (http.Handler, error
 	if services.Access == nil || services.Databases == nil || services.Migrations == nil {
 		return nil, errors.New("access, database and migration services are required")
 	}
-	templates, err := loadTemplates(filepath.Join(root, "frontend", "templates"))
+	entryHTML, err := os.ReadFile(filepath.Join(root, "frontend", "dist", "index.html"))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("build the React frontend with npm ci and npm run build in frontend/: %w", err)
 	}
 	products, err := os.ReadFile(filepath.Join(root, "backend", "Products.json"))
 	if err != nil || !json.Valid(products) {
 		products = []byte("[]")
 	}
-	app := &application{services: services, templates: templates, productJSON: products,
-		static: http.FileServer(http.Dir(filepath.Join(root, "frontend", "static"))),
+	app := &application{services: services, entryHTML: entryHTML, productJSON: products,
+		assets: http.StripPrefix("/assets/", http.FileServer(http.Dir(filepath.Join(root, "frontend", "dist", "assets")))),
 		public: http.StripPrefix("/public/", http.FileServer(http.Dir(filepath.Join(root, "frontend", "public")))),
 	}
 	return http.HandlerFunc(app.serveHTTP), nil
-}
-
-func loadTemplates(root string) (map[string]*template.Template, error) {
-	funcs := template.FuncMap{
-		"permission": func(p dao.Permission) string {
-			if p == access.ViewEdit {
-				return "View + Edit"
-			}
-			if p == access.ViewOnly {
-				return "View Only"
-			}
-			return "No Access"
-		},
-		"initials": func(name string) string {
-			var s []rune
-			for _, word := range strings.Fields(name) {
-				for _, c := range word {
-					s = append(s, unicode.ToUpper(c))
-					break
-				}
-				if len(s) == 2 {
-					break
-				}
-			}
-			return string(s)
-		},
-		"stamp":          func(t time.Time) string { return t.Format("02 Jan 2006 15:04 MST") },
-		"rfc":            func(t time.Time) string { return t.Format(time.RFC3339Nano) },
-		"json":           func(v any) string { b, _ := json.Marshal(v); return string(b) },
-		"pretty":         func(v any) string { b, _ := json.MarshalIndent(v, "", "  "); return string(b) },
-		"schemaDiffView": BuildSchemaDiffView,
-		"hasString":      slices.Contains[[]string, string],
-		"cell": func(v any) string {
-			if v == nil {
-				return "NULL"
-			}
-			if b, ok := v.([]byte); ok {
-				return string(b)
-			}
-			if n, ok := v.(*float64); ok && n != nil {
-				return strconv.FormatFloat(*n, 'f', -1, 64)
-			}
-			return fmt.Sprint(v)
-		},
-		"link": link,
-	}
-	result := make(map[string]*template.Template)
-	list := make([]page, 0, len(pages)+1)
-	for _, p := range pages {
-		list = append(list, p)
-	}
-	list = append(list, page{template: "error.gohtml", layout: "app_layout"})
-	for _, p := range list {
-		if _, ok := result[p.template]; ok {
-			continue
-		}
-		files := []string{filepath.Join(root, "layouts", p.layout+".gohtml"), filepath.Join(root, "partials", "icons.gohtml"), filepath.Join(root, "partials", "sidebar.gohtml"), filepath.Join(root, "partials", "topbar.gohtml"), filepath.Join(root, "pages", p.template)}
-		tmpl, err := template.New(p.layout + ".gohtml").Funcs(funcs).ParseFiles(files...)
-		if err != nil {
-			return nil, fmt.Errorf("parse %s: %w", p.template, err)
-		}
-		result[p.template] = tmpl
-	}
-	return result, nil
 }
 
 func link(route string, args ...any) string {
@@ -229,8 +162,8 @@ func (app *application) serveHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Referrer-Policy", "same-origin")
 	w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'")
-	if r.URL.Path == "/app.js" || r.URL.Path == "/app.css" {
-		app.static.ServeHTTP(w, r)
+	if strings.HasPrefix(r.URL.Path, "/assets/") {
+		app.assets.ServeHTTP(w, r)
 		return
 	}
 	if strings.HasPrefix(r.URL.Path, "/public/") {
@@ -242,31 +175,67 @@ func (app *application) serveHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Cache-Control", "no-store")
+	if strings.HasPrefix(r.URL.Path, "/api/") {
+		// Reuse the existing page loaders and actions with their original route names.
+		request := r.Clone(r.Context())
+		request.URL.Path = strings.TrimPrefix(r.URL.Path, "/api")
+		app.serveAPI(w, request)
+		return
+	}
 	if target, ok := legacyRoutes[r.URL.Path]; ok {
 		http.Redirect(w, r, target, http.StatusMovedPermanently)
 		return
 	}
-	if r.Method != http.MethodGet && r.Method != http.MethodHead && r.Method != http.MethodPost {
-		w.Header().Set("Allow", "GET, HEAD, POST")
-		http.Error(w, "Method not allowed", 405)
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		w.Header().Set("Allow", "GET, HEAD")
+		app.jsonError(w, r, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	if r.URL.Path == "/" || r.URL.Path == "/login" {
+	if _, exists := pages[r.URL.Path]; !exists {
+		http.NotFound(w, r)
+		return
+	}
+	writeResponse(w, r, http.StatusOK, "text/html; charset=utf-8", app.entryHTML)
+}
+
+func (app *application) serveAPI(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path == "/login" {
+		if r.Method != http.MethodPost {
+			w.Header().Set("Allow", "POST")
+			app.jsonError(w, r, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
 		app.login(w, r)
 		return
 	}
 	p, exists := pages[r.URL.Path]
-	if !exists && r.URL.Path != "/logout" {
-		http.NotFound(w, r)
+	if !exists && r.URL.Path != "/logout" && r.URL.Path != "/session" {
+		app.jsonError(w, r, "The requested endpoint was not found.", http.StatusNotFound)
+		return
+	}
+	allowed := "GET, HEAD, POST"
+	if r.URL.Path == "/session" {
+		allowed = "GET, HEAD"
+	}
+	if r.URL.Path == "/logout" {
+		allowed = "POST"
+	}
+	if !strings.Contains(", "+allowed+", ", ", "+r.Method+", ") {
+		w.Header().Set("Allow", allowed)
+		app.jsonError(w, r, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 	identity, replacement, err := app.services.Access.Authenticate(r.Context(), cookieValue(r, access.CookieName))
 	if err != nil {
 		if errors.Is(err, access.ErrUnauthenticated) {
 			app.clearCookie(w, r, access.CookieName)
-			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			if r.URL.Path == "/session" {
+				app.loginChallenge(w, r, "", http.StatusOK)
+			} else {
+				app.jsonError(w, r, "Your session expired. Please sign in again.", http.StatusUnauthorized)
+			}
 		} else {
-			http.Error(w, "Authentication is unavailable. Please retry.", 503)
+			app.jsonError(w, r, "Authentication is unavailable. Please retry.", http.StatusServiceUnavailable)
 		}
 		return
 	}
@@ -275,33 +244,31 @@ func (app *application) serveHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	csrf, err := app.services.Access.CSRFToken(identity)
 	if err != nil {
-		http.Error(w, "Session is unavailable", 401)
+		app.jsonError(w, r, "Session is unavailable", http.StatusUnauthorized)
 		return
 	}
 	data := pageData{Title: p.title, Active: p.active, Section: p.section, User: identity.User, CSRF: csrf, Now: time.Now(), Expires: identity.AbsoluteExpires}
+	if r.URL.Path == "/session" {
+		app.json(w, r, http.StatusOK, data)
+		return
+	}
 	if r.Method == http.MethodPost {
-		r.Body = http.MaxBytesReader(w, r.Body, 4<<20)
-		if err := r.ParseForm(); err != nil {
-			app.fail(w, r, data, access.ErrInvalid)
+		if err := parseActionJSON(w, r); err != nil {
+			app.fail(w, r, data, err)
 			return
 		}
-		if !sameOrigin(r) || app.services.Access.ValidateCSRF(identity, r.PostForm.Get("csrf")) != nil {
+		if !sameOrigin(r) || app.services.Access.ValidateCSRF(identity, r.Header.Get("X-CSRF-Token")) != nil {
 			app.fail(w, r, data, access.ErrForbidden)
 			return
 		}
 	}
 	if r.URL.Path == "/logout" {
-		if r.Method != http.MethodPost {
-			w.Header().Set("Allow", "POST")
-			http.Error(w, "Method not allowed", 405)
-			return
-		}
 		if err := app.services.Access.Logout(r.Context(), identity.SessionID); err != nil {
 			app.fail(w, r, data, err)
 			return
 		}
 		app.clearCookie(w, r, access.CookieName)
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		app.redirect(w, r, "/login", "")
 		return
 	}
 	if strings.HasPrefix(r.URL.Path, "/admin/") {
@@ -317,13 +284,8 @@ func (app *application) serveHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodPost {
 		handled, err := app.action(w, r, &data)
 		if err != nil {
-			if errors.Is(err, access.ErrForbidden) || errors.Is(err, access.ErrNotFound) {
-				app.fail(w, r, data, err)
-				return
-			}
-			data.Error, data.Status = userError(err)
-			data.Review = nil
-			data.ReviewJSON = ""
+			app.fail(w, r, data, err)
+			return
 		}
 		if handled {
 			return
@@ -333,26 +295,79 @@ func (app *application) serveHTTP(w http.ResponseWriter, r *http.Request) {
 		app.fail(w, r, data, err)
 		return
 	}
-	status := http.StatusOK
-	if data.Error != "" {
-		status = data.Status
+	if data.Review != nil && data.Review.SchemaDiff != nil {
+		view := BuildSchemaDiffView(data.Review.SchemaDiff.Current, data.Review.SchemaDiff.Desired)
+		data.SchemaDiff = &view
 	}
-	app.render(w, r, p, data, status)
+	// SQL drivers may return textual values as byte slices. Preserve the old
+	// display semantics, including exact large integers and non-finite floats.
+	if data.Data != nil {
+		normalizeDisplayRows(data.Data.Rows)
+	}
+	if data.ViewerResult != nil {
+		normalizeDisplayRows(data.ViewerResult.Rows)
+	}
+	app.json(w, r, http.StatusOK, data)
 }
 
-func (app *application) render(w http.ResponseWriter, r *http.Request, p page, data pageData, status int) {
-	var body bytes.Buffer
-	if err := app.templates[p.template].ExecuteTemplate(&body, p.layout, data); err != nil {
-		http.Error(w, "Page could not be rendered", 500)
+func normalizeDisplayRows(rows [][]any) {
+	for _, row := range rows {
+		for i, value := range row {
+			if bytes, ok := value.([]byte); ok {
+				row[i] = string(bytes)
+			} else if value != nil {
+				row[i] = fmt.Sprint(value)
+			}
+		}
+	}
+}
+
+// JSON action bodies retain repeated fields (for atomic grants and visual filters)
+// while reusing the existing validated action/service boundary.
+func parseActionJSON(w http.ResponseWriter, r *http.Request) error {
+	r.Body = http.MaxBytesReader(w, r.Body, 4<<20)
+	if strings.Split(r.Header.Get("Content-Type"), ";")[0] != "application/json" {
+		return access.ErrInvalid
+	}
+	var values map[string]json.RawMessage
+	decoder := json.NewDecoder(r.Body)
+	if decoder.Decode(&values) != nil || values == nil {
+		return access.ErrInvalid
+	}
+	var extra any
+	if decoder.Decode(&extra) != io.EOF {
+		return access.ErrInvalid
+	}
+	r.PostForm = url.Values{}
+	for key, value := range values {
+		var single string
+		if json.Unmarshal(value, &single) == nil {
+			r.PostForm.Set(key, single)
+			continue
+		}
+		var multiple []string
+		if json.Unmarshal(value, &multiple) != nil || multiple == nil {
+			return access.ErrInvalid
+		}
+		r.PostForm[key] = multiple
+	}
+	return nil
+}
+
+func (app *application) json(w http.ResponseWriter, r *http.Request, status int, value any) {
+	body, err := json.Marshal(value)
+	if err != nil {
+		app.jsonError(w, r, "The response could not be encoded.", http.StatusInternalServerError)
 		return
 	}
-	writeResponse(w, r, status, "text/html; charset=utf-8", body.Bytes())
+	writeResponse(w, r, status, "application/json; charset=utf-8", body)
+}
+func (app *application) jsonError(w http.ResponseWriter, r *http.Request, message string, status int) {
+	app.json(w, r, status, map[string]string{"error": message})
 }
 func (app *application) fail(w http.ResponseWriter, r *http.Request, data pageData, err error) {
-	data.Error, _ = userError(err)
-	_, status := userError(err)
-	data.Title = http.StatusText(status)
-	app.render(w, r, page{template: "error.gohtml", layout: "app_layout"}, data, status)
+	message, status := userError(err)
+	app.jsonError(w, r, message, status)
 }
 func userError(err error) (string, int) {
 	switch {
@@ -428,5 +443,5 @@ func pageOffset(raw string) (int, error) {
 }
 func (app *application) redirect(w http.ResponseWriter, r *http.Request, route, message string, args ...any) {
 	args = append(args, "notice", message)
-	http.Redirect(w, r, link(route, args...), http.StatusSeeOther)
+	app.json(w, r, http.StatusOK, map[string]string{"location": link(route, args...)})
 }

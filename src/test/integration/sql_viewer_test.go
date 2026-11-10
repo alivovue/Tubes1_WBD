@@ -82,33 +82,31 @@ func TestSQLViewerHTTPReaderPageAndCSRFProtection(t *testing.T) {
 	handler, err := backend.NewHandlerWithServices(root, backend.Services{Access: f.access, Databases: f.databases, Migrations: f.migrations})
 	must(t, err)
 	request := func(method, route string, form url.Values) *httptest.ResponseRecorder {
-		r := httptest.NewRequest(method, route, strings.NewReader(form.Encode()))
-		if method == http.MethodPost {
-			r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		}
-		r.AddCookie(&http.Cookie{Name: access.CookieName, Value: cookie})
-		response := httptest.NewRecorder()
-		handler.ServeHTTP(response, r)
-		return response
+		return apiRequest(t, handler, method, route, cookie, form)
 	}
 	response := request(http.MethodGet, fmt.Sprintf("/sql-viewer?db=%d", target.ID), nil)
-	if response.Code != 200 || !strings.Contains(response.Body.String(), "Visual SELECT builder") {
+	if response.Code != 200 || !strings.Contains(response.Body.String(), `"Detail":{`) {
 		t.Fatalf("reader viewer page unavailable: %d %s", response.Code, response.Body.String())
 	}
 	form := url.Values{"db": {fmt.Sprint(target.ID)}, "action": {"run_query"}, "sql": {"SELECT name FROM employees ORDER BY name"}, "csrf": {csrf}}
 	response = request(http.MethodPost, "/sql-viewer", form)
-	if response.Code != 200 || !strings.Contains(response.Body.String(), "Query results") || !strings.Contains(response.Body.String(), "Alice") {
+	if response.Code != 200 || !strings.Contains(response.Body.String(), `"ViewerResult":{`) || !strings.Contains(response.Body.String(), "Alice") {
 		t.Fatalf("reader query failed: %d %s", response.Code, response.Body.String())
 	}
 	visual := url.Values{"db": {fmt.Sprint(target.ID)}, "action": {"build_query"}, "csrf": {csrf}, "schema": {"public"}, "table": {"employees"}, "columns": {"name"}, "filter_column": {"salary"}, "filter_operator": {">="}, "filter_type": {"number"}, "filter_value": {"6000"}, "sort": {"name"}, "direction": {"asc"}, "limit": {"10"}}
 	response = request(http.MethodPost, "/sql-viewer", visual)
-	if response.Code != 200 || !strings.Contains(response.Body.String(), "SELECT generated") || !strings.Contains(response.Body.String(), "LIMIT 10 OFFSET 0;") || strings.Contains(response.Body.String(), "<h2>Query results</h2>") {
+	if response.Code != 200 || !strings.Contains(response.Body.String(), "SELECT generated") || !strings.Contains(response.Body.String(), "LIMIT 10 OFFSET 0;") || !strings.Contains(response.Body.String(), `"ViewerResult":null`) {
 		t.Fatalf("visual preview did not generate SQL without executing: %d %s", response.Code, response.Body.String())
 	}
 	form.Set("sql", "SELECT '<script>alert(1)</script>' AS payload")
 	response = request(http.MethodPost, "/sql-viewer", form)
-	if response.Code != 200 || strings.Contains(response.Body.String(), "<script>alert(1)</script>") || !strings.Contains(response.Body.String(), "&lt;script&gt;") {
+	if response.Code != 200 || strings.Contains(response.Body.String(), "<script>alert(1)</script>") || !strings.Contains(response.Body.String(), `\u003cscript\u003e`) {
 		t.Fatal("viewer query result was not escaped")
+	}
+	form.Set("sql", "SELECT 9007199254740993::bigint AS precise, 'NaN'::float8 AS special")
+	response = request(http.MethodPost, "/sql-viewer", form)
+	if response.Code != 200 || !strings.Contains(response.Body.String(), `"9007199254740993"`) || !strings.Contains(response.Body.String(), `"NaN"`) {
+		t.Fatalf("display values lost precision or could not be encoded: %d %s", response.Code, response.Body.String())
 	}
 	form.Set("sql", "DROP TABLE employees")
 	response = request(http.MethodPost, "/sql-viewer", form)

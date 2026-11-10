@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/http/httptest"
 	"net/url"
 	"reflect"
 	"strings"
@@ -120,11 +119,8 @@ CREATE TABLE public.cleanup_children(id INTEGER PRIMARY KEY,parent_id INTEGER,CO
 	encoded, err := json.Marshal(operations)
 	must(t, err)
 	form := url.Values{"csrf": {csrf}, "action": {"analyze_visual"}, "db": {fmt.Sprint(target.ID)}, "description": {"Drop referenced column"}, "operations": {string(encoded)}}
-	request := httptest.NewRequest(http.MethodPost, "/migrations/new", strings.NewReader(form.Encode()))
-	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	request.AddCookie(&http.Cookie{Name: access.CookieName, Value: raw})
-	response := httptest.NewRecorder()
-	promotionHandler(t, f).ServeHTTP(response, request)
+	handler := promotionHandler(t, f)
+	response := apiRequest(t, handler, http.MethodPost, "/migrations/new", raw, form)
 	if response.Code != http.StatusConflict || !strings.Contains(response.Body.String(), "cleanup_children_parent_fk") || !strings.Contains(response.Body.String(), "CASCADE") {
 		t.Fatalf("dependency error was not rendered with its blocker and CASCADE guidance: %d", response.Code)
 	}

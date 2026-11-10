@@ -11,6 +11,7 @@ Siapkan koneksi internet untuk mengunduh dependensi Go dan toolchain saat build 
 | Perangkat lunak | Kebutuhan | Unduhan / instalasi |
 | --- | --- | --- |
 | Go | Wajib, versi 1.26 atau lebih baru. `src/go.mod` menetapkan toolchain `go1.26.10`. | [Unduh dan pasang Go](https://go.dev/doc/install) sesuai sistem operasi dan arsitektur komputer. |
+| Node.js dan npm | Wajib untuk build React SPA, Node.js 22.12 atau lebih baru. | [Unduh Node.js](https://nodejs.org/) (npm disertakan). |
 | PostgreSQL Server | Wajib untuk menjalankan database lokal bawaan. Pasang versi 14 atau lebih baru, termasuk `postgres`, `initdb`, dan `pg_ctl`. | [Unduh PostgreSQL](https://www.postgresql.org/download/). |
 | Bash | Wajib untuk launcher Linux, versi 4 atau lebih baru. | Tersedia melalui paket `bash` pada Linux. |
 | Windows PowerShell | Wajib untuk launcher Windows, versi 5.1 atau lebih baru. | Sudah tersedia pada Windows 10/11. |
@@ -37,9 +38,11 @@ sudo apt update
 sudo apt install postgresql postgresql-client bash
 ```
 
-Pasang Go sesuai [panduan instalasi resmi untuk Linux](https://go.dev/doc/install). Pastikan direktori Go sudah masuk ke `PATH`, lalu periksa instalasi:
+Pasang Node.js 22.12+ beserta npm, lalu pasang Go sesuai [panduan instalasi resmi untuk Linux](https://go.dev/doc/install). Pastikan direktori Go sudah masuk ke `PATH`, lalu periksa instalasi:
 
 ```bash
+node --version
+npm --version
 go version
 psql --version
 bash --version
@@ -56,7 +59,7 @@ Mock MariaDB memerlukan `mariadbd` dan `mariadb-install-db`.
 
 ## Instalasi dependensi di Windows
 
-1. Pasang Go menggunakan installer Windows dari [halaman instalasi Go](https://go.dev/doc/install).
+1. Pasang Node.js 22.12+ dari [halaman unduhan Node.js](https://nodejs.org/), termasuk npm. Pasang Go menggunakan installer Windows dari [halaman instalasi Go](https://go.dev/doc/install).
 2. Pasang PostgreSQL Server dari [halaman unduhan PostgreSQL](https://www.postgresql.org/download/) dengan memilih Windows. Sertakan `postgres.exe`, `initdb.exe`, dan `pg_ctl.exe`. Direktori standar `C:\Program Files\PostgreSQL\<versi>\bin` dideteksi otomatis.
 3. Jika ingin menggunakan mock MariaDB, pasang MariaDB Server dari [halaman unduhan MariaDB](https://mariadb.org/download/). Pastikan tersedia `mariadbd.exe` dan `mariadb-install-db.exe`; nama lama `mysqld.exe` dan `mysql_install_db.exe` juga didukung.
 4. Buka kembali PowerShell setelah instalasi, lalu periksa Go dan versi PowerShell:
@@ -81,7 +84,10 @@ bash ./run.sh
 Jika hanya ingin build tanpa menjalankan aplikasi:
 
 ```bash
-cd src
+cd src/frontend
+npm ci
+npm run build
+cd ..
 go mod download
 go build -o schakker .
 cd ..
@@ -106,7 +112,10 @@ run.bat
 Jika hanya ingin build tanpa menjalankan aplikasi, gunakan PowerShell atau CMD:
 
 ```powershell
-cd src
+cd src/frontend
+npm ci
+npm run build
+cd ..
 go mod download
 go build -o schakker.exe .
 cd ..
@@ -114,7 +123,7 @@ cd ..
 
 Hasil build saja adalah `src\schakker.exe`. Untuk menjalankan aplikasi beserta penyiapan admin, gunakan `.\run.bat` di PowerShell atau `run.bat` di CMD.
 
-Kedua launcher (`run.sh` dan `run.bat`) sudah mencakup build, penyiapan database PostgreSQL lokal, dan menjalankan server. Database proyek tidak perlu dibuat secara manual.
+Kedua launcher (`run.sh` dan `run.bat`) menginstal dependensi frontend sesuai lockfile, membangun React SPA, lalu mencakup build Go, penyiapan database PostgreSQL lokal, dan menjalankan server. Database proyek tidak perlu dibuat secara manual.
 
 ## Penyiapan saat menjalankan aplikasi
 
@@ -216,3 +225,47 @@ Rotasi identifier tidak memperpanjang absolute expiration. Logout, penonaktifan 
 Mengubah pengaturan atau menonaktifkan koneksi database membatalkan sesi pengguna yang memiliki akses ke database tersebut, termasuk sesi admin jika admin juga memiliki akses melalui grup. Pengguna terkait harus login kembali; koneksi nonaktif tetap tidak dapat diakses sampai diaktifkan kembali.
 
 Client menerima identifier sesi melalui cookie `schakker_session`; data sesi disimpan di backend. Cookie menggunakan `HttpOnly` dan `SameSite=Lax`, serta `Secure` pada HTTPS atau mode production. Request yang mengubah state dilindungi token CSRF.
+
+
+## Pengembangan React SPA
+
+Seluruh halaman menggunakan React, TypeScript, Vite, dan React Router di `src/frontend/app/`.
+Go menyajikan hasil build dari `src/frontend/dist/`, termasuk fallback entry HTML pada route
+seperti `/explorer` dan `/migrations/new`. Setelah mengubah frontend, jalankan `npm run build`
+atau jalankan ulang launcher. `dist/` tidak disimpan di Git.
+
+Untuk pengembangan dengan hot reload, jalankan server Go pada port bawaan `3000`, lalu:
+
+```bash
+cd src/frontend
+npm ci
+npm run dev
+```
+
+Buka alamat Vite yang ditampilkan di terminal. Vite meneruskan `/api/` dan `/public/`
+ke Go pada `127.0.0.1:3000`, sehingga cookie sesi dan CSRF tetap menggunakan origin browser
+yang sama. Jika port Go diubah, sesuaikan target proxy pada `vite.config.ts`.
+
+Pengujian dan build:
+
+```bash
+cd src/frontend
+npm test
+npm run build
+cd ..
+go test ./test/unit/...
+go test -count=1 -timeout=5m ./test/integration/...
+```
+
+API frontend menggunakan JSON pada `/api/session`, `/api/login`, `/api/logout`, dan
+`/api` diikuti route halaman yang sama (misalnya `/api/explorer?db=1`). POST menerima
+objek berisi string atau array string untuk field berulang dan wajib menyertakan header
+`X-CSRF-Token`. `/api/session` memberikan token CSRF login saat belum terautentikasi,
+atau pengguna, token CSRF sesi, dan waktu kedaluwarsa setelah login. Identifier sesi
+hanya tersedia melalui cookie HttpOnly. Respons aksi yang memerlukan perpindahan halaman
+mengembalikan `{ "location": "/route?..." }` untuk React Router; error mengembalikan
+`{ "error": "..." }` dengan status HTTP yang sesuai. Nilai sel hasil query dikirim sebagai
+teks atau `null`, sehingga angka besar tetap dapat ditampilkan secara utuh.
+
+Revisi ini mempertahankan halaman admin dalam aplikasi yang sama serta presentasi
+query plan yang sudah ada. Pemisahan server admin dan UI khusus query plan belum diterapkan.

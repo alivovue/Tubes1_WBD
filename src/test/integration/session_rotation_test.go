@@ -67,7 +67,7 @@ func TestPrivilegePromotionRotatesAllActiveSessionsAndDeliversCookie(t *testing.
 			t.Fatal("promotion revoked the session or changed its original expiration")
 		}
 	}
-	request := httptest.NewRequest(http.MethodGet, "https://schakker.test/admin/users", nil)
+	request := httptest.NewRequest(http.MethodGet, "https://schakker.test/api/admin/users", nil)
 	request.AddCookie(&http.Cookie{Name: access.CookieName, Value: oldFirst})
 	response := httptest.NewRecorder()
 	promotionHandler(t, f).ServeHTTP(response, request)

@@ -172,6 +172,16 @@ try {
     if (-not $command) { throw 'Install Go for Windows and reopen the terminal before starting Schakker.' }
     $goCommand = $command.Source
 
+    $npm = Get-Command npm.cmd -CommandType Application -ErrorAction SilentlyContinue
+    if (-not $npm) { throw 'Install Node.js 22.12+ (with npm) and reopen the terminal before starting Schakker.' }
+    Push-Location -LiteralPath 'frontend'
+    try {
+        & $npm.Source ci --no-audit --no-fund
+        if ($LASTEXITCODE -ne 0) { throw 'Frontend dependency installation failed.' }
+        & $npm.Source run build
+        if ($LASTEXITCODE -ne 0) { throw 'Frontend build failed.' }
+    } finally { Pop-Location }
+
     $runUnitTests = Read-LaunchChoice 'Run unit tests before launching the website?' $true
     $runIntegrationTests = Read-LaunchChoice 'Run PostgreSQL integration tests before launching the website?' $true
 

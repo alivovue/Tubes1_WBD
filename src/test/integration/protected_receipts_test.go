@@ -3,7 +3,6 @@ package integration_test
 import (
 	"fmt"
 	"net/http"
-	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
@@ -71,11 +70,8 @@ func TestPostgreSQLRejectsReceiptAttacksAndPreviouslySignedReviews(t *testing.T)
 	csrf, err := f.access.CSRFToken(identity)
 	must(t, err)
 	form := url.Values{"csrf": {csrf}, "action": {"analyze"}, "db": {fmt.Sprint(target.ID)}, "description": {"Rejected SQL"}, "sql": {attacks[0]}}
-	request := httptest.NewRequest(http.MethodPost, "/migrations/new", strings.NewReader(form.Encode()))
-	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	request.AddCookie(&http.Cookie{Name: access.CookieName, Value: raw})
-	response := httptest.NewRecorder()
-	promotionHandler(t, f).ServeHTTP(response, request)
+	handler := promotionHandler(t, f)
+	response := apiRequest(t, handler, http.MethodPost, "/migrations/new", raw, form)
 	if response.Code != http.StatusBadRequest || !strings.Contains(response.Body.String(), "Migration SQL cannot run procedural blocks") {
 		t.Fatalf("unsafe SQL did not show the policy rejection: %d", response.Code)
 	}
