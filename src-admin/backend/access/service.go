@@ -5,11 +5,10 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"errors"
-	"sync"
+
+	"schakker_shared/auth"
 
 	"tubes1_wbd_admin/database/dao"
-
-	"golang.org/x/crypto/bcrypt"
 )
 
 type User = dao.User
@@ -18,12 +17,6 @@ type Membership = dao.Membership
 type Grant = dao.Grant
 type Database = dao.Database
 type AdminData = dao.AdminData
-
-// Missing accounts use the same bcrypt cost as real administrator and ordinary
-// accounts. This dummy hash is local to the control plane; real hashes use new salts.
-var dummyPasswordHash = sync.OnceValues(func() ([]byte, error) {
-	return bcrypt.GenerateFromPassword([]byte("dummy-password-not-an-account"), 12)
-})
 
 type Service struct {
 	store     *dao.Store
@@ -41,11 +34,11 @@ func NewService(store *dao.Store, config Config) (*Service, error) {
 	mac := hmac.New(sha256.New, config.Key)
 	mac.Write([]byte("schakker/admin-auth/v1"))
 	config.Key = mac.Sum(nil)
-	dummy, err := dummyPasswordHash()
+	dummy, err := auth.DummyPasswordHash()
 	if err != nil {
 		return nil, err
 	}
-	return &Service{store: store, config: config, dummyHash: dummy}, nil
+	return &Service{store: store, config: config, dummyHash: []byte(dummy)}, nil
 }
 
 func (s *Service) RequireAdmin(ctx context.Context, actor int64) error {
@@ -83,4 +76,4 @@ func (s *Service) Administration(ctx context.Context, actor int64) (AdminData, e
 
 // DummyPasswordHash is used only by the private ordinary-user verifier. It
 // shares bcrypt cost with real passwords without exposing any account hash.
-func DummyPasswordHash() string { hash, _ := dummyPasswordHash(); return string(hash) }
+func DummyPasswordHash() string { hash, _ := auth.DummyPasswordHash(); return hash }

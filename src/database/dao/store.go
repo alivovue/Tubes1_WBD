@@ -6,12 +6,13 @@ import (
 	"errors"
 
 	"github.com/jackc/pgx/v5/pgconn"
+	"schakker_shared/validation"
 )
 
 var (
 	ErrNotFound = errors.New("data tidak ditemukan")
 	ErrConflict = errors.New("data sudah ada atau masih digunakan")
-	ErrInvalid  = errors.New("input tidak valid")
+	ErrInvalid  = validation.ErrInvalid
 )
 
 type executor interface {

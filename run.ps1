@@ -117,7 +117,7 @@ function Remove-TemporaryFixtures {
     }
 }
 
-function Invoke-TestSuite([string]$Name, [string]$Package) {
+function Invoke-TestSuite([string]$Name, [string]$Package, [string]$Directory = $applicationDirectory) {
     $log = Join-Path $reportDirectory ($Name + '.log')
     $timeout = if ($Name -eq 'integration') { '10m' } else { '5m' }
     $encoding = New-Object Text.UTF8Encoding -ArgumentList $false
@@ -125,7 +125,7 @@ function Invoke-TestSuite([string]$Name, [string]$Package) {
     $preference = $ErrorActionPreference
     try {
         $ErrorActionPreference = 'Continue'
-        & $goCommand test -count=1 "-timeout=$timeout" -v $Package 2>&1 | ForEach-Object {
+        & $goCommand -C $Directory test -count=1 "-timeout=$timeout" -v $Package 2>&1 | ForEach-Object {
             $line = $_.ToString()
             Write-Host $line
             $writer.WriteLine($line)
@@ -153,15 +153,14 @@ try {
     $goCommand = $command.Source
     $npm = Get-Command npm.cmd -CommandType Application -ErrorAction SilentlyContinue
     if (-not $npm) { throw 'Install Node.js 22.12+ (with npm) before starting Schakker.' }
-    foreach ($frontendDirectory in @('frontend')) {
-        Push-Location -LiteralPath $frontendDirectory
-        try {
-            & $npm.Source ci --no-audit --no-fund
-            if ($LASTEXITCODE -ne 0) { throw 'Frontend dependency installation failed.' }
-            & $npm.Source run build
-            if ($LASTEXITCODE -ne 0) { throw 'Frontend build failed.' }
-        } finally { Pop-Location }
-    }
+    $frontendWorkspace = if ($Admin) { 'schakker-admin-frontend' } else { 'schakker-frontend' }
+    Push-Location -LiteralPath $PSScriptRoot
+    try {
+        & $npm.Source ci "--workspace=$frontendWorkspace" '--workspace=@schakker/ui' --no-audit --no-fund
+        if ($LASTEXITCODE -ne 0) { throw 'Frontend dependency installation failed.' }
+        & $npm.Source run build "--workspace=$frontendWorkspace"
+        if ($LASTEXITCODE -ne 0) { throw 'Frontend build failed.' }
+    } finally { Pop-Location }
     $runUnitTests = Read-LaunchChoice 'Run unit tests before launching the website?' $true
     $runIntegrationTests = $false
     if (-not $Admin) { $runIntegrationTests = Read-LaunchChoice 'Run PostgreSQL integration tests before launching the website?' $true }
@@ -174,8 +173,9 @@ try {
         Write-Host "Test reports: $reportDirectory"
     }
     if ($runUnitTests) {
+        Set-LaunchEnvironment 'GOWORK' 'off'
+        if (-not (Invoke-TestSuite 'shared' './...' (Join-Path $PSScriptRoot 'shared/backend'))) { $failures++ }
         if ($Admin) {
-            Set-LaunchEnvironment 'GOWORK' 'off'
             if (-not (Invoke-TestSuite 'unit' './...')) { $failures++ }
         } else {
             if (-not (Invoke-TestSuite 'unit' './test/unit/...')) { $failures++ }
@@ -183,9 +183,10 @@ try {
         }
     }
     if ($runIntegrationTests) {
+        Set-LaunchEnvironment 'GOWORK' 'off'
         $fixtureState = New-FixtureDirectory
         Set-LaunchEnvironment 'SCHAKKER_TEST_STATE' $fixtureState
-        if (-not (Invoke-TestSuite 'integration' './test/integration/...')) { $failures++ }
+        if (-not (Invoke-TestSuite 'integration' './...' (Join-Path $PSScriptRoot 'tests/integration'))) { $failures++ }
         Remove-TemporaryFixtures
         $fixtureState = ''
         Set-LaunchEnvironment 'SCHAKKER_TEST_STATE' $null

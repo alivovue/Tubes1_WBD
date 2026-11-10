@@ -25,6 +25,7 @@ Database, schema, role PostgreSQL terbatas, akun administrator pertama, key yang
 Panduan lengkap tersedia di:
 
 - [Arsitektur, struktur direktori, API internal, environment dan batasan](docs/admin-auth-database.md)
+- [Modularisasi backend, paket shared, build dan hasil pengujian](docs/backend-modularization.md)
 - [Kontrak schema untuk provisioning eksternal](docs/application-databases.md)
 - [Cutover data lama, validasi, retry dan recovery](docs/control-plane-cutover.md)
 
@@ -49,14 +50,18 @@ bash ./run.sh
 
 Windows menggunakan `run-admin.bat` dan `run.bat`. Setiap launcher membangun frontend dan server aplikasinya sendiri, menawarkan pengujian yang terkait, lalu menjalankan binary dalam `bin/`. Fixture integration test tidak diteruskan ke server.
 
-Kedua aplikasi dapat dibangun sendiri dari folder masing-masing, tanpa aplikasi lain dan tanpa workspace Go:
+Kedua aplikasi menggunakan utilitas Go di `shared/backend/` dan paket React `@schakker/ui` di `shared/frontend/`. Tidak ada import antaraplikasi atau konfigurasi runtime bersama. Build source independen memerlukan aplikasi yang dipilih dan folder `shared/` pada layout repositori ini. Binary hasil build tidak memerlukan source shared atau aplikasi lain.
 
 ```bash
-# Dalam src-admin/ ATAU src/, dengan environment aplikasi terkait sudah tersedia
-(cd frontend && npm ci && npm run build)
+# Dari root; pilih schakker-admin-frontend atau schakker-frontend
+npm ci --workspace=schakker-admin-frontend --workspace=@schakker/ui
+npm run build:admin
+cd src-admin                 # atau src untuk aplikasi pengguna
 GOWORK=off go build -o bin/server .
 ./bin/server
 ```
+
+Gunakan `npm run build:user` untuk frontend pengguna. Satu lockfile npm berada di root. Source checkout minimal juga harus menyertakan manifest/lockfile root; `replace schakker_shared => ../shared/backend` pada setiap modul Go membuat build tidak bergantung pada `go.work`.
 
 Jalankan `npm run dev` dari frontend aplikasi terkait untuk pengembangan Vite. Proxy `/api/` dan `/public/` hanya mengarah ke server publik aplikasi tersebut. Route pengguna dan tampilan explorer/migrasi tetap sama. Route admin: `/admin/users`, `/admin/administrators`, `/admin/groups`, `/admin/connections`; `/admin/access` tetap menjadi alias grup.
 
@@ -71,12 +76,13 @@ Setup database, seed data, bootstrap akun dan simulasi upgrade hanya ada dalam t
 Setelah membangun kedua frontend, jalankan dari root:
 
 ```bash
-go test -count=1 -timeout=10m ./src/... ./src-admin/...
-(cd src/frontend && npm test)
-(cd src-admin/frontend && npm test)
+go test -count=1 -timeout=10m ./src/... ./src-admin/... ./shared/backend/... ./tests/integration/...
+npm run build
+npm run typecheck:shared
+npm test
 ```
 
-Admin juga dapat diuji sendiri dari `src-admin/` dengan `GOWORK=off go test ./...`. Cross-application integration test menggunakan workspace hanya untuk menyusun fixture; komunikasi aplikasi tetap melalui API HTTP privat. Tes mencakup menjalankan binary admin terisolasi tanpa folder `src/`, kegagalan authority, pencabutan permission, dan SQL prosedur cutover/recovery yang terdokumentasi.
+Admin juga dapat diuji sendiri dari `src-admin/` dengan `GOWORK=off go test ./...`. Cross-application integration test berada dalam modul terpisah di `tests/integration/`, di luar source kedua aplikasi. Workspace menyusun fixture; komunikasi aplikasi tetap melalui API HTTP privat. Tes mencakup menjalankan binary admin terisolasi tanpa folder `src/`, kegagalan authority, pencabutan permission, dan SQL prosedur cutover/recovery yang terdokumentasi.
 
 PostgreSQL server/client tools diperlukan untuk fixture lokal (`SCHAKKER_POSTGRES_BIN` dapat menentukan direktori tools). MariaDB server tools opsional (`SCHAKKER_MARIADB_BIN`). Laporan launcher berada di `test/output/` aplikasi terpilih. Database aplikasi tidak dimulai atau dimigrasikan oleh launcher.
 

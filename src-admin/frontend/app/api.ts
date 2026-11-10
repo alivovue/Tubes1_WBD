@@ -1,54 +1,25 @@
+import { requestJSON, collectFormFields } from "@schakker/ui";
+export { APIError } from "@schakker/ui";
 import type { APIResult, Fields } from "./types";
-
-export class APIError extends Error {
-  constructor(
-    public status: number,
-    public result: APIResult,
-  ) {
-    super(
-      result.error || "The operation is temporarily unavailable. Please retry.",
-    );
-  }
-}
-
-export async function api(
+// This application's client always targets its own public API origin.
+export function api(
   path: string,
   fields?: Fields,
   csrf?: string,
   signal?: AbortSignal,
 ): Promise<APIResult> {
-  const response = await fetch(`/api${path}`, {
-    method: fields ? "POST" : "GET",
-    credentials: "same-origin",
-    headers: fields
-      ? { "Content-Type": "application/json", "X-CSRF-Token": csrf || "" }
-      : { Accept: "application/json" },
-    body: fields ? JSON.stringify(fields) : undefined,
-    signal,
-  });
-  const result = (await response.json().catch(() => ({
-    error: "The server returned an unreadable response. Please retry.",
-  }))) as APIResult;
-  if (!response.ok) throw new APIError(response.status, result);
-  return result;
+  return requestJSON<APIResult>(`/api${path}`, fields, csrf, signal);
 }
-
 export function formFields(
   form: HTMLFormElement,
   submitter: HTMLElement | null,
 ): Fields {
-  const values = new FormData(form);
-  if (submitter instanceof HTMLButtonElement && submitter.name)
-    values.append(submitter.name, submitter.value);
-  const fields: Fields = {};
-  for (const key of new Set(values.keys())) {
-    const list = values.getAll(key).map(String);
-    fields[key] = list.length > 1 ? list : list[0];
-  }
+  const fields = collectFormFields(form, submitter);
   if (fields.action === "set_grants") {
-    for (const key of ["db", "permission"])
+    for (const key of ["db", "permission"]) {
       if (key in fields && !Array.isArray(fields[key]))
         fields[key] = [fields[key]];
+    }
   }
   return fields;
 }

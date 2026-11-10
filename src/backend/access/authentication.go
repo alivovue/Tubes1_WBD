@@ -5,6 +5,8 @@ import (
 	"errors"
 	"time"
 
+	"schakker_shared/auth"
+
 	"tubes1_wbd/database/dao"
 )
 
@@ -28,7 +30,7 @@ func (s *Service) Login(ctx context.Context, username, password, oldToken string
 		return Identity{}, "", ErrUnauthenticated
 	}
 
-	raw, err := randomToken()
+	raw, err := auth.RandomToken()
 	if err != nil {
 		return Identity{}, "", err
 	}
@@ -41,15 +43,15 @@ func (s *Service) Login(ctx context.Context, username, password, oldToken string
 		now := s.config.Now()
 		absolute := now.Add(s.config.AbsoluteLifetime)
 		if oldToken != "" {
-			if err := tx.RevokeTokenSession(ctx, tokenHash(oldToken), now); err != nil {
+			if err := tx.RevokeTokenSession(ctx, auth.TokenHash(oldToken), now); err != nil {
 				return err
 			}
 		}
-		id, err := tx.CreateSession(ctx, user.ID, now, minTime(now.Add(s.config.IdleTimeout), absolute), absolute, user.Version, user.Rotation)
+		id, err := tx.CreateSession(ctx, user.ID, now, auth.MinTime(now.Add(s.config.IdleTimeout), absolute), absolute, user.Version, user.Rotation)
 		if err != nil {
 			return err
 		}
-		if err := tx.InsertSessionToken(ctx, id, tokenHash(raw), now); err != nil {
+		if err := tx.InsertSessionToken(ctx, id, auth.TokenHash(raw), now); err != nil {
 			return err
 		}
 		identity = Identity{User: user, SessionID: id, AbsoluteExpires: absolute}
@@ -70,13 +72,13 @@ func (s *Service) Authenticate(ctx context.Context, raw string) (Identity, strin
 	var sessionID string
 	var invalidate bool
 	err := s.store.Transaction(ctx, func(tx *dao.Store) error {
-		session, err := tx.LockSession(ctx, tokenHash(raw))
+		session, err := tx.LockSession(ctx, auth.TokenHash(raw))
 		if err != nil {
 			return authenticationError(err)
 		}
 		sessionID = session.ID
 		now := s.config.Now()
-		token, err := tx.SessionToken(ctx, tokenHash(raw))
+		token, err := tx.SessionToken(ctx, auth.TokenHash(raw))
 		if err != nil {
 			return authenticationError(err)
 		}
@@ -93,9 +95,9 @@ func (s *Service) Authenticate(ctx context.Context, raw string) (Identity, strin
 			return ErrUnauthenticated
 		}
 		if token.ReplacedAt == nil && (!now.Before(token.IssuedAt.Add(s.config.RotationInterval)) || user.Rotation != session.Rotation) {
-			replacement, err = s.rotateSession(ctx, tx, session, tokenHash(raw), now)
+			replacement, err = s.rotateSession(ctx, tx, session, auth.TokenHash(raw), now)
 		} else if token.ReplacedAt != nil {
-			replacement, err = s.replacementForGraceToken(ctx, tx, session.ID, tokenHash(raw), now)
+			replacement, err = s.replacementForGraceToken(ctx, tx, session.ID, auth.TokenHash(raw), now)
 		}
 		if err != nil {
 			return err
@@ -110,7 +112,7 @@ func (s *Service) Authenticate(ctx context.Context, raw string) (Identity, strin
 			}
 		}
 
-		if err := tx.TouchSession(ctx, session.ID, now, minTime(now.Add(s.config.IdleTimeout), session.AbsoluteExpires)); err != nil {
+		if err := tx.TouchSession(ctx, session.ID, now, auth.MinTime(now.Add(s.config.IdleTimeout), session.AbsoluteExpires)); err != nil {
 			return err
 		}
 		if err := tx.DeleteExpiredTokens(ctx, session.ID, now); err != nil {
@@ -142,11 +144,4 @@ func authenticationError(err error) error {
 		return ErrUnauthenticated
 	}
 	return err
-}
-
-func minTime(a, b time.Time) time.Time {
-	if a.Before(b) {
-		return a
-	}
-	return b
 }

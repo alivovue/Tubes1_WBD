@@ -3,13 +3,13 @@ package backend
 import (
 	"context"
 	"database/sql"
-	"encoding/base64"
-	"encoding/hex"
 	"errors"
 	"net/http"
 	"os"
 	"strings"
 	"time"
+
+	"schakker_shared/config"
 
 	"tubes1_wbd_admin/backend/access"
 	"tubes1_wbd_admin/backend/connectionconfig"
@@ -17,6 +17,13 @@ import (
 	"tubes1_wbd_admin/database/dao"
 	"tubes1_wbd_admin/database/setup"
 )
+
+type Services struct {
+	Authentication *access.Service
+	Access         *access.Service
+	Connections    *connectionconfig.Service
+	Production     bool
+}
 
 type runtime struct {
 	db       *sql.DB
@@ -73,10 +80,7 @@ func servicesFromEnvironment(root string) (Services, *runtime, error) {
 }
 func adminMasterKey() ([]byte, error) {
 	encoded := strings.TrimSpace(os.Getenv("SCHAKKER_ADMIN_MASTER_KEY"))
-	key, err := hex.DecodeString(encoded)
-	if err != nil || len(key) != 32 {
-		key, err = base64.StdEncoding.DecodeString(encoded)
-	}
+	key, err := config.Key32(encoded)
 	if err != nil || len(key) != 32 {
 		return nil, errors.New("SCHAKKER_ADMIN_MASTER_KEY must contain an existing 32-byte key encoded as hex or base64")
 	}

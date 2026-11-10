@@ -1,10 +1,18 @@
 package backend
 
 import (
+	"tubes1_wbd/backend/access"
 	"tubes1_wbd/backend/dbmanagement"
 	"tubes1_wbd/backend/migration"
 	"tubes1_wbd/database/platform"
 )
+
+type Services struct {
+	Access     *access.Service
+	Databases  *dbmanagement.Service
+	Migrations *migration.Service
+	Production bool
+}
 
 func servicesFromEnvironment(root string) (Services, func(), error) {
 	runtime, err := platform.Open(root)

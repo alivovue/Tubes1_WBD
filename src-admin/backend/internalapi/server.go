@@ -11,11 +11,11 @@ import (
 	"strconv"
 	"strings"
 
+	"schakker_shared/auth"
+
 	"tubes1_wbd_admin/backend/access"
 	"tubes1_wbd_admin/backend/connectionconfig"
 	"tubes1_wbd_admin/database/dao"
-
-	"golang.org/x/crypto/bcrypt"
 )
 
 type server struct {
@@ -77,7 +77,7 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			hash = access.DummyPasswordHash()
 		}
-		valid := bcrypt.CompareHashAndPassword([]byte(hash), []byte(in.Password)) == nil
+		valid := auth.VerifyPassword(hash, in.Password)
 		if !valid || err != nil || !c.Active {
 			send(w, 401, map[string]string{"error": "invalid credentials"})
 			return

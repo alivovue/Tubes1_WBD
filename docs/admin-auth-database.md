@@ -1,6 +1,6 @@
 # Independent Milestone 1 applications
 
-`src-admin/` is a standalone control plane. `src/` is the ordinary database-management application. The public applications have independent Go modules, React projects, dependencies, assets, configuration, session cookies, and database connections. There is no shared application package or runtime directory. `go.work` is only a development/test convenience; either server builds with `GOWORK=off` from its own directory.
+`src-admin/` is a standalone control plane. `src/` is the ordinary database-management application. The public applications have independent Go modules, React entry points, assets, configuration, session cookies, and database connections. Both depend on reusable build-time libraries in `shared/backend` and `shared/frontend`; these libraries own no database, identity domain, runtime configuration or secrets. Neither application imports the other. `go.work` is a development/test convenience; either server builds with `GOWORK=off` from its own directory when its sibling `shared/backend` dependency is included. See [modularization and build procedures](backend-modularization.md).
 
 ```
 src-admin/
@@ -82,7 +82,7 @@ Copy and fill in each application's own `.env.example`. The launcher reads only 
 | `SCHAKKER_INTERNAL_TOKEN` | Same provisioned private service credential |
 | `SCHAKKER_STATE_DIR` | Optional user-owned directory to read an existing `master.key` in development |
 
-From each application directory, build its own frontend with `npm ci` and `npm run build` in `frontend/`, then run `GOWORK=off go build -o bin/server .` and execute that binary from the application directory with its environment supplied. Start admin before ordinary users need authentication/authorization. Root wrappers remain `bash ./run.sh --admin` and `bash ./run.sh`, or `run-admin.bat` / `run.bat` on Windows. Each wrapper builds only its selected frontend and server. Vite development ports remain `5174` (admin) and `5173` (user), proxying only their respective public API/static paths.
+From the repository root, run `npm ci --workspace=schakker-admin-frontend --workspace=@schakker/ui` and `npm run build:admin` for admin, or select `schakker-frontend` and `npm run build:user` for users. Each source build includes the selected app, `shared/`, and the root npm manifest/lockfile. From the selected application directory, run `GOWORK=off go build -o bin/server .` and execute that binary with its own environment supplied. Runtime deployment needs only its binary and frontend assets, without shared source or the other app. Start admin before ordinary users need authentication/authorization. Root wrappers remain `bash ./run.sh --admin` and `bash ./run.sh`, or `run-admin.bat` / `run.bat` on Windows. Each wrapper builds only its selected frontend and server. Vite development ports remain `5174` (admin) and `5173` (user), proxying only their respective public API/static paths.
 
 Admin pages remain `/admin/users`, `/admin/administrators`, `/admin/groups`, `/admin/connections`, with `/admin/access` as the existing group-page alias. Ordinary explorer, SQL viewer, query plans and migration pages retain their routes and UI. No Milestone 2 feature is added.
 
@@ -96,6 +96,6 @@ Uncertain non-atomic migration outcomes continue to require operator recovery. T
 
 ## Verification
 
-Run `GOWORK=off go test ./...` from `src-admin/` after building its frontend. From the repository workspace, run `go test ./src/test/unit/... ./src/backend/controlplane/...` and `go test -timeout=10m ./src/test/integration/...`. The cross-application integration harness imports both implementations only for fixture construction and verifies communication through the real private HTTP API. Neither production dependency graph imports the other module. Integration tests include an isolated admin binary launched without a sibling `src/` directory and with workspace support disabled.
+Run `GOWORK=off go test ./...` from `src-admin/` after building its frontend. From the repository workspace, run `go test ./src/test/unit/... ./src/backend/controlplane/...` and `go test -timeout=10m ./tests/integration/...`. The separate test-only module in `tests/integration` imports both implementations only for fixture construction and verifies communication through the real private HTTP API. Neither application’s production or unit-test dependency graph imports the other module; shared libraries import neither application. Integration tests include an isolated admin binary launched without a sibling `src/` directory and with workspace support disabled.
 
-Run `npm test` independently in both frontend directories. Database creation, historical upgrade simulations, role provisioning and seed accounts exist only in test support.
+After the root workspace install, run `npm test` at the root for both frontends and the shared package, or use `npm run test:admin`, `npm run test:user`, and `npm run test:shared`. Run `go test ./shared/backend/...` for the independent shared Go primitives. Database creation, historical upgrade simulations, role provisioning and seed accounts exist only in test support.

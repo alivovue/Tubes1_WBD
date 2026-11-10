@@ -17,8 +17,8 @@ import (
 
 	admin "tubes1_wbd_admin/backend"
 	"tubes1_wbd_admin/backend/access"
+	httpapi "tubes1_wbd_admin/backend/api/auth"
 	"tubes1_wbd_admin/backend/connectionconfig"
-	"tubes1_wbd_admin/backend/httpapi"
 	"tubes1_wbd_admin/database/dao"
 )
 

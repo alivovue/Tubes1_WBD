@@ -3,7 +3,7 @@ package unit_test
 import (
 	"testing"
 
-	"tubes1_wbd/backend"
+	"tubes1_wbd/backend/api/response"
 )
 
 func TestSchemaDiffViewPairsChangedRows(t *testing.T) {
@@ -16,7 +16,7 @@ func TestSchemaDiffViewPairsChangedRows(t *testing.T) {
 		"Name":     "new",
 		"Nullable": true,
 	}
-	view := backend.BuildSchemaDiffView(before, after)
+	view := response.BuildSchemaDiffView(before, after)
 
 	if view.Added != 3 || view.Removed != 2 {
 		t.Fatalf("expected +3 -2, got +%d -%d", view.Added, view.Removed)
@@ -37,7 +37,7 @@ func TestSchemaDiffViewPairsChangedRows(t *testing.T) {
 
 func TestSchemaDiffViewLeavesIdenticalSnapshotsUnmarked(t *testing.T) {
 	snapshot := map[string]any{"tables": []string{"employees"}}
-	view := backend.BuildSchemaDiffView(snapshot, snapshot)
+	view := response.BuildSchemaDiffView(snapshot, snapshot)
 
 	if view.Added != 0 || view.Removed != 0 {
 		t.Fatalf("identical snapshots must have no changes, got +%d -%d", view.Added, view.Removed)

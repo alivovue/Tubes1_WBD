@@ -1,3 +1,4 @@
+import { useNavigation } from "@schakker/ui";
 import {
   createContext,
   useCallback,
@@ -260,27 +261,10 @@ function Brand() {
 
 function Layout() {
   const { session, expire } = useSession();
-  const [open, setOpen] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const location = useLocation();
-  useEffect(() => {
-    setOpen(false);
-  }, [location.pathname, location.search]);
-  useEffect(() => {
-    document.getElementById("main-content")?.focus();
-  }, [location.pathname]);
-  useEffect(() => {
-    document.body.classList.toggle("sidebar-is-open", open);
-    const close = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("keydown", close);
-    return () => {
-      document.body.classList.remove("sidebar-is-open");
-      document.removeEventListener("keydown", close);
-    };
-  }, [open]);
+  const { open, setOpen } = useNavigation(location.pathname, location.search);
   async function logout() {
     setBusy(true);
     setError("");

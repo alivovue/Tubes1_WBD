@@ -1,10 +1,6 @@
 package access
 
 import (
-	"crypto/hmac"
-	"crypto/rand"
-	"crypto/sha256"
-	"encoding/base64"
 	"errors"
 	"time"
 
@@ -47,20 +43,4 @@ func (c *Config) validate() error {
 		c.Now = time.Now
 	}
 	return nil
-}
-
-func randomToken() (string, error) {
-	b := make([]byte, 32)
-	if _, err := rand.Read(b); err != nil {
-		return "", err
-	}
-	return base64.RawURLEncoding.EncodeToString(b), nil
-}
-
-func tokenHash(raw string) []byte { sum := sha256.Sum256([]byte(raw)); return sum[:] }
-
-func sign(key []byte, purpose, value string) string {
-	m := hmac.New(sha256.New, key)
-	m.Write([]byte(purpose + "\x00" + value))
-	return base64.RawURLEncoding.EncodeToString(m.Sum(nil))
 }

@@ -30,9 +30,11 @@ if ! command -v npm >/dev/null 2>&1; then
     exit 1
 fi
 (
-    cd frontend
-    npm ci --no-audit --no-fund
-    npm run build
+    cd "$project_directory"
+    frontend_workspace=schakker-frontend
+    if [[ "$application_mode" == admin ]]; then frontend_workspace=schakker-admin-frontend; fi
+    npm ci --workspace="$frontend_workspace" --workspace=@schakker/ui --no-audit --no-fund
+    npm run build --workspace="$frontend_workspace"
 )
 
 ask() {
@@ -90,9 +92,9 @@ if [[ "$run_unit_tests" == yes || "$run_integration_tests" == yes ]]; then
     printf 'Test reports: %s\n' "$report_directory"
 fi
 run_suite() {
-    local name="$1" package="$2" timeout=5m
+    local name="$1" package="$2" directory="${3:-$application_directory}" timeout=5m
     if [[ "$name" == integration ]]; then timeout=10m; fi
-    if go test -count=1 -timeout="$timeout" -v "$package" 2>&1 | tee "$report_directory/$name.log"; then
+    if GOWORK=off go -C "$directory" test -count=1 -timeout="$timeout" -v "$package" 2>&1 | tee "$report_directory/$name.log"; then
         printf 'PASS %s\n' "$name" >> "$report_directory/summary.txt"
     else
         printf 'FAIL %s\n' "$name" >> "$report_directory/summary.txt"
@@ -100,8 +102,9 @@ run_suite() {
     fi
 }
 if [[ "$run_unit_tests" == yes ]]; then
+    run_suite shared ./... "$project_directory/shared/backend"
     if [[ "$application_mode" == admin ]]; then
-        GOWORK=off run_suite unit ./...
+        run_suite unit ./...
     else
         run_suite unit ./test/unit/...
         run_suite authority ./backend/controlplane/...
@@ -109,7 +112,7 @@ if [[ "$run_unit_tests" == yes ]]; then
 fi
 if [[ "$run_integration_tests" == yes ]]; then
     fixture_state="$(mktemp -d "${TMPDIR:-/tmp}/schakker-tests.XXXXXXXX")"
-    SCHAKKER_TEST_STATE="$fixture_state" run_suite integration ./test/integration/...
+    SCHAKKER_TEST_STATE="$fixture_state" run_suite integration ./... "$project_directory/tests/integration"
     cleanup_fixtures
     fixture_state=''
 fi

@@ -4,13 +4,13 @@ package platform
 import (
 	"context"
 	"database/sql"
-	"encoding/base64"
-	"encoding/hex"
 	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"schakker_shared/config"
 
 	"tubes1_wbd/backend/access"
 	"tubes1_wbd/backend/controlplane"
@@ -82,10 +82,7 @@ func MasterKey(directory string, production bool) ([]byte, error) {
 		}
 		encoded = strings.TrimSpace(string(raw))
 	}
-	key, err := hex.DecodeString(encoded)
-	if err != nil || len(key) != 32 {
-		key, err = base64.StdEncoding.DecodeString(encoded)
-	}
+	key, err := config.Key32(encoded)
 	if err != nil || len(key) != 32 {
 		return nil, errors.New("the master key must contain 32 bytes encoded as hex or base64")
 	}

@@ -1,19 +1,14 @@
 package access
 
 import (
-	"crypto/hmac"
-	"crypto/rand"
-	"crypto/sha256"
-	"encoding/base64"
 	"errors"
-	"fmt"
 	"regexp"
 	"strings"
 	"time"
 
-	"tubes1_wbd_admin/database/dao"
+	"schakker_shared/auth"
 
-	"golang.org/x/crypto/bcrypt"
+	"tubes1_wbd_admin/database/dao"
 )
 
 var (
@@ -54,28 +49,6 @@ func (c *Config) validate() error {
 	return nil
 }
 
-func HashPassword(password string) (string, error) {
-	if len(password) < 12 || len(password) > 72 {
-		return "", fmt.Errorf("%w: password harus 12–72 byte", ErrInvalid)
-	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), 12)
-	return string(hash), err
-}
-
-func randomToken() (string, error) {
-	b := make([]byte, 32)
-	if _, err := rand.Read(b); err != nil {
-		return "", err
-	}
-	return base64.RawURLEncoding.EncodeToString(b), nil
-}
-
-func tokenHash(raw string) []byte { sum := sha256.Sum256([]byte(raw)); return sum[:] }
-
-func sign(key []byte, purpose, value string) string {
-	m := hmac.New(sha256.New, key)
-	m.Write([]byte(purpose + "\x00" + value))
-	return base64.RawURLEncoding.EncodeToString(m.Sum(nil))
-}
-
 func cleanName(s string, max int) bool { return strings.TrimSpace(s) != "" && len(s) <= max }
+
+func HashPassword(password string) (string, error) { return auth.HashPassword(password) }
