@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"schakker_shared/observability"
 	"strings"
 	"time"
 
@@ -42,6 +43,7 @@ type ReadQuerySpec struct {
 }
 
 func (s *Service) ReadQuery(ctx context.Context, actor, database int64, query string) (ReadResult, error) {
+	ctx = observability.WithActor(ctx, actor, database)
 	started := time.Now()
 	result := ReadResult{Rows: [][]any{}}
 	ctx, cancel := context.WithTimeout(ctx, s.config.QueryTimeout)
@@ -64,7 +66,10 @@ func (s *Service) ReadQuery(ctx context.Context, actor, database int64, query st
 	if err != nil {
 		return result, ErrConnection
 	}
-	defer tx.Rollback()
+	defer func() {
+		err := tx.Rollback()
+		observability.Event(ctx, "sql.rollback", err, "database_id", database, "actor_id", actor, "read_only", true)
+	}()
 	if dbms == "mariadb" {
 		var name string
 		if tx.QueryRowContext(ctx, "SELECT DATABASE()").Scan(&name) != nil {
@@ -76,7 +81,7 @@ func (s *Service) ReadQuery(ctx context.Context, actor, database int64, query st
 	}
 
 	bounded := fmt.Sprintf("SELECT * FROM (\n%s\n) AS schakker_viewer_result LIMIT %d", statement.SQL, ViewerRowLimit+1)
-	rows, err := tx.QueryContext(ctx, bounded)
+	rows, err := observability.WrapSQL(tx).QueryContext(ctx, bounded)
 	if err != nil {
 		return result, ErrViewerQuery
 	}

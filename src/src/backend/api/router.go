@@ -17,6 +17,7 @@ import (
 	"tubes1_wbd/backend/api/sqlviewer"
 	"tubes1_wbd/backend/dbmanagement"
 	"tubes1_wbd/backend/migration"
+	"tubes1_wbd/backend/queue"
 )
 
 type page struct{ title, active, section string }
@@ -40,10 +41,16 @@ type router struct {
 	explorer   explorer.Handler
 	viewer     sqlviewer.Handler
 	migrations migrationsapi.Handler
+	jobs       migrationsapi.JobsHandler
 }
 
-func NewHandler(auth *access.Service, databases *dbmanagement.Service, migrations *migration.Service, production bool) http.Handler {
+func NewHandler(auth *access.Service, databases *dbmanagement.Service, migrations *migration.Service, production bool, jobs ...*queue.Service) http.Handler {
+	var jobService *queue.Service
+	if len(jobs) > 0 {
+		jobService = jobs[0]
+	}
 	return &router{
+		jobs: migrationsapi.JobsHandler{Jobs: jobService},
 		auth: apiauth.Auth{
 			Access: auth, Production: production, SessionCookie: access.CookieName,
 			LoginCookie: apiauth.UserLoginCookieName, Home: "/dashboard",
@@ -55,6 +62,20 @@ func NewHandler(auth *access.Service, databases *dbmanagement.Service, migration
 	}
 }
 func (h *router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if migrationsapi.IsJobRoute(r.URL.Path) {
+		identity, _, ok := h.auth.Authenticate(w, r, false)
+		if !ok {
+			return
+		}
+		if r.Method != http.MethodGet && r.Method != http.MethodHead {
+			if err := h.auth.ValidateJSONAction(r, identity); err != nil {
+				response.Fail(w, r, err)
+				return
+			}
+		}
+		h.jobs.Serve(w, r, identity.User.ID)
+		return
+	}
 	if migrationsapi.IsWorkflowRoute(r.URL.Path) {
 		identity, _, ok := h.auth.Authenticate(w, r, false)
 		if !ok {

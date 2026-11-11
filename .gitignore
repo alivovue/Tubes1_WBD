@@ -7,6 +7,10 @@ node_modules/
 /src/src/.test-postgres/
 /src/src/.test-postgres.log
 /src/src/.schakker/
+/src/.schakker/
+/src/.test-postgres/
+/src/.test-postgres.log
+/src/bin/
 /src/tests/output/*
 !/src/tests/output/.gitkeep
 /src/src/frontend/public/*

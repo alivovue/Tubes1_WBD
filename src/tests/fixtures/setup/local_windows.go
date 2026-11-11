@@ -124,7 +124,9 @@ func StartLocalCluster(ctx context.Context, directory string, options LocalOptio
 		return nil, closeErr
 	}
 
-	if _, err := exec.CommandContext(ctx, cluster.control, "-D", data, "-l", filepath.Join(directory, "postgres.log"), "-w", "-t", "15", "start").CombinedOutput(); err != nil {
+	start := exec.CommandContext(ctx, cluster.control, "-D", data, "-l", filepath.Join(directory, "postgres.log"), "-w", "-t", "15", "start")
+	start.WaitDelay = 2 * time.Second
+	if _, err := start.CombinedOutput(); err != nil && !errors.Is(err, exec.ErrWaitDelay) {
 		return nil, fmt.Errorf("local PostgreSQL did not start; inspect %s", filepath.Join(directory, "postgres.log"))
 	}
 	cluster.started = true

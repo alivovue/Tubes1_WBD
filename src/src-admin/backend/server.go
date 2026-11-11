@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"schakker_shared/observability"
 	"strings"
 
 	"schakker_shared/httpapi"
@@ -47,7 +48,7 @@ func NewHandlerWithServices(root string, services Services) (http.Handler, error
 		assets: http.StripPrefix("/assets/", http.FileServer(http.Dir(filepath.Join(root, "frontend", "dist", "assets")))),
 		public: http.StripPrefix("/public/", http.FileServer(http.Dir(filepath.Join(root, "frontend", "public")))),
 	}
-	return http.HandlerFunc(app.serveHTTP), nil
+	return observability.Middleware(http.HandlerFunc(app.serveHTTP)), nil
 }
 func (app *application) serveHTTP(w http.ResponseWriter, r *http.Request) {
 	httpapi.SecurityHeaders(w)

@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"schakker_shared/httpapi"
+	"schakker_shared/observability"
 
 	"tubes1_wbd/backend/api"
 )
@@ -55,11 +56,11 @@ func NewHandlerWithServices(root string, services Services) (http.Handler, error
 	if err != nil || !json.Valid(products) {
 		products = []byte("[]")
 	}
-	app := &application{api: api.NewHandler(services.Access, services.Databases, services.Migrations, services.Production), entryHTML: entryHTML, productJSON: products,
+	app := &application{api: api.NewHandler(services.Access, services.Databases, services.Migrations, services.Production, services.Jobs), entryHTML: entryHTML, productJSON: products,
 		assets: http.StripPrefix("/assets/", http.FileServer(http.Dir(filepath.Join(root, "frontend", "dist", "assets")))),
 		public: http.StripPrefix("/public/", http.FileServer(http.Dir(filepath.Join(root, "frontend", "public")))),
 	}
-	return http.HandlerFunc(app.serveHTTP), nil
+	return observability.Middleware(http.HandlerFunc(app.serveHTTP)), nil
 }
 func (app *application) serveHTTP(w http.ResponseWriter, r *http.Request) {
 	httpapi.SecurityHeaders(w)

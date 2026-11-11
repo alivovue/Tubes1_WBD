@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"schakker_shared/observability"
 	"syscall"
 	"time"
 
@@ -22,6 +23,15 @@ func main() {
 }
 
 func run() error {
+	shutdown, err := observability.Configure("schakker-api", nil, nil)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		cleanup, stop := context.WithTimeout(context.Background(), 5*time.Second)
+		defer stop()
+		shutdown(cleanup)
+	}()
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	handler, err := backend.NewHandler(".")

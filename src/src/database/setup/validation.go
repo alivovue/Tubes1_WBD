@@ -21,7 +21,7 @@ func ValidateSchema(ctx context.Context, db *sql.DB) error {
 		return errors.New("platform runtime schema is incompatible; provision it outside the application")
 	}
 	rows.Close()
-	workflow, err := db.QueryContext(ctx, `SELECT r.up_sql,r.down_sql,v.authority_revision,h.reverses_execution_id,s.active_stack,j.status,a.outcome,p.last_cursor FROM migration_revisions r CROSS JOIN migration_reviews v CROSS JOIN migration_execution_history h CROSS JOIN migration_database_state s CROSS JOIN migration_jobs j CROSS JOIN migration_job_attempts a CROSS JOIN migration_batch_progress p LIMIT 0`)
+	workflow, err := db.QueryContext(ctx, `SELECT r.up_sql,r.down_sql,v.authority_revision,h.reverses_execution_id,s.active_stack,j.status,j.execution_id,j.attempt,j.max_attempts,j.action_hash,j.sql_hash,j.error_class,j.cancellation_job_id,a.outcome,p.last_cursor,p.reverted_batches,p.reverted_rows FROM migration_revisions r CROSS JOIN migration_reviews v CROSS JOIN migration_execution_history h CROSS JOIN migration_database_state s CROSS JOIN migration_jobs j CROSS JOIN migration_job_attempts a CROSS JOIN migration_batch_progress p LIMIT 0`)
 	if err != nil {
 		return errors.New("platform database schema is incomplete; provision the current schema outside the application")
 	}

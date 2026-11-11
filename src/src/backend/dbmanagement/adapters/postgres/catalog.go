@@ -119,7 +119,7 @@ func describe(ctx context.Context, tx adapters.Querier, schema, table string) (T
 		return result, ErrQuery
 	}
 	rows.Close()
-	rows, err = tx.QueryContext(ctx, `SELECT c.conname,c.contype::text,pg_catalog.pg_get_constraintdef(c.oid,true),COALESCE((SELECT json_agg(a.attname ORDER BY k.position)::text FROM unnest(c.conkey) WITH ORDINALITY k(number,position) JOIN pg_catalog.pg_attribute a ON a.attrelid=c.conrelid AND a.attnum=k.number),'[]'),rn.nspname,rc.relname FROM pg_catalog.pg_constraint c LEFT JOIN pg_catalog.pg_class rc ON rc.oid=c.confrelid LEFT JOIN pg_catalog.pg_namespace rn ON rn.oid=rc.relnamespace WHERE c.conrelid=$1 ORDER BY c.conname`, oid)
+	rows, err = tx.QueryContext(ctx, `SELECT c.conname,c.contype::text,pg_catalog.pg_get_constraintdef(c.oid,true),COALESCE((SELECT json_agg(a.attname ORDER BY k.position)::text FROM unnest(c.conkey) WITH ORDINALITY k(number,position) JOIN pg_catalog.pg_attribute a ON a.attrelid=c.conrelid AND a.attnum=k.number),'[]'),rn.nspname,rc.relname FROM pg_catalog.pg_constraint c LEFT JOIN pg_catalog.pg_class rc ON rc.oid=c.confrelid LEFT JOIN pg_catalog.pg_namespace rn ON rn.oid=rc.relnamespace WHERE c.conrelid=$1 AND c.contype<>'n' ORDER BY c.conname`, oid)
 	if err != nil {
 		return result, ErrQuery
 	}

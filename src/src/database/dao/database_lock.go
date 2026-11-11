@@ -3,6 +3,7 @@ package dao
 import (
 	"context"
 	"database/sql/driver"
+	"schakker_shared/observability"
 	"time"
 )
 
@@ -34,7 +35,7 @@ func (d *Store) WithDatabaseLock(ctx context.Context, id int64, action func(*Sto
 	if _, err := conn.ExecContext(ctx, `SELECT pg_advisory_lock($1)`, -id); err != nil {
 		return err
 	}
-	return action(&Store{db: d.db, q: conn, conn: conn, lockSlots: d.lockSlots})
+	return action(&Store{db: d.db, q: observability.WrapSQL(conn), conn: conn, lockSlots: d.lockSlots})
 }
 
 func (d *Store) LockDatabase(ctx context.Context, id int64) error {

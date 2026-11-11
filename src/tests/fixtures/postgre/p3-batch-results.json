@@ -1,0 +1,19 @@
+{
+  "affected_rows": 100000,
+  "architecture": "amd64",
+  "batch_size": 10000,
+  "batched_rows_per_second": 7806.32672023748,
+  "batched_seconds": 12.8101223,
+  "committed_batches": 10,
+  "committed_rows": 100000,
+  "go_version": "go1.26.10",
+  "logical_cpus": 24,
+  "cpu_model": "Intel(R) Core(TM) i7-14650HX",
+  "ram_bytes": 33943117824,
+  "os": "windows",
+  "postgresql_version": "18.6",
+  "rows": 100000,
+  "same_initial_dataset": true,
+  "status": "succeeded",
+  "unbatched_seconds": 1.5374727
+}

@@ -9,7 +9,9 @@ import (
 	"strings"
 	"time"
 
+	"log/slog"
 	"schakker_shared/config"
+	"schakker_shared/observability"
 
 	"tubes1_wbd_admin/backend/access"
 	"tubes1_wbd_admin/backend/connectionconfig"
@@ -64,7 +66,10 @@ func servicesFromEnvironment(root string) (Services, *runtime, error) {
 	if err != nil {
 		return fail(err)
 	}
-	auth, err := access.NewService(store, access.DefaultConfig(key))
+	config := access.DefaultConfig(key)
+	config.Logger = slog.Default()
+	config.Observer = observability.Observer{}
+	auth, err := access.NewService(store, config)
 	if err != nil {
 		return fail(err)
 	}

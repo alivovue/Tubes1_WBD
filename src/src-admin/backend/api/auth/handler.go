@@ -3,6 +3,7 @@ package auth
 import (
 	"errors"
 	"net/http"
+	"schakker_shared/observability"
 	"time"
 
 	primitive "schakker_shared/auth"
@@ -43,6 +44,7 @@ func (a Auth) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	identity, raw, err := a.Access.Login(r.Context(), r.PostForm.Get("username"), r.PostForm.Get("password"), httpapi.CookieValue(r, a.SessionCookie))
+	observability.Event(r.Context(), "authentication.admin.login", err, "actor_id", identity.User.ID)
 	if err != nil {
 		if errors.Is(err, access.ErrForbidden) {
 			a.Challenge(w, r, "Administrator sign in is unavailable.", http.StatusForbidden)

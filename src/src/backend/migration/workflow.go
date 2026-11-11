@@ -38,6 +38,10 @@ type RecoverySource struct {
 type RecoveryProvider interface {
 	CancellationSource(context.Context, string) (RecoverySource, error)
 }
+
+type AuthorizedRecoveryProvider interface {
+	CancellationSourceFor(context.Context, int64, string) (RecoverySource, error)
+}
 type Activity = dao.MigrationActivity
 type ActivityReader interface {
 	MigrationActivities(context.Context, int64, int, int) ([]Activity, error)

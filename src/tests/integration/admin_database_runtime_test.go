@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -209,6 +210,9 @@ func TestStandaloneAdminBinaryRunsWithoutTheUserModule(t *testing.T) {
 	source, err := filepath.Abs(filepath.Join(repositoryRoot(t), "src-admin"))
 	must(t, err)
 	binary := filepath.Join(root, "admin-server")
+	if runtime.GOOS == "windows" {
+		binary += ".exe"
+	}
 	build := exec.CommandContext(f.ctx, "go", "build", "-o", binary, ".")
 	build.Dir = source
 	build.Env = append(os.Environ(), "GOWORK=off", "CGO_ENABLED=0")

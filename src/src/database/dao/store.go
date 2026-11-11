@@ -6,6 +6,7 @@ import (
 	"errors"
 
 	"github.com/jackc/pgx/v5/pgconn"
+	"schakker_shared/observability"
 	"schakker_shared/validation"
 )
 
@@ -48,7 +49,7 @@ func New(db *sql.DB) (*Store, error) {
 	if capacity < 1 {
 		capacity = 1
 	}
-	return &Store{db: db, q: db, lockSlots: make(chan struct{}, capacity)}, nil
+	return &Store{db: db, q: observability.WrapSQL(db), lockSlots: make(chan struct{}, capacity)}, nil
 }
 
 func (d *Store) Transaction(ctx context.Context, change func(*Store) error) error {
@@ -66,10 +67,10 @@ func (d *Store) Transaction(ctx context.Context, change func(*Store) error) erro
 		return classify(err)
 	}
 	defer tx.Rollback()
-	if err := change(&Store{db: d.db, q: tx, inTx: true, conn: d.conn, lockSlots: d.lockSlots}); err != nil {
+	if err := change(&Store{db: d.db, q: observability.WrapSQL(tx), inTx: true, conn: d.conn, lockSlots: d.lockSlots}); err != nil {
 		return classify(err)
 	}
-	return classify(tx.Commit())
+	return classify(observability.Commit(ctx, tx.Commit))
 }
 
 func classify(err error) error {

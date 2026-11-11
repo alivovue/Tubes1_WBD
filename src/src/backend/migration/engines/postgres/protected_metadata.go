@@ -2,7 +2,10 @@ package postgres
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"maps"
+	"schakker_shared/observability"
 	"time"
 
 	"tubes1_wbd/backend/migration/engines"
@@ -22,6 +25,7 @@ type protectedReceipt struct {
 type protectedMetadata struct {
 	catalog  string
 	receipts map[receiptKey]protectedReceipt
+	jobs     string
 }
 
 const protectedCatalogSQL = `SELECT COALESCE((SELECT c.relkind='r' AND NOT c.relrowsecurity AND NOT c.relforcerowsecurity FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='_schakker' AND c.relname='migration_receipts'),false),
@@ -42,10 +46,10 @@ UNION ALL SELECT pg_catalog.json_build_array('setting',name,setting)::text FROM 
 func (s *session) captureProtectedMetadata(ctx context.Context) (*protectedMetadata, error) {
 	state := &protectedMetadata{receipts: make(map[receiptKey]protectedReceipt)}
 	var valid bool
-	if err := s.tx.QueryRowContext(ctx, protectedCatalogSQL).Scan(&valid, &state.catalog); err != nil || !valid {
+	if err := observability.WrapSQL(s.tx).QueryRowContext(ctx, protectedCatalogSQL).Scan(&valid, &state.catalog); err != nil || !valid {
 		return nil, engines.ErrProtectedMetadata
 	}
-	rows, err := s.tx.QueryContext(ctx, `SELECT namespace,attempt_id,version,sql_hash,applied_at FROM _schakker.migration_receipts`)
+	rows, err := observability.WrapSQL(s.tx).QueryContext(ctx, `SELECT namespace,attempt_id,version,sql_hash,applied_at FROM _schakker.migration_receipts`)
 	if err != nil {
 		return nil, engines.ErrProtectedMetadata
 	}
@@ -62,7 +66,58 @@ func (s *session) captureProtectedMetadata(ctx context.Context) (*protectedMetad
 	if rows.Err() != nil {
 		return nil, engines.ErrProtectedMetadata
 	}
+	rows.Close()
+	state.jobs, err = s.hashJobMetadata(ctx)
+	if err != nil {
+		return nil, engines.ErrProtectedMetadata
+	}
 	return state, nil
+}
+
+func (s *session) hashJobMetadata(ctx context.Context) (string, error) {
+	hash := sha256.New()
+	for _, table := range []string{"job_receipts", "batch_jobs", "batch_undo", "batch_receipts"} {
+		var exists bool
+		if err := observability.WrapSQL(s.tx).QueryRowContext(ctx, `SELECT to_regclass($1) IS NOT NULL`, "_schakker."+table).Scan(&exists); err != nil {
+			return "", err
+		}
+		if !exists {
+			continue
+		}
+		hash.Write([]byte(table + "\x00"))
+		query := `SELECT row_to_json(x)::text FROM _schakker.` + table + ` x`
+		var args []any
+		if table == "job_receipts" {
+			query += ` WHERE execution_id::text<>$1`
+			args = []any{s.jobReceiptException}
+		}
+		query += ` ORDER BY namespace,job_id`
+		if table == "batch_undo" {
+			query += `,row_id`
+		}
+		if table == "batch_receipts" {
+			query += `,batch_no,direction`
+		}
+		rows, err := observability.WrapSQL(s.tx).QueryContext(ctx, query, args...)
+		if err != nil {
+			return "", err
+		}
+		for rows.Next() {
+			var raw string
+			if err = rows.Scan(&raw); err != nil {
+				rows.Close()
+				return "", err
+			}
+			hash.Write([]byte(raw))
+			hash.Write([]byte{0})
+		}
+		err = rows.Err()
+		rows.Close()
+		if err != nil {
+			return "", err
+		}
+	}
+	return hex.EncodeToString(hash.Sum(nil)), nil
 }
 
 func (s *session) verifyProtectedMetadata(ctx context.Context) error {
@@ -70,7 +125,7 @@ func (s *session) verifyProtectedMetadata(ctx context.Context) error {
 		return engines.ErrProtectedMetadata
 	}
 	actual, err := s.captureProtectedMetadata(ctx)
-	if err != nil || actual.catalog != s.protected.catalog || !maps.Equal(actual.receipts, s.protected.receipts) {
+	if err != nil || actual.catalog != s.protected.catalog || actual.jobs != s.protected.jobs || !maps.Equal(actual.receipts, s.protected.receipts) {
 		return engines.ErrProtectedMetadata
 	}
 	return nil

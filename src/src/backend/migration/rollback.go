@@ -23,7 +23,12 @@ func (w *Workflow) cancellation(ctx context.Context, tx *dao.Store, r dao.Migrat
 	if original.RevisionID != revision.ID || original.DatabaseID != revision.DatabaseID || original.QueuedJobID == nil || *original.QueuedJobID != *r.TargetJobID || !allApproved(original) || (original.Action != "up" && original.Action != "forward") || (status != "partial" && status != "uncertain" && status != "partially_reverted") {
 		return RecoverySource{}, ErrWorkflowConflict
 	}
-	source, err := w.options.Recovery.CancellationSource(ctx, *r.TargetJobID)
+	var source RecoverySource
+	if provider, ok := w.options.Recovery.(AuthorizedRecoveryProvider); ok {
+		source, err = provider.CancellationSourceFor(ctx, r.SubmittedBy, *r.TargetJobID)
+	} else {
+		source, err = w.options.Recovery.CancellationSource(ctx, *r.TargetJobID)
+	}
 	if err != nil {
 		return source, ErrWorkflowUnavailable
 	}

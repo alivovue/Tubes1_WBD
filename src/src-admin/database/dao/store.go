@@ -6,6 +6,7 @@ import (
 	"errors"
 
 	"github.com/jackc/pgx/v5/pgconn"
+	"schakker_shared/observability"
 	"schakker_shared/validation"
 )
 
@@ -31,7 +32,7 @@ func New(db *sql.DB) (*Store, error) {
 	if db == nil {
 		return nil, errors.New("admin metadata database is required")
 	}
-	return &Store{db: db, q: db}, nil
+	return &Store{db: db, q: observability.WrapSQL(db)}, nil
 }
 func (d *Store) Transaction(ctx context.Context, change func(*Store) error) error {
 	if d.inTx {
@@ -42,10 +43,10 @@ func (d *Store) Transaction(ctx context.Context, change func(*Store) error) erro
 		return classify(err)
 	}
 	defer tx.Rollback()
-	if err := change(&Store{db: d.db, q: tx, inTx: true}); err != nil {
+	if err := change(&Store{db: d.db, q: observability.WrapSQL(tx), inTx: true}); err != nil {
 		return classify(err)
 	}
-	return classify(tx.Commit())
+	return classify(observability.Commit(ctx, tx.Commit))
 }
 func (d *Store) LockAdministration(ctx context.Context) error {
 	if !d.inTx {

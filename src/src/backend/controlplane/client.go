@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"net/url"
 	"schakker_shared/authority"
+	"schakker_shared/observability"
 	"strconv"
 	"strings"
 	"time"
@@ -45,7 +46,14 @@ func New(rawURL, token string, production bool) (*Client, error) {
 	transport.TLSClientConfig = &tls.Config{MinVersion: tls.VersionTLS12}
 	return &Client{base: strings.TrimRight(u.String(), "/"), token: token, http: &http.Client{Transport: transport, Timeout: 5 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}, nil
 }
-func (c *Client) request(ctx context.Context, method, path string, input, output any) error {
+func (c *Client) request(ctx context.Context, method, path string, input, output any) (err error) {
+	ctx, span := observability.Start(ctx, "authority.request")
+	defer func() {
+		if err != nil {
+			observability.Event(ctx, "authority.request.failed", err)
+		}
+		span.End()
+	}()
 	var body io.Reader
 	if input != nil {
 		raw, err := json.Marshal(input)
@@ -60,6 +68,7 @@ func (c *Client) request(ctx context.Context, method, path string, input, output
 	}
 	req.Header.Set("Authorization", "Bearer "+c.token)
 	req.Header.Set("Accept", "application/json")
+	observability.InjectHTTP(ctx, req)
 	if input != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}

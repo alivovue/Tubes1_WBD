@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"schakker_shared/observability"
 
 	"tubes1_wbd/backend/access"
 	"tubes1_wbd/backend/dbmanagement/adapters"
@@ -25,6 +26,7 @@ type Plan = adapters.Plan
 var ErrStaleSnapshot = errors.New("schema changed while reading; retry the operation")
 
 func (s *Service) read(ctx context.Context, actor, database int64, permission access.Permission, action func(context.Context, adapters.Querier, adapters.Adapter) error) error {
+	ctx = observability.WithActor(ctx, actor, database)
 	ctx, cancel := context.WithTimeout(ctx, s.config.QueryTimeout)
 	defer cancel()
 	target, err := s.open(ctx, actor, database, permission)
@@ -37,12 +39,14 @@ func (s *Service) read(ctx context.Context, actor, database int64, permission ac
 		return ErrConnection
 	}
 	defer tx.Rollback()
-	if err := action(ctx, tx, target.Adapter); err != nil {
+	if err := action(ctx, observability.WrapSQL(tx), target.Adapter); err != nil {
 		return err
 	}
 	if err := tx.Commit(); err != nil {
+		observability.Event(ctx, "sql.commit", err, "database_id", database, "actor_id", actor, "read_only", true)
 		return ErrQuery
 	}
+	observability.Event(ctx, "sql.commit", nil, "database_id", database, "actor_id", actor, "read_only", true)
 	return nil
 }
 func (s *Service) Schemas(ctx context.Context, actor, database int64) ([]Schema, error) {

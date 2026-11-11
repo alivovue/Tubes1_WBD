@@ -2,6 +2,12 @@ package dao
 
 import "context"
 
+func (d *Store) ExistingDatabaseNamespace(ctx context.Context, id int64) (string, error) {
+	var namespace string
+	err := d.q.QueryRowContext(ctx, `SELECT connection_options->>'migration_namespace' FROM managed_databases WHERE id=$1 AND COALESCE(connection_options->>'migration_namespace','')<>''`, id).Scan(&namespace)
+	return namespace, classify(err)
+}
+
 // Registered IDs remain local solely for runtime foreign keys and receipt
 // namespaces. Credentials and editable registration metadata live remotely.
 func (d *Store) RememberDatabase(ctx context.Context, id int64) error {

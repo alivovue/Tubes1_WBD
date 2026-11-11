@@ -7,6 +7,7 @@ import (
 
 	primitive "schakker_shared/auth"
 	"schakker_shared/httpapi"
+	"schakker_shared/observability"
 
 	"tubes1_wbd/backend/access"
 )
@@ -41,6 +42,7 @@ func (a Auth) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	identity, raw, err := a.Access.Login(r.Context(), r.PostForm.Get("username"), r.PostForm.Get("password"), httpapi.CookieValue(r, a.SessionCookie))
+	observability.Event(r.Context(), "authentication.login", err, "actor_id", identity.User.ID)
 	if err != nil {
 		if errors.Is(err, access.ErrForbidden) {
 			a.Challenge(w, r, "Sign in is unavailable.", http.StatusForbidden)

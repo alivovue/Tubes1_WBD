@@ -1,0 +1,13 @@
+BEGIN;
+ALTER TABLE public.migration_jobs ADD COLUMN execution_id uuid NOT NULL DEFAULT gen_random_uuid();
+ALTER TABLE public.migration_jobs ADD COLUMN attempt integer NOT NULL DEFAULT 0 CHECK(attempt>=0);
+ALTER TABLE public.migration_jobs ADD COLUMN max_attempts integer NOT NULL DEFAULT 5 CHECK(max_attempts BETWEEN 1 AND 20);
+ALTER TABLE public.migration_jobs ADD COLUMN action_hash text NOT NULL DEFAULT '';
+ALTER TABLE public.migration_jobs ADD COLUMN sql_hash text NOT NULL DEFAULT '';
+ALTER TABLE public.migration_jobs ADD COLUMN error_class text NOT NULL DEFAULT '';
+ALTER TABLE public.migration_jobs ADD COLUMN cancellation_job_id uuid;
+CREATE UNIQUE INDEX migration_jobs_execution_id ON public.migration_jobs(execution_id);
+CREATE INDEX migration_jobs_database_order ON public.migration_jobs(database_id,created_at,id);
+ALTER TABLE public.migration_batch_progress ADD COLUMN reverted_batches bigint NOT NULL DEFAULT 0 CHECK(reverted_batches>=0);
+ALTER TABLE public.migration_batch_progress ADD COLUMN reverted_rows bigint NOT NULL DEFAULT 0 CHECK(reverted_rows>=0);
+COMMIT;

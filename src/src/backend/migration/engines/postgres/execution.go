@@ -10,12 +10,14 @@ import (
 )
 
 type session struct {
-	tx        *sql.Tx
-	adapter   adapters.Adapter
-	once      sync.Once
-	completed int
-	total     int
-	protected *protectedMetadata
+	tx                  *sql.Tx
+	adapter             adapters.Adapter
+	once                sync.Once
+	completed           int
+	total               int
+	protected           *protectedMetadata
+	jobReceiptException string
+	lastRows            int64
 }
 
 func (Engine) Open(ctx context.Context, db *sql.DB, adapter adapters.Adapter, mode string) (engines.Session, error) {
@@ -55,9 +57,11 @@ func (s *session) Execute(ctx context.Context, statement adapters.Statement) err
 	if _, err := s.tx.ExecContext(ctx, `SELECT pg_catalog.set_config('standard_conforming_strings','on',true)`); err != nil {
 		return err
 	}
-	if _, err := s.tx.ExecContext(ctx, statement.SQL); err != nil {
+	result, err := s.tx.ExecContext(ctx, statement.SQL)
+	if err != nil {
 		return err
 	}
+	s.lastRows, _ = result.RowsAffected()
 	s.completed++
 	return nil
 }

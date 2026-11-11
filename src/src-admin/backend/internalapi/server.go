@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"schakker_shared/auth"
+	"schakker_shared/observability"
 
 	"tubes1_wbd_admin/backend/access"
 	"tubes1_wbd_admin/backend/connectionconfig"
@@ -28,7 +29,7 @@ func NewHandler(store *dao.Store, key []byte, token string) (http.Handler, error
 	if store == nil || len(key) != 32 || len(token) < 32 {
 		return nil, errors.New("internal API requires a metadata store, encryption key, and a service token of at least 32 bytes")
 	}
-	return &server{store: store, key: append([]byte(nil), key...), token: token}, nil
+	return observability.InternalMiddleware(&server{store: store, key: append([]byte(nil), key...), token: token}), nil
 }
 
 type userResponse struct {
