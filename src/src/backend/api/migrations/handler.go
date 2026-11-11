@@ -169,16 +169,7 @@ func (h Handler) Action(w http.ResponseWriter, r *http.Request, data *response.D
 		if data.SQL != review.SQL {
 			return false, migration.ErrStale
 		}
-		execution, err := h.Migrations.Execute(r.Context(), actor, db, migration.ExecuteInput{Review: review, Description: data.Description, DraftID: data.DraftID, AcceptNonAtomic: form.Get("accept_non_atomic") == "on"})
-		if execution.ID > 0 {
-			message := "Migration completed"
-			if err != nil {
-				message, _ = response.ErrorStatus(err)
-			}
-			response.Redirect(w, r, "/migrations", message, "db", db, "id", execution.ID)
-			return true, nil
-		}
-		return false, err
+		return false, migration.ErrWorkflowRequired
 	case "reconcile":
 		if err := h.Migrations.Reconcile(r.Context(), actor, db); err != nil {
 			return false, err

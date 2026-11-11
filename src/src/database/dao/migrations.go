@@ -107,7 +107,7 @@ func (d *Store) HasMigrationHistory(ctx context.Context, database int64) (bool, 
 
 func (d *Store) MigrationVersion(ctx context.Context, database int64) (int64, error) {
 	var version int64
-	err := d.q.QueryRowContext(ctx, `SELECT COALESCE(MAX(applied_version),0) FROM migration_executions WHERE database_id=$1 AND status='succeeded'`, database).Scan(&version)
+	err := d.q.QueryRowContext(ctx, `SELECT COALESCE((SELECT active_version FROM migration_database_state WHERE database_id=$1),(SELECT COALESCE(MAX(applied_version),0) FROM migration_executions WHERE database_id=$1 AND status='succeeded'))`, database).Scan(&version)
 	return version, classify(err)
 }
 

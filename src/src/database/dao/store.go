@@ -15,10 +15,21 @@ var (
 	ErrInvalid  = validation.ErrInvalid
 )
 
-type executor interface {
+type Executor interface {
 	ExecContext(context.Context, string, ...any) (sql.Result, error)
 	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
 	QueryRowContext(context.Context, string, ...any) *sql.Row
+}
+
+type executor = Executor
+
+// TransactionQueries lets P3 insert its durable queue record in the SAME
+// metadata transaction as approval reservation. It never opens a target DB.
+func (d *Store) TransactionQueries() (Executor, error) {
+	if !d.inTx {
+		return nil, ErrInvalid
+	}
+	return d.q, nil
 }
 
 type Store struct {

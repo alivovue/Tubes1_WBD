@@ -145,6 +145,19 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		send(w, 400, map[string]string{"error": "invalid database"})
 		return
 	}
+	if parts[6] == "migration-authority" {
+		snapshot, err := s.store.MigrationAuthority(r.Context(), uid, did)
+		if errors.Is(err, dao.ErrNotFound) {
+			send(w, 403, map[string]string{"error": "permission denied"})
+			return
+		}
+		if err != nil {
+			send(w, 503, map[string]string{"error": "authority unavailable"})
+			return
+		}
+		send(w, 200, snapshot)
+		return
+	}
 	permission, err := s.store.EffectivePermission(r.Context(), uid, did)
 	if err != nil {
 		send(w, 503, map[string]string{"error": "authority unavailable"})

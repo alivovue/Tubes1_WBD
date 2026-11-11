@@ -17,9 +17,12 @@ type Credentials struct {
 }
 
 type Group struct {
-	ID          int64
-	Name        string
-	Description string
+	ID           int64
+	Name         string
+	Description  string
+	LeaderUserID *int64
+	LeaderName   string
+	LeaderValid  bool
 }
 
 type Membership struct {

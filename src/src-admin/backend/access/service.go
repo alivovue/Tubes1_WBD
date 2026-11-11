@@ -5,6 +5,8 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"errors"
+	"log/slog"
+	"os"
 
 	"schakker_shared/auth"
 
@@ -34,6 +36,9 @@ func NewService(store *dao.Store, config Config) (*Service, error) {
 	mac := hmac.New(sha256.New, config.Key)
 	mac.Write([]byte("schakker/admin-auth/v1"))
 	config.Key = mac.Sum(nil)
+	if config.Logger == nil {
+		config.Logger = slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	}
 	dummy, err := auth.DummyPasswordHash()
 	if err != nil {
 		return nil, err
@@ -55,7 +60,22 @@ func (s *Service) RequireAdmin(ctx context.Context, actor int64) error {
 	return nil
 }
 
-func (s *Service) adminChange(ctx context.Context, actor int64, change func(*dao.Store) error) error {
+func (s *Service) adminChange(ctx context.Context, actor int64, change func(*dao.Store) error) (err error) {
+	end := func(string) {}
+	if s.config.Observer != nil {
+		ctx, end = s.config.Observer.Start(ctx, "admin.authority.change", actor, 0)
+		if end == nil {
+			end = func(string) {}
+		}
+	}
+	defer func() {
+		status := "succeeded"
+		if err != nil {
+			status = "rejected"
+		}
+		end(status)
+		s.config.Logger.InfoContext(ctx, "admin.authority.change", "event", "admin.authority.change", "actor_id", actor, "status", status)
+	}()
 	return s.store.Transaction(ctx, func(tx *dao.Store) error {
 		if err := tx.LockAdministration(ctx); err != nil {
 			return err

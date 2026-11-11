@@ -13,6 +13,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"schakker_shared/authority"
 	"strconv"
 	"strings"
 	"time"
@@ -156,3 +157,22 @@ func (c *Client) Connection(ctx context.Context, user, database int64, required 
 }
 
 var _ access.Authority = (*Client)(nil)
+
+func (c *Client) MigrationAuthority(ctx context.Context, actor, database int64) (authority.Snapshot, error) {
+	var out authority.Snapshot
+	err := c.request(ctx, "GET", fmt.Sprintf("/internal/v1/users/%d/databases/%d/migration-authority", actor, database), nil, &out)
+	if err != nil {
+		return out, err
+	}
+	if out.DatabaseID != database || out.Revision < 1 || len(out.ConnectionFingerprint) != 64 {
+		return authority.Snapshot{}, ErrUnavailable
+	}
+	seen := map[int64]bool{}
+	for _, g := range out.Groups {
+		if g.ID < 1 || seen[g.ID] || (g.Permission != "view_only" && g.Permission != "view_edit") {
+			return authority.Snapshot{}, ErrUnavailable
+		}
+		seen[g.ID] = true
+	}
+	return out, nil
+}

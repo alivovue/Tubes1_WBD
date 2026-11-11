@@ -66,7 +66,7 @@ func (d *Store) SetGrant(ctx context.Context, actor, group, database int64, perm
 }
 
 func (d *Store) Groups(ctx context.Context) ([]Group, error) {
-	rows, err := d.q.QueryContext(ctx, `SELECT id,name,COALESCE(description,'') FROM access_groups ORDER BY name`)
+	rows, err := d.q.QueryContext(ctx, `SELECT g.id,g.name,COALESCE(g.description,''),g.leader_user_id,COALESCE(u.display_name,''),COALESCE(u.is_active AND EXISTS(SELECT 1 FROM user_groups m WHERE m.group_id=g.id AND m.user_id=u.id),FALSE) FROM access_groups g LEFT JOIN users u ON u.id=g.leader_user_id ORDER BY g.name`)
 	if err != nil {
 		return nil, classify(err)
 	}
@@ -74,7 +74,7 @@ func (d *Store) Groups(ctx context.Context) ([]Group, error) {
 	result := make([]Group, 0)
 	for rows.Next() {
 		var group Group
-		if err := rows.Scan(&group.ID, &group.Name, &group.Description); err != nil {
+		if err := rows.Scan(&group.ID, &group.Name, &group.Description, &group.LeaderUserID, &group.LeaderName, &group.LeaderValid); err != nil {
 			return nil, classify(err)
 		}
 		result = append(result, group)

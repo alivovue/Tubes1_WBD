@@ -111,6 +111,13 @@ func (s *Service) Execute(ctx context.Context, actor, database int64, input Exec
 	defer cancel()
 	var execution dao.MigrationExecution
 	err = s.store.WithDatabaseLock(ctx, database, func(store *dao.Store) error {
+		enabled, err := store.WorkflowEnabled(ctx, database)
+		if err != nil {
+			return err
+		}
+		if enabled {
+			return ErrWorkflowRequired
+		}
 		connection, err := s.databases.ConnectionFingerprint(ctx, actor, database)
 		if err != nil {
 			return err

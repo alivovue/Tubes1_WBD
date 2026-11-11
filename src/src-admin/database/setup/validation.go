@@ -18,6 +18,13 @@ func ValidateSchema(ctx context.Context, db *sql.DB) error {
 	if err := rows.Close(); err != nil {
 		return err
 	}
+	workflow, err := db.QueryContext(ctx, `SELECT g.leader_user_id,c.revision FROM access_groups g CROSS JOIN migration_authority_clock c LIMIT 0`)
+	if err != nil {
+		return errors.New("admin database schema is incomplete; provision the current schema outside the application")
+	}
+	if err = workflow.Close(); err != nil {
+		return err
+	}
 	var mixed bool
 	if err := db.QueryRowContext(ctx, `SELECT to_regclass('public.migration_drafts') IS NOT NULL OR to_regclass('public.migration_executions') IS NOT NULL OR to_regclass('public.sessions') IS NOT NULL`).Scan(&mixed); err != nil || mixed {
 		return errors.New("admin control plane requires a separate database without ordinary runtime tables")

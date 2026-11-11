@@ -3,6 +3,7 @@ package access
 import (
 	"context"
 	"errors"
+	"schakker_shared/authority"
 	"tubes1_wbd/database/dao"
 )
 
@@ -18,6 +19,15 @@ type Authority interface {
 	AccessibleDatabases(context.Context, int64) ([]Database, error)
 	Connection(context.Context, int64, int64, Permission) (dao.DatabaseMetadata, error)
 }
+
+func (s *Service) MigrationAuthority(ctx context.Context, actor, database int64) (authority.Snapshot, error) {
+	provider, ok := s.authority.(authority.Reviewer)
+	if !ok {
+		return authority.Snapshot{}, errors.New("migration review authority is unavailable")
+	}
+	return provider.MigrationAuthority(ctx, actor, database)
+}
+
 type Service struct {
 	store     *dao.Store
 	config    Config

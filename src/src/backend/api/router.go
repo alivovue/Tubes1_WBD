@@ -55,6 +55,20 @@ func NewHandler(auth *access.Service, databases *dbmanagement.Service, migration
 	}
 }
 func (h *router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if migrationsapi.IsWorkflowRoute(r.URL.Path) {
+		identity, _, ok := h.auth.Authenticate(w, r, false)
+		if !ok {
+			return
+		}
+		if r.Method != http.MethodGet && r.Method != http.MethodHead {
+			if err := h.auth.ValidateJSONAction(r, identity); err != nil {
+				response.Fail(w, r, err)
+				return
+			}
+		}
+		h.migrations.ServeWorkflow(w, r, identity.User.ID)
+		return
+	}
 	if r.URL.Path == "/login" {
 		if r.Method != http.MethodPost {
 			w.Header().Set("Allow", "POST")

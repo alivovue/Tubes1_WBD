@@ -1,7 +1,9 @@
 package access
 
 import (
+	"context"
 	"errors"
+	"log/slog"
 	"regexp"
 	"strings"
 	"time"
@@ -29,6 +31,10 @@ const (
 )
 
 type Config struct {
+	Logger   *slog.Logger
+	Observer interface {
+		Start(context.Context, string, int64, int64) (context.Context, func(string))
+	}
 	Key                                                          []byte
 	IdleTimeout, AbsoluteLifetime, RotationInterval, GracePeriod time.Duration
 	Now                                                          func() time.Time

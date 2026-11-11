@@ -67,7 +67,7 @@ func (h Handler) Load(r *http.Request, data *response.Data) error {
 }
 func groupEditor(action string) string {
 	switch action {
-	case "membership":
+	case "membership", "set_group_leader":
 		return "membership"
 	case "set_grant", "set_grants":
 		return "access"
@@ -90,7 +90,21 @@ func (h Handler) Action(w http.ResponseWriter, r *http.Request, data *response.D
 	}
 	switch form.Get("action") {
 	case "save_group":
-		err = h.Access.SaveGroup(r.Context(), actor, id, form.Get("name"), form.Get("description"))
+		leader, e := httpapi.ID(form.Get("leader_user_id"))
+		if e != nil {
+			return e
+		}
+		if leader > 0 {
+			err = h.Access.SaveGroupWithLeader(r.Context(), actor, id, form.Get("name"), form.Get("description"), leader)
+		} else {
+			err = h.Access.SaveGroup(r.Context(), actor, id, form.Get("name"), form.Get("description"))
+		}
+	case "set_group_leader":
+		leader, e := httpapi.ID(form.Get("leader_user_id"))
+		if e != nil {
+			return e
+		}
+		err = h.Access.SetGroupLeader(r.Context(), actor, id, leader)
 	case "delete_group":
 		err = h.Access.DeleteGroup(r.Context(), actor, id)
 	case "membership":

@@ -73,7 +73,7 @@ Cookie menggunakan HttpOnly, SameSite=Lax, serta Secure pada HTTPS/production. I
 
 ## Pengujian
 
-Hanya backend yang memiliki test. Semua Go unit test, integration test, mock database dan laporan berada di `src/tests/` dari root repositori. Test frontend beserta setup, runner dan dependensinya telah dihapus. Lihat [struktur dan perintah test](tests/README.md).
+Hanya backend yang memiliki test. Semua Go unit test, integration test, mock database dan laporan berada di `src/tests/` dari root repositori. Test frontend beserta setup, runner dan dependensinya telah dihapus. Lihat [struktur dan perintah test M2](docs/m2-person2.md#verification).
 
 ```text
 src/tests/
@@ -102,6 +102,12 @@ GOWORK=off go -C src/tests test ./unit/...
 Go unit suite dapat dipilih melalui `./unit/src/...`, `./unit/src-admin/...`, dan `./unit/shared/...` dari `src/tests/`. `go.work` menyertakan modul test tersebut; production build kedua aplikasi tidak bergantung padanya. npm hanya digunakan untuk instalasi, build dan pengembangan frontend.
 
 Setup database, seed data dan bootstrap akun hanya ada dalam test support. Fixture hanya menyimpan schema database aplikasi saat ini dan data contoh PostgreSQL/MariaDB; schema lama beserta helper dan test cutover telah dihapus. PostgreSQL server/client tools diperlukan untuk fixture lokal (`SCHAKKER_POSTGRES_BIN`); MariaDB server tools opsional (`SCHAKKER_MARIADB_BIN`). Launcher root tetap menawarkan unit/integration test sebelum menjalankan aplikasi, dengan laporan di `src/tests/output/user/` atau `src/tests/output/admin/`. Database aplikasi tidak dimulai atau dimigrasikan oleh launcher.
+
+## Milestone 2 — Person 2
+
+Backend Person 2 menyediakan group leader dan authority snapshot privat, immutable migration revision, approval semua grup, perencanaan rollback/forward, committed history dan active state. Kontrak API serta integrasi frontend/worker ada di [M2 API](docs/m2-api.md), [handoff Person 2](docs/m2-person2.md), dan [schema database saat ini](docs/m2-person2.md#database-schemas).
+
+Schema yang sudah ada di `src/tests/fixtures/website/schema.sql` dan `src/tests/fixtures/admin/schema.sql` langsung mendefinisikan struktur database saat ini, termasuk M2. Startup hanya memvalidasi schema. Frontend M2 milik Person 1; queue/worker, executor, batch dan infrastruktur OTel milik Person 3. Sampai dispatcher Person 3 dipasang, endpoint enqueue mengembalikan 503. Aksi browser `execute` lama mengembalikan 409 agar tidak melewati approval. Bonus M2 belum dikerjakan.
 
 ## Query Plan
 

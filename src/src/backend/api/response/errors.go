@@ -7,6 +7,7 @@ import (
 	"schakker_shared/httpapi"
 
 	"tubes1_wbd/backend/access"
+	"tubes1_wbd/backend/controlplane"
 	"tubes1_wbd/backend/dbmanagement"
 	"tubes1_wbd/backend/migration"
 	"tubes1_wbd/backend/migration/diff"
@@ -20,6 +21,14 @@ func Fail(w http.ResponseWriter, r *http.Request, err error) {
 }
 func ErrorStatus(err error) (string, int) {
 	switch {
+	case errors.Is(err, migration.ErrDefinitionInvalid):
+		return "Supply valid SQL up and SQL down, or mark the migration irreversible with a reason.", 422
+	case errors.Is(err, migration.ErrWorkflowRequired):
+		return "Submit an immutable migration revision for leader approval and asynchronous execution.", 409
+	case errors.Is(err, migration.ErrWorkflowConflict):
+		return "The revision, approval, authority or active migration position changed, or the database is blocked. Refresh and start a new review.", 409
+	case errors.Is(err, migration.ErrWorkflowUnavailable), errors.Is(err, controlplane.ErrUnavailable):
+		return "Migration authority or the required worker infrastructure is unavailable.", 503
 	case errors.Is(err, access.ErrForbidden):
 		return "You do not have permission for this action.", 403
 	case errors.Is(err, access.ErrNotFound):

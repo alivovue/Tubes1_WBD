@@ -16,6 +16,31 @@ func (s *Service) SaveGroup(ctx context.Context, actor, id int64, name, descript
 	})
 }
 
+func (s *Service) SetGroupLeader(ctx context.Context, actor, group, user int64) error {
+	if group < 1 || user < 1 {
+		return ErrInvalid
+	}
+	return s.adminChange(ctx, actor, func(tx *dao.Store) error {
+		return tx.SetGroupLeader(ctx, group, user)
+	})
+}
+
+func (s *Service) SaveGroupWithLeader(ctx context.Context, actor, id int64, name, description string, leader int64) error {
+	if id < 0 || leader < 1 || !cleanName(name, 100) || len(description) > 2000 {
+		return ErrInvalid
+	}
+	return s.adminChange(ctx, actor, func(tx *dao.Store) error {
+		if id == 0 {
+			_, err := tx.CreateLedGroup(ctx, strings.TrimSpace(name), description, leader)
+			return err
+		}
+		if err := tx.SaveGroup(ctx, id, strings.TrimSpace(name), description); err != nil {
+			return err
+		}
+		return tx.SetGroupLeader(ctx, id, leader)
+	})
+}
+
 func (s *Service) DeleteGroup(ctx context.Context, actor, id int64) error {
 	if id < 1 {
 		return ErrInvalid

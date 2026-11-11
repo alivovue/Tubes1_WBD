@@ -37,6 +37,7 @@ type Service struct {
 	access    *access.Service
 	databases *dbmanagement.Service
 	engines   *engines.Registry
+	workflow  *Workflow
 }
 type DraftInput struct {
 	ID                int64
@@ -74,7 +75,16 @@ func NewService(store *dao.Store, auth *access.Service, databases *dbmanagement.
 	if store == nil || auth == nil || databases == nil {
 		return nil, ErrInvalid
 	}
-	return &Service{store: store, access: auth, databases: databases, engines: engines.NewRegistry(pgengine.New(), mariaengine.New())}, nil
+	s := &Service{store: store, access: auth, databases: databases, engines: engines.NewRegistry(pgengine.New(), mariaengine.New())}
+	s.workflow = NewWorkflow(store, auth, WorkflowOptions{})
+	return s, nil
+}
+
+func (s *Service) Workflow() *Workflow { return s.workflow }
+
+// ConfigureWorkflow wires P3's adapters before starting HTTP servers/workers.
+func (s *Service) ConfigureWorkflow(options WorkflowOptions) {
+	s.workflow = NewWorkflow(s.store, s.access, options)
 }
 func SQLHash(query string) string {
 	sum := sha256.Sum256([]byte(query))

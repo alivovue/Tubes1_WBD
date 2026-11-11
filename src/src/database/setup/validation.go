@@ -21,6 +21,13 @@ func ValidateSchema(ctx context.Context, db *sql.DB) error {
 		return errors.New("platform runtime schema is incompatible; provision it outside the application")
 	}
 	rows.Close()
+	workflow, err := db.QueryContext(ctx, `SELECT r.up_sql,r.down_sql,v.authority_revision,h.reverses_execution_id,s.active_stack,j.status,a.outcome,p.last_cursor FROM migration_revisions r CROSS JOIN migration_reviews v CROSS JOIN migration_execution_history h CROSS JOIN migration_database_state s CROSS JOIN migration_jobs j CROSS JOIN migration_job_attempts a CROSS JOIN migration_batch_progress p LIMIT 0`)
+	if err != nil {
+		return errors.New("platform database schema is incomplete; provision the current schema outside the application")
+	}
+	if err = workflow.Close(); err != nil {
+		return err
+	}
 	var secrets bool
 	if err := db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='users' AND column_name IN ('password_hash','is_platform_admin','is_legacy_admin')) OR to_regclass('public.group_database_permissions') IS NOT NULL OR to_regclass('public.access_groups') IS NOT NULL OR to_regclass('public.user_groups') IS NOT NULL OR to_regclass('public.admin_users') IS NOT NULL OR EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='managed_databases' AND column_name IN ('db_username','encrypted_password'))`).Scan(&secrets); err != nil || secrets {
 		return errors.New("platform database still contains authoritative access-control storage; complete the documented control-plane cutover")

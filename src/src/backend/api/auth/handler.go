@@ -89,6 +89,13 @@ func (a Auth) ValidateAction(w http.ResponseWriter, r *http.Request, identity ac
 	}
 	return nil
 }
+
+func (a Auth) ValidateJSONAction(r *http.Request, identity access.Identity) error {
+	if !httpapi.SameOrigin(r) || a.Access.ValidateCSRF(identity, r.Header.Get("X-CSRF-Token")) != nil {
+		return access.ErrForbidden
+	}
+	return nil
+}
 func (a Auth) Logout(w http.ResponseWriter, r *http.Request, identity access.Identity) {
 	if err := a.Access.Logout(r.Context(), identity.SessionID); err != nil {
 		httpapi.Error(w, r, "Logout is temporarily unavailable. Please retry.", http.StatusServiceUnavailable)

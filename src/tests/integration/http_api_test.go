@@ -217,13 +217,13 @@ func TestMigrationAPIReviewDraftAndExecute(t *testing.T) {
 		t.Fatalf("changed SQL returned %d", stale.Code)
 	}
 	form.Set("sql", draft.SQL)
-	location = apiLocation(t, apiRequest(t, handler, http.MethodPost, "/migrations/new", cookie, form))
-	if location.Path != "/migrations" || location.Query().Get("id") == "" {
-		t.Fatal("execution did not lead to its changelog entry")
+	blocked := apiRequest(t, handler, http.MethodPost, "/migrations/new", cookie, form)
+	if blocked.Code != 409 {
+		t.Fatalf("browser bypassed approval/async workflow: %d %s", blocked.Code, blocked.Body.String())
 	}
-	history := apiRequest(t, handler, http.MethodGet, location.String(), cookie, nil)
-	execution := decodeAPI[struct{ Execution *dao.MigrationExecution }](t, history)
-	if history.Code != 200 || execution.Execution == nil || execution.Execution.Status != "succeeded" {
-		t.Fatalf("executed migration absent from history: %s", history.Body.String())
+	entries, err := f.migrations.History(f.ctx, f.editor, target.ID, 50, 0)
+	must(t, err)
+	if len(entries) != 0 {
+		t.Fatal("blocked browser execution created migration history")
 	}
 }
