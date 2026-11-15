@@ -1,0 +1,43 @@
+=== RUN   TestIT01CreateAdminAndLogin
+--- PASS: TestIT01CreateAdminAndLogin (2.70s)
+=== RUN   TestIT02IncorrectCredentialsCreateNoSession
+--- PASS: TestIT02IncorrectCredentialsCreateNoSession (2.54s)
+=== RUN   TestIT03LogoutInvalidatesPersistedSession
+--- PASS: TestIT03LogoutInvalidatesPersistedSession (2.14s)
+=== RUN   TestIT04DeactivateUserInvalidatesSessions
+--- PASS: TestIT04DeactivateUserInvalidatesSessions (3.04s)
+=== RUN   TestIT05LastActiveAdminCannotBeRemoved
+--- PASS: TestIT05LastActiveAdminCannotBeRemoved (2.28s)
+=== RUN   TestIT06PermissionsComeFromGroupsAndHighestGrantWins
+--- PASS: TestIT06PermissionsComeFromGroupsAndHighestGrantWins (2.34s)
+=== RUN   TestIT07ViewOnlyUserCannotAnalyzeOrExecuteMigration
+--- PASS: TestIT07ViewOnlyUserCannotAnalyzeOrExecuteMigration (2.41s)
+=== RUN   TestIT08RevokingGroupGrantInvalidatesAccessAndSessions
+--- PASS: TestIT08RevokingGroupGrantInvalidatesAccessAndSessions (2.68s)
+=== RUN   TestIT09ValidateAndRegisterPostgreSQLConnection
+--- PASS: TestIT09ValidateAndRegisterPostgreSQLConnection (1.80s)
+=== RUN   TestIT10ExploreRealSchemasTablesColumnsIndexesAndRows
+--- PASS: TestIT10ExploreRealSchemasTablesColumnsIndexesAndRows (2.32s)
+=== RUN   TestIT11DisableConnectionRemovesAccessAndRevokesSessions
+--- PASS: TestIT11DisableConnectionRemovesAccessAndRevokesSessions (2.65s)
+=== RUN   TestMariaDBMockRetainsDataAndRegistersWithPermissions
+    mariadb_fixture_test.go:44: optional MariaDB fixture test requires mariadbd and mariadb-install-db
+--- SKIP: TestMariaDBMockRetainsDataAndRegistersWithPermissions (0.29s)
+=== RUN   TestIT12SuccessfulMigrationCommitsSchemaReceiptAndHistory
+--- PASS: TestIT12SuccessfulMigrationCommitsSchemaReceiptAndHistory (1.99s)
+=== RUN   TestIT13FailedMigrationRollsBackAndDoesNotAdvanceVersion
+--- PASS: TestIT13FailedMigrationRollsBackAndDoesNotAdvanceVersion (2.04s)
+=== RUN   TestIT14SchemaAndVersionChangesInvalidateMigrationReview
+--- PASS: TestIT14SchemaAndVersionChangesInvalidateMigrationReview (2.08s)
+=== RUN   TestIT15StaleDraftUpdateDoesNotOverwriteNewerSQL
+--- PASS: TestIT15StaleDraftUpdateDoesNotOverwriteNewerSQL (1.78s)
+=== RUN   TestPrivilegePromotionRotatesAllActiveSessionsAndDeliversCookie
+--- PASS: TestPrivilegePromotionRotatesAllActiveSessionsAndDeliversCookie (4.59s)
+=== RUN   TestPrivilegeRotationsRecoverLatestTokenForConcurrentGraceRequests
+--- PASS: TestPrivilegeRotationsRecoverLatestTokenForConcurrentGraceRequests (3.39s)
+=== RUN   TestPrivilegeRotationFailureRollsBackPromotionAndTokens
+--- PASS: TestPrivilegeRotationFailureRollsBackPromotionAndTokens (3.28s)
+=== RUN   TestPrivilegeRotationGraceDoesNotOutliveAbsoluteExpiration
+--- PASS: TestPrivilegeRotationGraceDoesNotOutliveAbsoluteExpiration (3.33s)
+PASS
+ok  	tubes1_wbd/test/integration	53.355s

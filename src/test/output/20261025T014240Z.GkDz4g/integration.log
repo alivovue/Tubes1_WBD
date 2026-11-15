@@ -1,0 +1,3 @@
+Cannot prepare isolated integration databases: local PostgreSQL initialization failed; run as a regular user with PostgreSQL server tools installed
+FAIL	tubes1_wbd/test/integration	2.268s
+FAIL
