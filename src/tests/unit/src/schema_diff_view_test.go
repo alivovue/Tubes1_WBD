@@ -48,3 +48,16 @@ func TestSchemaDiffViewLeavesIdenticalSnapshotsUnmarked(t *testing.T) {
 		}
 	}
 }
+
+// A very asymmetric snapshot must remain usable without allocating a product
+// sized matrix or overflowing a summed preallocation capacity.
+func TestSchemaDiffViewHandlesLargeAsymmetricSnapshot(t *testing.T) {
+	before := make([]string, 12000)
+	for i := range before {
+		before[i] = "column"
+	}
+	view := response.BuildSchemaDiffView(before, []string{})
+	if view.Removed != len(before)+2 || view.Added != 1 || len(view.Rows) != len(before)+2 {
+		t.Fatalf("large snapshot lost diff rows: removed=%d added=%d rows=%d", view.Removed, view.Added, len(view.Rows))
+	}
+}

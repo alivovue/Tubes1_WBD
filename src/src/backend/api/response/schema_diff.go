@@ -6,6 +6,7 @@ import (
 )
 
 const maxSchemaDiffCells = 2_000_000
+const maxSchemaDiffLCSLines = 10_000
 
 type SchemaDiffCell struct {
 	Line   int
@@ -48,12 +49,18 @@ func alignSchemaDiffLines(before, after []string) SchemaDiffView {
 		return SchemaDiffView{}
 	}
 
-	if len(before) > 0 && len(after) > 0 && len(before) > maxSchemaDiffCells/len(after) {
+	// Bound both dimensions before adding the sentinel row/column or multiplying.
+	// The linear fallback also handles empty and very asymmetric snapshots.
+	if len(before) > maxSchemaDiffLCSLines || len(after) > maxSchemaDiffLCSLines {
 		return alignLargeSchemaDiff(before, after)
 	}
 
+	rows := len(before) + 1
 	columns := len(after) + 1
-	lcs := make([]int, (len(before)+1)*columns)
+	if rows > maxSchemaDiffCells/columns {
+		return alignLargeSchemaDiff(before, after)
+	}
+	lcs := make([]int, rows*columns)
 	for beforeIndex := len(before) - 1; beforeIndex >= 0; beforeIndex-- {
 		for afterIndex := len(after) - 1; afterIndex >= 0; afterIndex-- {
 			cell := beforeIndex*columns + afterIndex
@@ -71,7 +78,7 @@ func alignSchemaDiffLines(before, after []string) SchemaDiffView {
 		}
 	}
 
-	operations := make([]schemaDiffOperation, 0, len(before)+len(after))
+	var operations []schemaDiffOperation
 	beforeIndex, afterIndex := 0, 0
 	for beforeIndex < len(before) || afterIndex < len(after) {
 		switch {
@@ -163,7 +170,7 @@ func alignLargeSchemaDiff(before, after []string) SchemaDiffView {
 		suffix++
 	}
 
-	operations := make([]schemaDiffOperation, 0, len(before)+len(after))
+	var operations []schemaDiffOperation
 	for index := 0; index < prefix; index++ {
 		operations = append(operations, schemaDiffOperation{kind: "equal", line: index + 1, text: before[index]})
 	}

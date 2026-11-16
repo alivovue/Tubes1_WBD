@@ -569,7 +569,7 @@ func Compare(current, desired Snapshot) (Result, error) {
 			if new.Table.Kind != "" && new.Table.Kind != "r" {
 				return result, ErrUnsupported
 			}
-			parts := make([]string, 0, len(new.Columns)+len(new.Constraints))
+			var parts []string
 			for _, column := range new.Columns {
 				value, err := columnSQL(dbms, column)
 				if err != nil {
