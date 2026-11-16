@@ -1,0 +1,32 @@
+=== RUN   TestIT01CreateAdminAndLogin
+--- PASS: TestIT01CreateAdminAndLogin (2.61s)
+=== RUN   TestIT02IncorrectCredentialsCreateNoSession
+--- PASS: TestIT02IncorrectCredentialsCreateNoSession (2.55s)
+=== RUN   TestIT03LogoutInvalidatesPersistedSession
+--- PASS: TestIT03LogoutInvalidatesPersistedSession (2.11s)
+=== RUN   TestIT04DeactivateUserInvalidatesSessions
+--- PASS: TestIT04DeactivateUserInvalidatesSessions (2.95s)
+=== RUN   TestIT05LastActiveAdminCannotBeRemoved
+--- PASS: TestIT05LastActiveAdminCannotBeRemoved (2.09s)
+=== RUN   TestIT06PermissionsComeFromGroupsAndHighestGrantWins
+--- PASS: TestIT06PermissionsComeFromGroupsAndHighestGrantWins (2.15s)
+=== RUN   TestIT07ViewOnlyUserCannotAnalyzeOrExecuteMigration
+--- PASS: TestIT07ViewOnlyUserCannotAnalyzeOrExecuteMigration (2.24s)
+=== RUN   TestIT08RevokingGroupGrantInvalidatesAccessAndSessions
+--- PASS: TestIT08RevokingGroupGrantInvalidatesAccessAndSessions (2.56s)
+=== RUN   TestIT09ValidateAndRegisterPostgreSQLConnection
+--- PASS: TestIT09ValidateAndRegisterPostgreSQLConnection (1.89s)
+=== RUN   TestIT10ExploreRealSchemasTablesColumnsIndexesAndRows
+--- PASS: TestIT10ExploreRealSchemasTablesColumnsIndexesAndRows (2.22s)
+=== RUN   TestIT11DisableConnectionRemovesAccessAndRevokesSessions
+--- PASS: TestIT11DisableConnectionRemovesAccessAndRevokesSessions (2.52s)
+=== RUN   TestIT12SuccessfulMigrationCommitsSchemaReceiptAndHistory
+--- PASS: TestIT12SuccessfulMigrationCommitsSchemaReceiptAndHistory (1.95s)
+=== RUN   TestIT13FailedMigrationRollsBackAndDoesNotAdvanceVersion
+--- PASS: TestIT13FailedMigrationRollsBackAndDoesNotAdvanceVersion (2.00s)
+=== RUN   TestIT14SchemaAndVersionChangesInvalidateMigrationReview
+--- PASS: TestIT14SchemaAndVersionChangesInvalidateMigrationReview (2.11s)
+=== RUN   TestIT15StaleDraftUpdateDoesNotOverwriteNewerSQL
+--- PASS: TestIT15StaleDraftUpdateDoesNotOverwriteNewerSQL (1.76s)
+PASS
+ok  	tubes1_wbd/test/integration	36.815s

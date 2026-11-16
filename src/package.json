@@ -11,7 +11,8 @@
     "build": "npm run build --workspaces --if-present",
     "build:user": "npm run build --workspace=schakker-frontend",
     "build:admin": "npm run build --workspace=schakker-admin-frontend",
-    "typecheck:shared": "npm run typecheck --workspace=@schakker/ui"
+    "typecheck:shared": "npm run typecheck --workspace=@schakker/ui",
+    "verify:person1": "node tests/frontend/person1-ui.mjs"
   },
   "engines": {
     "node": ">=22.12.0"

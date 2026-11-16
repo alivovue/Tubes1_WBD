@@ -37,6 +37,12 @@ export function MigrationEditor() {
         title="Create migration"
         text="Compose → Analyze → Review → Execute. Only Execute applies changes."
       >
+        <Link
+          className="button button--primary"
+          to={url("/migrations", { db: data.Database.ID, view: "definitions" })}
+        >
+          Up/down approval workflow
+        </Link>
         {!!data.Database.ID && (
           <a className="button button--secondary" href="#query-plan">
             Query Plan

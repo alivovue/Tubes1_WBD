@@ -34,11 +34,7 @@ export function Dashboard() {
             "Based on group permissions",
           ],
           ["Editable databases", data.EditableCount, "View + Edit"],
-          [
-            "Account role",
-            "Employee",
-            "Database access is granted separately",
-          ],
+          ["Account role", "Employee", "Database access is granted separately"],
           ["Session expires", stamp(data.Expires), "Idle timeout: 30 minutes"],
         ].map(([label, value, detail]) => (
           <article className="metric-card" key={label}>
@@ -454,6 +450,12 @@ export function History() {
         title="Changelog"
         text="Linear history of execution attempts for each database."
       >
+        <Link
+          className="button button--secondary"
+          to={url("/migrations", { db: data.Database.ID, view: "history" })}
+        >
+          Committed history
+        </Link>
         {data.CanEdit && (
           <Link
             className="button button--primary"

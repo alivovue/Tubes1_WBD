@@ -1,5 +1,7 @@
 # Schakker
 
+Milestone 2 Person 1 UI (tanpa bonus): buka **Migration workflow** untuk draft SQL up/down, approval grup, antrean/progres job, rollback/forward dan riwayat committed. Admin **Groups** menyediakan penunjukan leader. Lihat [cakupan, demo dan hasil verifikasi frontend](docs/m2-person1.md) serta [kontrak API P2/P3](docs/m2-frontend-api.md). Endpoint M2 dan penyimpanan leader masih membutuhkan implementasi backend P2/P3; frontend menampilkan error saat endpoint belum tersedia.
+
 Source workspace Schakker berada di folder `src/` repositori. Di dalamnya terdapat aplikasi pengguna (`src/src/` dari root repositori), aplikasi administrasi (`src/src-admin/`), library bersama (`src/shared/`), serta konfigurasi Go/npm dan test integrasi. Launcher Bash dan Windows berada di root repositori.
 
 | Aplikasi | Port Go | Port Vite | Launcher |
@@ -73,7 +75,7 @@ Cookie menggunakan HttpOnly, SameSite=Lax, serta Secure pada HTTPS/production. I
 
 ## Pengujian
 
-Hanya backend yang memiliki test. Semua Go unit test, integration test, mock database dan laporan berada di `src/tests/` dari root repositori. Test frontend beserta setup, runner dan dependensinya telah dihapus. Lihat [struktur dan perintah test M2](docs/m2-person2.md#verification).
+Go unit test, integration test, mock database dan laporan berada di `src/tests/` dari root repositori. Verifikasi browser Person 1 menggunakan fixture API sintetis tanpa dependensi test frontend tambahan: jalankan `npm run verify:person1` dari `src/` setelah build. [Panduan dan batas verifikasi UI](docs/m2-person1.md) menjelaskan bukti screenshot serta integrasi backend yang masih diperlukan.
 
 ```text
 src/tests/

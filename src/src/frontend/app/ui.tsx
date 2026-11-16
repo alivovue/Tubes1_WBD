@@ -26,6 +26,8 @@ export const PageContext = createContext<{
   analysisState: { loading: boolean; error: string };
   submit: (fields: Fields) => Promise<boolean>;
   refresh: () => void;
+  expire: () => void;
+  acceptCSRF: (csrf?: string) => void;
 } | null>(null);
 export function usePage() {
   const value = useContext(PageContext);
@@ -51,9 +53,11 @@ export function Form(props: {
 export function DatabasePicker({
   databases,
   selected,
+  preserve = {},
 }: {
   databases: Database[] | null;
   selected: number;
+  preserve?: Record<string, string>;
 }) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
@@ -62,7 +66,9 @@ export function DatabasePicker({
       <Field label="Target database">
         <select
           value={selected || ""}
-          onChange={(e) => navigate(url(pathname, { db: e.target.value }))}
+          onChange={(e) =>
+            navigate(url(pathname, { ...preserve, db: e.target.value }))
+          }
           disabled={!databases?.length}
         >
           {!databases?.length && (

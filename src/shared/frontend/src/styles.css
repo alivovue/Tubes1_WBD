@@ -3283,6 +3283,132 @@ pre {
   color: var(--text-muted);
   cursor: pointer;
 }
+
+/* Migration workflow: contained SQL/table scrolling on desktop and mobile. */
+.migration-tabs,
+.migration-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 0 0 20px;
+}
+.migration-definition-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(240px, 1fr);
+  align-items: start;
+  gap: 20px;
+}
+.migration-definition-layout > *,
+.migration-review-card > *,
+.migration-batch-config,
+.migration-decision,
+.form-fields,
+.field {
+  min-width: 0;
+}
+.migration-sql-input {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow: auto;
+  resize: vertical;
+  font:
+    13px/1.65 "Cascadia Code",
+    Consolas,
+    monospace;
+  tab-size: 2;
+}
+.migration-card-list {
+  display: grid;
+  gap: 16px;
+  padding: 20px;
+}
+.migration-list-entry {
+  display: grid;
+  gap: 8px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-soft);
+  overflow-wrap: anywhere;
+}
+.migration-list-entry p {
+  margin: 0;
+}
+.migration-list-entry small,
+.migration-secondary {
+  display: block;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+.migration-review-card,
+.migration-batch-config,
+.migration-progress {
+  display: grid;
+  gap: 18px;
+}
+.migration-review-card p,
+.migration-progress p {
+  margin: 0;
+}
+.migration-decision {
+  padding: 18px;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+}
+.migration-sql-details,
+.migration-audit {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.migration-sql-details summary,
+.migration-audit summary {
+  cursor: pointer;
+}
+.migration-sql-details pre {
+  padding: 16px;
+  background: var(--surface-strong);
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+}
+.migration-warning {
+  color: #f2bd76;
+  overflow-wrap: anywhere;
+}
+.migration-progress progress {
+  display: block;
+  width: 100%;
+  height: 14px;
+  accent-color: var(--blue);
+}
+.migration-progress .detail-grid {
+  margin-bottom: 0;
+}
+.migration-review-card code,
+.integration-form > p code {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 1000px) {
+  .migration-definition-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 600px) {
+  .migration-tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .migration-tabs .button {
+    white-space: normal;
+    text-align: center;
+  }
+  .migration-decision {
+    padding: 12px;
+  }
+  .migration-batch-config .form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
 @media (max-width: 600px) {
   .query-plan-statement {
     padding: 12px;

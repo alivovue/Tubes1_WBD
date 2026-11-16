@@ -1,0 +1,93 @@
+{
+  "browser": {
+    "protocolVersion": "1.3",
+    "product": "Edg/157.0.4341.42",
+    "revision": "@7b1486be4607d53d9f93841b7c776bc525ca74b7",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+    "jsVersion": "15.7.11.4"
+  },
+  "scope": "Synthetic API fixture UI checks; backend authorization and execution are not exercised.",
+  "viewport_widths": [
+    1440,
+    390,
+    375
+  ],
+  "results": [
+    {
+      "name": "M1 routes render in both SPAs",
+      "passed": true
+    },
+    {
+      "name": "Draft requires SQL down or irreversibility reason; batch settings persist",
+      "passed": true
+    },
+    {
+      "name": "Draft edits use optimistic revision and block unsaved submission",
+      "passed": true
+    },
+    {
+      "name": "Both access groups require explicit leader decisions, including View Only",
+      "passed": true
+    },
+    {
+      "name": "Partial jobs preserve committed progress; resume uses an idempotent API action",
+      "passed": true
+    },
+    {
+      "name": "Batch cancellation requests a fresh review",
+      "passed": true
+    },
+    {
+      "name": "Hide rollback uses exact execution pairs and preserves a later forward",
+      "passed": true
+    },
+    {
+      "name": "Rollback and forward each create a new review for the exact execution",
+      "passed": true
+    },
+    {
+      "name": "403, 409, 422, 503, loading, empty and missing resources have usable states",
+      "passed": true
+    },
+    {
+      "name": "View Only users can inspect and decide as leaders but cannot submit or enqueue",
+      "passed": true
+    },
+    {
+      "name": "Rejected and invalidated reviews can request a fresh approval cycle",
+      "passed": true
+    },
+    {
+      "name": "Frozen SQL can be copied into a separate draft without altering its revision",
+      "passed": true
+    },
+    {
+      "name": "A missing leader blocks enqueue even when an inconsistent server flag permits it",
+      "passed": true
+    },
+    {
+      "name": "Stale mutation errors retain unsaved SQL and title",
+      "passed": true
+    },
+    {
+      "name": "Compensation, failure and uncertain job states remain visible; leaving stops polling",
+      "passed": true
+    },
+    {
+      "name": "Responsive layouts and internal scrolling at 1440, 390 and 375 pixels",
+      "passed": true
+    },
+    {
+      "name": "Admin leader selection excludes inactive members and surfaces backend validation",
+      "passed": true
+    },
+    {
+      "name": "Login and logout remain usable in both SPAs",
+      "passed": true
+    },
+    {
+      "name": "No browser runtime errors or direct migration execution from new screens",
+      "passed": true
+    }
+  ]
+}

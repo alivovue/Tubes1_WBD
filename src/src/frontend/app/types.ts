@@ -186,3 +186,157 @@ export type APIResult = Partial<PageData> & {
   location?: string;
   error?: string;
 };
+
+// M2 resource contracts. Kept separate from the existing M1 page/analysis DTOs.
+export type MigrationAction =
+  | "up"
+  | "up_batch"
+  | "rollback"
+  | "forward"
+  | "cancel_batch";
+export type DefinitionStatus = "draft" | "submitted" | "executed";
+export type ReviewStatus =
+  | "pending_review"
+  | "approved"
+  | "rejected"
+  | "invalidated";
+export type JobStatus =
+  | "pending"
+  | "running"
+  | "succeeded"
+  | "failed"
+  | "partial"
+  | "uncertain"
+  | "reverting"
+  | "reverted"
+  | "partially_reverted";
+export type BatchConfig = {
+  template: "update_by_key";
+  schema: string;
+  table: string;
+  key_column: string;
+  batch_size: number;
+  expected_rows?: number;
+};
+export type DefinitionInput = {
+  database_id: number;
+  title: string;
+  up_sql: string;
+  down_sql: string;
+  irreversible: boolean;
+  irreversibility_reason: string;
+  batch: BatchConfig | null;
+  expected_revision?: number;
+};
+export type MigrationDefinition = DefinitionInput & {
+  id: number;
+  revision: number;
+  status: DefinitionStatus;
+  editable: boolean;
+  definition_hash: string;
+  created_by: string;
+  updated_at: string;
+};
+export type RequiredApproval = {
+  group_id: number;
+  group_name: string;
+  permission: "view_only" | "view_edit";
+  leader_user_id: number | null;
+  leader_name: string | null;
+  decision: "pending" | "approved" | "rejected";
+  decided_by?: string;
+  decided_at?: string;
+  reason?: string;
+  can_decide: boolean;
+};
+export type MigrationReview = {
+  id: number;
+  database_id: number;
+  definition_id: number;
+  revision: number;
+  title: string;
+  action: MigrationAction;
+  target_execution_id: number | null;
+  status: ReviewStatus;
+  requested_by: string;
+  requested_at: string;
+  definition_hash: string;
+  authority_revision: string;
+  up_sql: string;
+  down_sql: string;
+  irreversible: boolean;
+  irreversibility_reason: string;
+  batch: BatchConfig | null;
+  required_groups: RequiredApproval[];
+  reason?: string;
+  can_enqueue: boolean;
+  can_resubmit: boolean;
+  job_id?: string | null;
+};
+export type MigrationJob = {
+  job_id: string;
+  database_id: number;
+  definition_id: number;
+  review_id: number;
+  title: string;
+  operation: MigrationAction;
+  status: JobStatus;
+  requested_by: string;
+  created_at: string;
+  started_at: string | null;
+  completed_at: string | null;
+  attempt: number;
+  max_attempts: number;
+  next_retry_at: string | null;
+  committed_batches: number;
+  committed_rows: number;
+  reverted_batches: number;
+  reverted_rows: number;
+  total_rows: number | null;
+  last_cursor: string | null;
+  retryable: boolean;
+  can_cancel: boolean;
+  blocked_reason: string | null;
+  error: string | null;
+};
+export type MigrationExecution = {
+  id: number;
+  database_id: number;
+  definition_id: number;
+  revision: number;
+  version: number;
+  title: string;
+  operation: MigrationAction;
+  sql: string;
+  actor: string;
+  committed_at: string;
+  duration_ms: number;
+  job_id: string;
+  review_id: number;
+  target_execution_id: number | null;
+  irreversible: boolean;
+  irreversibility_reason: string;
+  can_rollback: boolean;
+  can_forward: boolean;
+  action_blocked_reason?: string;
+};
+export type ResourceResponse = { CSRF?: string; error?: string };
+export type DefinitionsResponse = ResourceResponse & {
+  definitions: MigrationDefinition[];
+};
+export type DefinitionResponse = ResourceResponse & {
+  definition: MigrationDefinition;
+};
+export type ReviewsResponse = ResourceResponse & { reviews: MigrationReview[] };
+export type ReviewResponse = ResourceResponse & { review: MigrationReview };
+export type JobsResponse = ResourceResponse & { jobs: MigrationJob[] };
+export type JobResponse = ResourceResponse & { job: MigrationJob };
+export type EnqueueResponse = ResourceResponse & {
+  job_id: string;
+  status: JobStatus;
+  review_id: number;
+};
+export type HistoryResponse = ResourceResponse & {
+  executions: MigrationExecution[];
+  next_cursor: string | null;
+};

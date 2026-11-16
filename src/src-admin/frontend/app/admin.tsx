@@ -186,6 +186,10 @@ function GroupCard({
 }) {
   const { data } = usePage();
   const [editor, setEditor] = useState(group.Editor);
+  const leader = group.Members?.find(
+    (user) => user.ID === group.LeaderUserID && user.Active,
+  );
+  const activeMembers = group.Members?.filter((user) => user.Active) || [];
   useEffect(() => {
     setEditor(group.Editor);
   }, [group.Editor]);
@@ -220,6 +224,20 @@ function GroupCard({
       </header>
       <div className="group-card__body">
         <section className="group-members" aria-label={`${group.Name} members`}>
+          <h3>Group leader</h3>
+          {leader ? (
+            <p>
+              {leader.DisplayName} <small>({leader.Username})</small>
+            </p>
+          ) : (
+            <p className="migration-warning">
+              No active member is designated as leader. Migration approvals may
+              be blocked.
+            </p>
+          )}
+          {group.LeadershipError && (
+            <Notice error>{group.LeadershipError}</Notice>
+          )}
           <h3>Members</h3>
           <ul className="member-list">
             {group.Members?.map((user) => (
@@ -262,6 +280,7 @@ function GroupCard({
       >
         {[
           ["membership", "Edit membership"],
+          ["leader", "Designate leader"],
           ["access", "Edit access"],
           ["information", "Edit group"],
         ].map(([key, label]) => (
@@ -277,6 +296,45 @@ function GroupCard({
           </button>
         ))}
       </div>
+      <section
+        className="group-editor"
+        id={`group-leader-${group.ID}`}
+        hidden={editor !== "leader"}
+      >
+        {heading("Designate group leader")}
+        <p className="muted">
+          Choose one active group member. This leader reviews migrations for
+          every database the group can access, including View Only grants.
+          Changing the leader may invalidate existing approvals.
+        </p>
+        <Form>
+          <Hidden name="action" value="set_leader" />
+          <Hidden name="id" value={group.ID} />
+          <Field label={`Leader for ${group.Name}`}>
+            <select
+              name="leader_user_id"
+              defaultValue={leader?.ID || ""}
+              required
+              disabled={!activeMembers.length}
+            >
+              <option value="" disabled>
+                Select an active member
+              </option>
+              {activeMembers.map((user) => (
+                <option key={user.ID} value={user.ID}>
+                  {user.DisplayName} ({user.Username})
+                </option>
+              ))}
+            </select>
+          </Field>
+          {!activeMembers.length && (
+            <Notice error>
+              Add an active member before designating a leader.
+            </Notice>
+          )}
+          <Button disabled={!activeMembers.length}>Save leader</Button>
+        </Form>
+      </section>
       <section
         className="group-editor"
         id={`group-membership-${group.ID}`}
@@ -301,6 +359,12 @@ function GroupCard({
               <option value="no">Remove from group</option>
             </select>
           </Field>
+          {leader && (
+            <p className="muted">
+              Assign a replacement leader before removing {leader.DisplayName}{" "}
+              or deactivating their account.
+            </p>
+          )}
           <Button secondary>Update membership</Button>
         </Form>
       </section>
@@ -455,7 +519,11 @@ function ConnectionForm({ database }: { database?: Database }) {
           />
         </Field>
         <Field label="DBMS">
-          <select name="dbms" defaultValue={database?.DBMS || "postgresql"} disabled={!!database}>
+          <select
+            name="dbms"
+            defaultValue={database?.DBMS || "postgresql"}
+            disabled={!!database}
+          >
             {data.DBMS?.map((value) => (
               <option key={value}>{value}</option>
             ))}

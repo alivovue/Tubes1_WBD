@@ -12,7 +12,6 @@ import {
 import {
   Link,
   Navigate,
-  NavLink,
   Outlet,
   Route,
   Routes,
@@ -25,6 +24,7 @@ import { Button, Field, Icon, initials, Notice, PageContext } from "./ui";
 import { Dashboard, Databases, Explorer, History } from "./workspace";
 import { SQLViewer } from "./SQLViewer";
 import { MigrationEditor } from "./MigrationEditor";
+import { MigrationWorkspace, migrationViews } from "./MigrationWorkspace";
 
 const SessionContext = createContext<{
   session: APIResult;
@@ -278,18 +278,29 @@ function Layout() {
       setBusy(false);
     }
   }
-  const nav = (to: string, label: string, icon: string) => (
-    <NavLink
-      end
-      className={({ isActive }) =>
-        `nav-item${isActive || (to === "/databases" && location.pathname === "/explorer") ? " is-active" : ""}`
-      }
-      to={to}
-    >
-      <Icon name={icon} />
-      <span>{label}</span>
-    </NavLink>
-  );
+  const workflowOpen =
+    location.pathname === "/migrations" &&
+    migrationViews.some(
+      (view) => view === new URLSearchParams(location.search).get("view"),
+    );
+  const nav = (to: string, label: string, icon: string) => {
+    const active = to.includes("?view=")
+      ? workflowOpen
+      : to === "/migrations"
+        ? location.pathname === to && !workflowOpen
+        : location.pathname === to ||
+          (to === "/databases" && location.pathname === "/explorer");
+    return (
+      <Link
+        className={`nav-item${active ? " is-active" : ""}`}
+        to={to}
+        aria-current={active ? "page" : undefined}
+      >
+        <Icon name={icon} />
+        <span>{label}</span>
+      </Link>
+    );
+  };
   return (
     <>
       <a className="skip-link" href="#main-content">
@@ -317,6 +328,11 @@ function Layout() {
             {nav("/databases", "My Databases", "database")}
             {nav("/sql-viewer", "SQL Viewer", "code")}
             {nav("/migrations/new", "SQL Migration", "code")}
+            {nav(
+              "/migrations?view=definitions",
+              "Migration workflow",
+              "history",
+            )}
             {nav("/migrations", "Changelog", "history")}
           </nav>
           <div className="sidebar__footer">
@@ -389,9 +405,20 @@ function Page() {
   });
   const currentPath = location.pathname + location.search;
   const apiParams = new URLSearchParams(location.search);
+  const workflow =
+    location.pathname === "/migrations" &&
+    migrationViews.some((view) => view === apiParams.get("view"));
+  const selectedDatabase = workflow ? apiParams.get("db") || "" : "";
   apiParams.delete("tab");
-  const requestPath =
-    location.pathname + (apiParams.size ? `?${apiParams}` : "");
+  const requestPath = workflow
+    ? "/databases"
+    : location.pathname + (apiParams.size ? `?${apiParams}` : "");
+  const acceptCSRF = useCallback((csrf?: string) => {
+    if (csrf)
+      setData((current) =>
+        current && current.CSRF !== csrf ? { ...current, CSRF: csrf } : current,
+      );
+  }, []);
   const activePath = useRef(currentPath);
   activePath.current = currentPath;
   const refresh = () => setRevision((value) => value + 1);
@@ -403,12 +430,26 @@ function Page() {
     setAnalysisState({ loading: false, error: "" });
     api(requestPath, undefined, undefined, controller.signal)
       .then((result) => {
+        if (controller.signal.aborted) return;
         if (result.location) {
           navigate(result.location, { replace: true });
           return;
         }
-        setData(result as PageData);
-        update(result);
+        if (workflow) {
+          const databases = result.Databases || [];
+          const database = selectedDatabase
+            ? databases.find((item) => String(item.ID) === selectedDatabase)
+            : databases[0];
+          if (selectedDatabase && !database)
+            throw new Error("You do not have access to the selected database.");
+          setData({
+            ...result,
+            Title: "Migration workflow",
+            Database: database || { ID: 0 },
+            CanEdit: database?.Permission === "view_edit",
+          } as PageData);
+        } else setData(result as PageData);
+        update(workflow ? { ...result, Title: "Migration workflow" } : result);
       })
       .catch((problem) => {
         if (controller.signal.aborted) return;
@@ -419,7 +460,15 @@ function Page() {
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [requestPath, revision, navigate, update, expire]);
+  }, [
+    requestPath,
+    revision,
+    navigate,
+    update,
+    expire,
+    workflow,
+    selectedDatabase,
+  ]);
   useEffect(() => {
     if (data?.Title) document.title = `${data.Title} · Schakker Data Platform`;
   }, [data?.Title]);
@@ -493,12 +542,16 @@ function Page() {
       content = <MigrationEditor />;
       break;
     case "/migrations":
-      content = <History />;
+      content = workflow ? (
+        <MigrationWorkspace key={data.Database.ID} />
+      ) : (
+        <History />
+      );
       break;
   }
   return (
     <PageContext.Provider
-      value={{ data, busy, submit, refresh, analysisState }}
+      value={{ data, busy, submit, refresh, analysisState, expire, acceptCSRF }}
     >
       <div aria-busy={busy}>
         {error && <Notice error>{error}</Notice>}
