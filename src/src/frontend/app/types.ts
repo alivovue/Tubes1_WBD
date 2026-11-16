@@ -215,6 +215,8 @@ export type BatchConfig = {
   schema: string;
   table: string;
   key_column: string;
+  value_column: string;
+  delta: number;
   batch_size: number;
   expected_rows?: number;
 };
@@ -226,10 +228,12 @@ export type DefinitionInput = {
   irreversible: boolean;
   irreversibility_reason: string;
   batch: BatchConfig | null;
-  expected_revision?: number;
+  expected_revision_id?: number;
 };
 export type MigrationDefinition = DefinitionInput & {
   id: number;
+  revision_id: number;
+  expected_generation: number;
   revision: number;
   status: DefinitionStatus;
   editable: boolean;
@@ -253,10 +257,13 @@ export type MigrationReview = {
   id: number;
   database_id: number;
   definition_id: number;
+  revision_id: number;
+  expected_generation: number;
   revision: number;
   title: string;
   action: MigrationAction;
-  target_execution_id: number | null;
+  target_execution_id: string | null;
+  target_job_id: string | null;
   status: ReviewStatus;
   requested_by: string;
   requested_at: string;
@@ -277,6 +284,8 @@ export type MigrationJob = {
   job_id: string;
   database_id: number;
   definition_id: number;
+  revision_id: number;
+  expected_generation: number;
   review_id: number;
   title: string;
   operation: MigrationAction;
@@ -300,9 +309,11 @@ export type MigrationJob = {
   error: string | null;
 };
 export type MigrationExecution = {
-  id: number;
+  id: string;
   database_id: number;
   definition_id: number;
+  revision_id: number;
+  expected_generation: number;
   revision: number;
   version: number;
   title: string;
@@ -310,10 +321,10 @@ export type MigrationExecution = {
   sql: string;
   actor: string;
   committed_at: string;
-  duration_ms: number;
+  duration_ms: number | null;
   job_id: string;
   review_id: number;
-  target_execution_id: number | null;
+  target_execution_id: string | null;
   irreversible: boolean;
   irreversibility_reason: string;
   can_rollback: boolean;

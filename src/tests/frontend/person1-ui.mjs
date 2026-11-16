@@ -10,7 +10,7 @@ import { basename, dirname, extname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
-const evidence = join(root, "docs/qa/person1");
+const evidence = process.env.SCHAKKER_QA_OUTPUT || join(root, "docs/qa/person1");
 const userDist = join(root, "src/src/frontend/dist");
 const adminDist = join(root, "src/src-admin/frontend/dist");
 const browserPath =
@@ -65,6 +65,8 @@ const database = {
 const date = "2026-11-11T03:00:00Z";
 const definition = {
   id: 1,
+  revision_id: 101,
+  expected_generation: 0,
   database_id: 7,
   title: "Add demo flag",
   revision: 1,
@@ -92,6 +94,9 @@ const makeReview = (id, source, action = "up", target = null) => ({
   id,
   database_id: 7,
   definition_id: source.id,
+  revision_id: source.revision_id,
+  expected_generation: 0,
+  target_job_id: null,
   revision: source.revision,
   title: source.title,
   action,
@@ -118,6 +123,8 @@ const makeJob = () => ({
   job_id: "demo-job-1",
   database_id: 7,
   definition_id: 1,
+  revision_id: 101,
+  expected_generation: 0,
   review_id: 1,
   title: "Batch demo update",
   operation: "up_batch",
@@ -141,9 +148,11 @@ const makeJob = () => ({
   error: null,
 });
 const makeEvent = (id, operation, target = null) => ({
-  id,
+  id: String(id),
   database_id: 7,
   definition_id: 1,
+  revision_id: 101,
+  expected_generation: 1,
   revision: 1,
   version: 1,
   title: "Add demo flag",
@@ -154,7 +163,7 @@ const makeEvent = (id, operation, target = null) => ({
   duration_ms: 125,
   job_id: `history-job-${id}`,
   review_id: id,
-  target_execution_id: target,
+  target_execution_id: target == null ? null : String(target),
   irreversible: false,
   irreversibility_reason: "",
   can_rollback: id === 3,
@@ -295,24 +304,30 @@ const server = createServer(async (req, res) => {
           saved = state.definitions.find(
             (item) => String(item.id) === path.split("/").at(-1),
           );
-          if (!saved || saved.revision !== body.expected_revision)
+          if (!saved || saved.revision_id !== body.expected_revision_id)
             return json(res, 409, { error: "Stale draft revision" });
-          Object.assign(saved, body, { revision: saved.revision + 1 });
+          Object.assign(saved, body, { revision: saved.revision + 1, revision_id: saved.revision_id + 1 });
         } else {
           saved = {
             ...structuredClone(definition),
             ...body,
             id: state.definitions.length + 1,
+            revision_id: 100 + state.definitions.length + 1,
           };
           state.definitions.push(saved);
         }
+        saved.irreversibility_reason = body.irreversible_reason;
+        if (body.up_sql.startsWith("-- schakker:batch ")) {
+          const spec = JSON.parse(body.up_sql.split("\n")[0].slice("-- schakker:batch ".length));
+          saved.batch = { template: "update_by_key", schema: spec.schema, table: spec.table, key_column: spec.key, value_column: spec.column, delta: spec.delta, batch_size: spec.size, expected_rows: spec.expected_rows };
+        } else saved.batch = null;
         return json(res, 200, { definition: saved });
       }
       if (path === "/api/migration-reviews" && req.method === "GET")
         return json(res, 200, { reviews: state.reviews });
       if (path === "/api/migration-reviews" && req.method === "POST") {
         const source = state.definitions.find(
-          (item) => item.id === body.definition_id,
+          (item) => item.revision_id === body.revision_id,
         );
         source.editable = false;
         source.status = "submitted";
@@ -334,15 +349,15 @@ const server = createServer(async (req, res) => {
             (group) => group.group_id === body.group_id,
           ),
           {
-            decision: body.decision,
-            reason: body.reason,
+            decision: body.decision === "approve" ? "approved" : "rejected",
+            reason: body.note,
             decided_by: person.Username,
             decided_at: date,
             can_decide: false,
           },
         );
         review.status =
-          body.decision === "rejected"
+          body.decision === "reject"
             ? "rejected"
             : review.required_groups.every(
                   (group) => group.decision === "approved",
@@ -403,7 +418,7 @@ const server = createServer(async (req, res) => {
           state.reviews.length + 1,
           definition,
           operation,
-          operation === "cancel_batch" ? null : Number(path.split("/")[3]),
+          operation === "cancel_batch" ? null : path.split("/")[3],
         );
         state.reviews.push(review);
         return json(res, 200, { review });
@@ -483,15 +498,18 @@ const browser = spawn(
     `--user-data-dir=${profile}`,
     "about:blank",
   ],
-  { stdio: "ignore", windowsHide: true },
+  { stdio: ["ignore", "ignore", "pipe"], windowsHide: true },
 );
+let browserStartup = "";
+browser.stderr.on("data", (chunk) => { browserStartup = (browserStartup + chunk).slice(-4000); });
 let socket;
 const results = [];
 const browserErrors = [];
 const delay = (ms) => new Promise((done) => setTimeout(done, ms));
 try {
   const portFile = join(profile, "DevToolsActivePort");
-  for (let i = 0; !existsSync(portFile) && i < 150; i++) await delay(100);
+  for (let i = 0; !existsSync(portFile) && i < 300 && browser.exitCode == null; i++) await delay(100);
+  assert(existsSync(portFile), `Browser did not start: ${browserStartup}`);
   const port = (await readFile(portFile, "utf8")).split("\n")[0];
   const target = await fetch(`http://127.0.0.1:${port}/json/new?about:blank`, {
     method: "PUT",
@@ -548,10 +566,15 @@ try {
       if (await evaluate(expression)) return;
       await delay(100);
     }
+    await writeFile(join(evidence, "timeout.json"), JSON.stringify({
+      expected: message,
+      page: await evaluate("({url: location.href, text: document.body?.innerText})"),
+      errors: browserErrors,
+    }, null, 2));
     throw new Error(`Timed out: ${message}`);
   };
   const text = (value) =>
-    `document.body.innerText.includes(${JSON.stringify(value)})`;
+    `!!document.body?.innerText.includes(${JSON.stringify(value)})`;
   const navigate = async (path, expected) => {
     await cdp("Page.navigate", { url: origin + path });
     await wait(text(expected));
@@ -645,12 +668,15 @@ try {
         request.path === "/api/migration-definitions" &&
         request.method === "POST",
     );
-    assert.equal(save.body.batch.batch_size, 500);
-    assert.equal(save.body.down_sql, "UPDATE demo SET enabled = false;");
+    const batch = JSON.parse(save.body.up_sql.split("\n")[0].slice("-- schakker:batch ".length));
+    assert.equal(batch.size, 500);
+    assert.equal(batch.column, "value");
+    assert.equal(batch.delta, 1);
+    assert(save.body.down_sql.includes('"value" - $1'));
     assert.equal(save.csrf, "synthetic-csrf");
   });
   await test("Draft edits use optimistic revision and block unsaved submission", async () => {
-    await field("SQL down", "UPDATE demo SET enabled = NULL;");
+    await field("Amount to add per row", "2");
     assert.equal(
       await evaluate(
         "[...document.querySelectorAll('button')].find(el => el.textContent === 'Submit for approval').disabled",
@@ -661,8 +687,8 @@ try {
     await wait(text("Revision 2 ·"));
     assert.equal(
       requests.findLast((request) => request.method === "PATCH").body
-        .expected_revision,
-      1,
+        .expected_revision_id,
+      102,
     );
     await check("Freeze revision");
     await click("Submit for approval");
@@ -754,7 +780,7 @@ try {
     await check("Request review for execution");
     await click("Request rollback review");
     await wait(text("Review #3"));
-    assert.equal(state.reviews[2].target_execution_id, 3);
+    assert.equal(state.reviews[2].target_execution_id, "3");
     state.history[0].can_forward = true;
     await navigate(
       "/migrations?view=history&db=7&execution=1",
@@ -1016,6 +1042,20 @@ try {
     }
     state.loggedOut = false;
   });
+  await test("SQL analysis carries SQL and title into a reviewed draft", async () => {
+    await navigate("/migrations/new?db=7", "Create migration");
+    await field("Description / draft title", "From analysis");
+    await evaluate(`(() => {
+      const input = document.querySelector('textarea[aria-label="SQL migration"]');
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(input, 'ALTER TABLE demo ADD reviewed boolean;');
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    })()`);
+    assert.equal(await evaluate(text("Execute migration")), false);
+    await click("Up/down approval workflow");
+    await wait(text("New migration draft"));
+    await wait(`document.querySelector('textarea')?.value === 'ALTER TABLE demo ADD reviewed boolean;'`);
+    assert.equal(await evaluate(`document.querySelector('input:not([type=hidden])').value`), "From analysis");
+  });
   await test("No browser runtime errors or direct migration execution from new screens", async () => {
     assert.deepEqual(browserErrors, []);
     assert.equal(
@@ -1038,7 +1078,7 @@ try {
     ) + "\n",
   );
   console.log(
-    `${results.length} UI checks passed. Screenshots and report: docs/qa/person1/`,
+    `${results.length} UI checks passed. Screenshots and report: ${evidence}`,
   );
 } finally {
   socket?.close();

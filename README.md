@@ -1,6 +1,6 @@
 # Schakker
 
-Milestone 2 Person 1 UI (tanpa bonus): buka **Migration workflow** untuk draft SQL up/down, approval grup, antrean/progres job, rollback/forward dan riwayat committed. Admin **Groups** menyediakan penunjukan leader. Lihat [cakupan, demo dan hasil verifikasi frontend](docs/m2-person1.md) serta [kontrak API P2/P3](docs/m2-frontend-api.md). Endpoint M2 dan penyimpanan leader masih membutuhkan implementasi backend P2/P3; frontend menampilkan error saat endpoint belum tersedia.
+Milestone 2 sudah menghubungkan kedua SPA, authority/group leader, immutable revision dan approval, durable queue, worker PostgreSQL, batch/recovery, serta committed history. Buka **Migration workflow** untuk alur draft → review → queue → execution; gunakan admin **Groups** untuk menunjuk leader. Lihat [panduan integrasi dan batasan](docs/m2-integration.md) serta [kontrak API aktual](docs/m2-frontend-api.md).
 
 Source workspace Schakker berada di folder `src/` repositori. Di dalamnya terdapat aplikasi pengguna (`src/src/` dari root repositori), aplikasi administrasi (`src/src-admin/`), library bersama (`src/shared/`), serta konfigurasi Go/npm dan test integrasi. Launcher Bash dan Windows berada di root repositori.
 
@@ -24,12 +24,7 @@ Akun admin dan pengguna biasa adalah identitas terpisah, termasuk bila username 
 
 Database, schema, role PostgreSQL terbatas, akun administrator pertama, key yang sudah ada dan token layanan harus disediakan di luar aplikasi. Startup tidak membuat database, schema, role, akun, seed data atau key, dan tidak menjalankan upgrade data.
 
-Panduan lengkap tersedia di:
-
-- [Arsitektur, struktur direktori, API internal, environment dan batasan](docs/admin-auth-database.md)
-- [Modularisasi backend, paket shared, build dan hasil pengujian](docs/backend-modularization.md)
-- [Kontrak schema untuk provisioning eksternal](docs/application-databases.md)
-- [Cutover data lama, validasi, retry dan recovery](docs/control-plane-cutover.md)
+Panduan startup, kontrak schema, worker, recovery dan verifikasi tersedia di [M2 integration](docs/m2-integration.md).
 
 Salin `src/src/.env.example` dan `src/src-admin/.env.example` menjadi `.env` dalam folder aplikasi masing-masing. Launcher hanya membaca `.env` aplikasi yang dipilih. Binary Go langsung membaca environment, tanpa memuat `.env` otomatis.
 
@@ -43,14 +38,15 @@ Listener internal default `127.0.0.1:3002`, dapat diatur dengan `SCHAKKER_ADMIN_
 
 Gunakan Go 1.26+ (toolchain modul `go1.26.10`), Node.js 22.12+ dengan npm, serta Bash 4+ atau Windows PowerShell 5.1+. Kedua database aplikasi harus sudah disediakan.
 
-Dari root repositori, jalankan admin dahulu, kemudian aplikasi pengguna, pada terminal terpisah:
+Dari root repositori, jalankan admin, aplikasi pengguna dan worker pada tiga terminal terpisah:
 
 ```bash
 bash ./run-admin.sh
 bash ./run.sh
+bash ./run-worker.sh
 ```
 
-Windows menggunakan `run-admin.bat` dan `run.bat` dari root repositori; PowerShell juga dapat memakai `./run.ps1 -Admin` atau `./run.ps1`. Launcher dapat dipanggil dari direktori mana pun karena semua path dihitung dari lokasi script. Setiap launcher membangun frontend dan server aplikasinya sendiri, menawarkan pengujian yang terkait, lalu menjalankan binary dalam `bin/`. Fixture integration test tidak diteruskan ke server.
+Windows menggunakan `run-admin.bat`, `run.bat` dan `run-worker.bat` dari root repositori; PowerShell juga dapat memakai `./run.ps1 -Admin` atau `./run.ps1`; worker memakai `./run.ps1 -Worker`. Launcher dapat dipanggil dari direktori mana pun karena semua path dihitung dari lokasi script. Setiap launcher membangun frontend dan server aplikasinya sendiri, menawarkan pengujian yang terkait, lalu menjalankan binary dalam `bin/`. Fixture integration test tidak diteruskan ke server. Launcher worker membaca `.env` aplikasi pengguna, membangun `cmd/worker` dan menjalankannya tanpa build frontend. Tanpa worker, job tetap pending.
 
 Di dalam source workspace `src/`, kedua aplikasi menggunakan utilitas Go di `shared/backend/` dan paket React `@schakker/ui` di `shared/frontend/`. Tidak ada import antaraplikasi atau konfigurasi runtime bersama. Build source independen memerlukan aplikasi yang dipilih dan folder `shared/` pada layout repositori ini. Binary hasil build tidak memerlukan source shared atau aplikasi lain.
 
@@ -75,7 +71,7 @@ Cookie menggunakan HttpOnly, SameSite=Lax, serta Secure pada HTTPS/production. I
 
 ## Pengujian
 
-Go unit test, integration test, mock database dan laporan berada di `src/tests/` dari root repositori. Verifikasi browser Person 1 menggunakan fixture API sintetis tanpa dependensi test frontend tambahan: jalankan `npm run verify:person1` dari `src/` setelah build. [Panduan dan batas verifikasi UI](docs/m2-person1.md) menjelaskan bukti screenshot serta integrasi backend yang masih diperlukan.
+Go unit test, integration test, mock database dan laporan berada di `src/tests/` dari root repositori. Verifikasi browser Person 1 menggunakan fixture API sintetis tanpa dependensi test frontend tambahan: jalankan `npm run verify:person1` dari `src/` setelah build. [Panduan integrasi](docs/m2-integration.md) membedakan pengujian API/database asli dan fixture sintetis untuk verifikasi browser.
 
 ```text
 src/tests/
@@ -105,11 +101,15 @@ Go unit suite dapat dipilih melalui `./unit/src/...`, `./unit/src-admin/...`, da
 
 Setup database, seed data dan bootstrap akun hanya ada dalam test support. Fixture hanya menyimpan schema database aplikasi saat ini dan data contoh PostgreSQL/MariaDB; schema lama beserta helper dan test cutover telah dihapus. PostgreSQL server/client tools diperlukan untuk fixture lokal (`SCHAKKER_POSTGRES_BIN`); MariaDB server tools opsional (`SCHAKKER_MARIADB_BIN`). Launcher root tetap menawarkan unit/integration test sebelum menjalankan aplikasi, dengan laporan di `src/tests/output/user/` atau `src/tests/output/admin/`. Database aplikasi tidak dimulai atau dimigrasikan oleh launcher.
 
-## Milestone 2 — Person 2
+## Milestone 2 terintegrasi
 
-Backend Person 2 menyediakan group leader dan authority snapshot privat, immutable migration revision, approval semua grup, perencanaan rollback/forward, committed history dan active state. Kontrak API serta integrasi frontend/worker ada di [M2 API](docs/m2-api.md), [handoff Person 2](docs/m2-person2.md), dan [schema database saat ini](docs/m2-person2.md#database-schemas).
+Kontrak resource aktual ada di [M2 API](docs/m2-frontend-api.md). Frontend menggunakan ID definition dan revision yang berbeda, UUID untuk execution/job, generation aktif untuk optimistic concurrency, dan `Idempotency-Key` untuk enqueue. Semua leader grup yang punya akses database, termasuk View Only, harus menyetujui setiap aksi. Enqueue menyimpan job dan segera mengembalikan 202; SQL dijalankan oleh worker terpisah.
 
-Schema yang sudah ada di `src/tests/fixtures/website/schema.sql` dan `src/tests/fixtures/admin/schema.sql` langsung mendefinisikan struktur database saat ini, termasuk M2. Startup hanya memvalidasi schema. Frontend M2 milik Person 1; queue/worker, executor, batch dan infrastruktur OTel milik Person 3. Sampai dispatcher Person 3 dipasang, endpoint enqueue mengembalikan 503. Aksi browser `execute` lama mengembalikan 409 agar tidak melewati approval. Bonus M2 belum dikerjakan.
+Schema lengkap saat ini ada di `src/tests/fixtures/website/schema.sql` dan `src/tests/fixtures/admin/schema.sql`. Startup hanya memvalidasi schema, sehingga provisioning/upgrade database tetap dilakukan di luar aplikasi. Jangan menjalankan fixture CREATE TABLE pada database yang sudah berisi data. Script `src/src/database/dao/jobs_upgrade.sql` hanya menambah kolom worker pada schema P2 sebelum integrasi, bukan upgrade umum dari M1.
+
+Batch mendukung penambahan/pengurangan nilai tetap pada kolom BIGINT dengan primary key BIGINT. UI menghasilkan pasangan SQL yang sama dengan `engines.BatchSQL`; pengaturan batch menjadi bagian dari SQL immutable yang disetujui. Riwayat committed memakai active/forward stack, sedangkan kegagalan dan progres parsial tampil di Jobs. SQL editor lama tetap tersedia untuk analisis; aksi HTTP `execute` ditolak agar tidak melewati approval.
+
+Batasan dan prosedur recovery ada di [M2 integration](docs/m2-integration.md). Bonus CodeQL/k6/Grafana belum disediakan dalam repo ini.
 
 ## Query Plan
 

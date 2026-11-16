@@ -23,6 +23,26 @@ type apiGroup struct {
 	Focus  bool
 }
 
+func TestGroupsPageAssignsLeaderUsingSPAAction(t *testing.T) {
+	f := newFixture(t, true)
+	group := f.group(t, "UI leaders")
+	must(t, f.access.SetMembership(f.ctx, f.admin, f.editor, group.ID, true))
+	identity, cookie := f.login(t, "it.admin")
+	csrf, err := f.adminAuth.CSRFToken(toAdminIdentity(identity))
+	must(t, err)
+	handler := adminHandler(t, f)
+	form := url.Values{"csrf": {csrf}, "action": {"set_leader"}, "id": {fmt.Sprint(group.ID)}, "leader_user_id": {fmt.Sprint(f.editor)}}
+	res := apiRequest(t, handler, http.MethodPost, "/admin/groups", cookie, form)
+	location := apiLocation(t, res)
+	if location.Query().Get("editor") != "leader" {
+		t.Fatal("leader panel lost after save")
+	}
+	view := groupFromResponse(t, apiRequest(t, handler, http.MethodGet, location.String(), cookie, nil), group.ID)
+	if view.Editor != "leader" || view.LeaderUserID == nil || *view.LeaderUserID != f.editor {
+		t.Fatal("leader assignment not persisted/displayed")
+	}
+}
+
 func groupFromResponse(t *testing.T, response *httptest.ResponseRecorder, id int64) apiGroup {
 	t.Helper()
 	if response.Code != 200 {

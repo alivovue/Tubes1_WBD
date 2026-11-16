@@ -6,7 +6,8 @@ application_mode=user
 case "${1:-}" in
     '') ;;
     --admin) application_mode=admin ;;
-    *) printf '%s\n' 'Usage: bash ./run.sh [--admin]' >&2; exit 2 ;;
+    --worker) application_mode=worker ;;
+    *) printf '%s\n' 'Usage: bash ./run.sh [--admin|--worker]' >&2; exit 2 ;;
 esac
 
 repository_directory="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -19,12 +20,17 @@ if [[ -f .env ]]; then
     source .env
     set +a
 fi
-if [[ "$application_mode" == user && -n "${SCHAKKER_STATE_DIR:-}" && "$SCHAKKER_STATE_DIR" != /* ]]; then
+if [[ "$application_mode" != admin && -n "${SCHAKKER_STATE_DIR:-}" && "$SCHAKKER_STATE_DIR" != /* ]]; then
     export SCHAKKER_STATE_DIR="$application_directory/$SCHAKKER_STATE_DIR"
 fi
 if ! command -v go >/dev/null 2>&1; then
     printf '%s\n' 'Install Go before starting Schakker.' >&2
     exit 1
+fi
+if [[ "$application_mode" == worker ]]; then
+    mkdir -p bin
+    GOWORK=off go build -o bin/migration-worker ./cmd/worker
+    exec ./bin/migration-worker
 fi
 if ! command -v npm >/dev/null 2>&1; then
     printf '%s\n' 'Install Node.js 22.12+ (with npm) before starting Schakker.' >&2

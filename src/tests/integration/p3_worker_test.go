@@ -401,7 +401,7 @@ func TestP3FreshCancellationCanReplaceAnInvalidatedReview(t *testing.T) {
 	assertJob(t, f, freshJob, "reverted")
 }
 func TestP3ApprovedCancellationReversesOnlyCommittedBatches(t *testing.T) {
-	f, _, r := p3Fixture(t)
+	f, jobs, r := p3Fixture(t)
 	revision := batchDefinition(t, f, 25, 10)
 	review := f.approve(t, f.submit(t, revision))
 	id, err := f.workflow.Enqueue(f.ctx, f.editor, review.ID, "batch-cancel")
@@ -412,9 +412,38 @@ func TestP3ApprovedCancellationReversesOnlyCommittedBatches(t *testing.T) {
 		t.Fatal("interruption missing")
 	}
 	assertJob(t, f, id, "partial")
-	cancel, err := f.workflow.SubmitReview(f.ctx, f.editor, migration.ReviewInput{RevisionID: revision.ID, Action: "batch_cancel", TargetJobID: &id, ExpectedGeneration: f.state(t).Generation})
+	identity, cookie := f.login(t, "it.editor")
+	csrf, err := f.access.CSRFToken(identity)
+	must(t, err)
+	handler := http.StripPrefix("/api", api.NewHandler(f.userAccess, f.databases, f.migrations, false, jobs))
+	status := workflowRequest(t, handler, "GET", "/migration-jobs/"+id, cookie, csrf, nil)
+	job := decodeAPI[struct {
+		Job struct {
+			CanCancel  bool  `json:"can_cancel"`
+			RevisionID int64 `json:"revision_id"`
+			Generation int64 `json:"expected_generation"`
+		} `json:"job"`
+	}](t, status).Job
+	if status.Code != 200 || !job.CanCancel || job.RevisionID != revision.ID {
+		t.Fatal("partial job does not expose cancellation review context")
+	}
+	res := workflowRequest(t, handler, "POST", "/migration-jobs/"+id+"/cancel-reviews", cookie, csrf, map[string]any{"revision_id": job.RevisionID, "expected_generation": job.Generation})
+	if res.Code != 201 {
+		t.Fatalf("cancel review: %d %s", res.Code, res.Body.String())
+	}
+	cancelIDView := decodeAPI[struct {
+		Review reviewResource `json:"review"`
+	}](t, res).Review.ID
+	cancel, err := f.workflow.Review(f.ctx, f.editor, cancelIDView)
 	must(t, err)
 	cancel = f.approve(t, cancel)
+	resources, err := f.workflow.Resources(f.ctx, f.editor, f.database)
+	must(t, err)
+	view, err := resources.Review(cancel)
+	must(t, err)
+	if view["can_enqueue"] != true {
+		t.Fatal("partial job blocked its own approved compensation")
+	}
 	cancelID, err := f.workflow.Enqueue(f.ctx, f.editor, cancel.ID, "cancel-approved")
 	must(t, err)
 	r.Execute = nil

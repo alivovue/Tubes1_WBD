@@ -110,9 +110,9 @@ function JobDetail({ id, reloadList }: { id: string; reloadList: () => void }) {
     }
   }
   async function requestCancel() {
-    if (!confirmed) return;
+    if (!confirmed || !job) return;
     const result = await action.run((csrf) =>
-      migrationsAPI.cancelReview(id, csrf),
+      migrationsAPI.cancelReview(job, csrf),
     );
     if (result)
       navigate(

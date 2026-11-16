@@ -15,7 +15,7 @@ import (
 type JobsHandler struct{ Jobs *queue.Service }
 
 func IsJobRoute(path string) bool {
-	return strings.HasPrefix(path, "/migration-jobs/") && !strings.HasSuffix(path, "/cancel-reviews")
+	return path == "/migration-jobs" || strings.HasPrefix(path, "/migration-jobs/") && !strings.HasSuffix(path, "/cancel-reviews")
 }
 func (h JobsHandler) Serve(w http.ResponseWriter, r *http.Request, actor int64) {
 	if h.Jobs == nil {
@@ -23,6 +23,39 @@ func (h JobsHandler) Serve(w http.ResponseWriter, r *http.Request, actor int64) 
 		return
 	}
 	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+	if len(parts) == 1 && (r.Method == http.MethodGet || r.Method == http.MethodHead) {
+		database, limit, offset, err := pageInput(r)
+		if err != nil || limit < 1 || limit > 200 {
+			response.Fail(w, r, dao.ErrInvalid)
+			return
+		}
+		view, err := h.Jobs.Workflow.Resources(r.Context(), actor, database)
+		if err != nil {
+			jobError(w, r, err)
+			return
+		}
+		jobs, err := h.Jobs.Store.Jobs(r.Context(), database, limit, offset)
+		if err != nil {
+			jobError(w, r, err)
+			return
+		}
+		items := make([]map[string]any, 0, len(jobs))
+		for _, job := range jobs {
+			p, err := h.Jobs.Store.BatchProgress(r.Context(), job.ID)
+			if err != nil {
+				jobError(w, r, err)
+				return
+			}
+			item, err := view.Job(job, p)
+			if err != nil {
+				jobError(w, r, err)
+				return
+			}
+			items = append(items, item)
+		}
+		httpapi.JSON(w, r, 200, map[string]any{"jobs": items})
+		return
+	}
 	if len(parts) < 2 {
 		httpapi.Error(w, r, "Job not found", 404)
 		return
@@ -52,11 +85,17 @@ func (h JobsHandler) Serve(w http.ResponseWriter, r *http.Request, actor int64) 
 	if r.Method == http.MethodPost {
 		status = 202
 	}
-	httpapi.JSON(w, r, status, struct {
-		dao.MigrationJob
-		dao.BatchProgress
-		Retryable bool `json:"retryable"`
-	}{j, p, j.CancellationJobID == nil && ((j.Status == "failed" || j.Status == "partial" || j.Status == "partially_reverted") && j.Attempt < j.MaxAttempts || j.Status == "uncertain")})
+	view, err := h.Jobs.Workflow.Resources(r.Context(), actor, j.DatabaseID)
+	if err != nil {
+		jobError(w, r, err)
+		return
+	}
+	item, err := view.Job(j, p)
+	if err != nil {
+		jobError(w, r, err)
+		return
+	}
+	httpapi.JSON(w, r, status, map[string]any{"job": item})
 }
 func jobError(w http.ResponseWriter, r *http.Request, err error) {
 	if queue.Conflict(err) || errors.Is(err, dao.ErrNotFound) {

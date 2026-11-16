@@ -6,8 +6,31 @@ export const defaultBatch: BatchConfig = {
   schema: "public",
   table: "",
   key_column: "id",
+  value_column: "value",
+  delta: 1,
   batch_size: 1000,
 };
+
+// Match engines.BatchSQL exactly: both directions and configuration are signed.
+export function batchSQL(value: BatchConfig) {
+  const spec = {
+    schema: value.schema,
+    table: value.table,
+    key: value.key_column,
+    column: value.value_column,
+    delta: value.delta,
+    size: value.batch_size,
+    expected_rows: value.expected_rows || 0,
+  };
+  const quote = (name: string) => `"${name.replaceAll('"', '""')}"`;
+  const header = `-- schakker:batch ${JSON.stringify(spec)}\n`;
+  const base = `UPDATE ${quote(spec.schema)}.${quote(spec.table)} SET ${quote(spec.column)} = ${quote(spec.column)} `;
+  const tail = ` $1 WHERE ${quote(spec.key)} = ANY($2::bigint[]);`;
+  return {
+    up_sql: header + base + "+" + tail,
+    down_sql: header + base + "-" + tail,
+  };
+}
 
 export function MigrationBatch({
   value,
@@ -34,8 +57,8 @@ export function MigrationBatch({
       {value && (
         <>
           <p className="muted">
-            The worker uses a stable unique BIGINT key. The SQL, target and
-            batch settings are frozen together for approval.
+            Add a fixed integer amount to a BIGINT column using a BIGINT primary
+            key. The generated SQL and settings are frozen together for approval.
           </p>
           <div className="form-grid">
             {(
@@ -43,6 +66,7 @@ export function MigrationBatch({
                 ["schema", "Schema"],
                 ["table", "Table"],
                 ["key_column", "Unique key column"],
+                ["value_column", "Value column (BIGINT)"],
               ] as const
             ).map(([key, label]) => (
               <Field key={key} label={label}>
@@ -51,6 +75,7 @@ export function MigrationBatch({
                   required
                   disabled={disabled}
                   maxLength={63}
+                  pattern="[A-Za-z_][A-Za-z0-9_]*"
                   onChange={(event) =>
                     onChange({ ...value, [key]: event.target.value })
                   }
@@ -61,7 +86,7 @@ export function MigrationBatch({
               <input
                 type="number"
                 min={1}
-                max={100000}
+                max={10000}
                 step={1}
                 required
                 disabled={disabled}
@@ -71,10 +96,25 @@ export function MigrationBatch({
                 }
               />
             </Field>
+            <Field label="Amount to add per row">
+              <input
+                type="number"
+                required
+                step={1}
+                disabled={disabled}
+                value={value.delta || ""}
+                min={-Number.MAX_SAFE_INTEGER}
+                max={Number.MAX_SAFE_INTEGER}
+                onChange={(event) =>
+                  onChange({ ...value, delta: Number(event.target.value) })
+                }
+              />
+            </Field>
             <Field label="Expected rows (optional)">
               <input
                 type="number"
-                min={1}
+                min={0}
+                max={Number.MAX_SAFE_INTEGER}
                 step={1}
                 disabled={disabled}
                 value={value.expected_rows ?? ""}

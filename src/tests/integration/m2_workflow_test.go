@@ -400,12 +400,20 @@ func TestM2WorkflowHTTPEnforcesSessionCSRFAndTypedJSON(t *testing.T) {
 	if created.Code != 201 {
 		t.Fatalf("create: %d %s", created.Code, created.Body.String())
 	}
-	revision := decodeAPI[dao.MigrationRevision](t, created)
-	submitted := workflowRequest(t, handler, "POST", "/migration-reviews", cookie, csrf, map[string]any{"revision_id": revision.ID, "action": "up", "expected_generation": 0})
+	revision := decodeAPI[struct {
+		Definition struct {
+			RevisionID int64 `json:"revision_id"`
+		} `json:"definition"`
+	}](t, created)
+	submitted := workflowRequest(t, handler, "POST", "/migration-reviews", cookie, csrf, map[string]any{"revision_id": revision.Definition.RevisionID, "action": "up", "expected_generation": 0})
 	if submitted.Code != 201 {
 		t.Fatalf("submit: %d %s", submitted.Code, submitted.Body.String())
 	}
-	review := decodeAPI[dao.MigrationReview](t, submitted)
+	review := decodeAPI[struct {
+		Review struct {
+			ID int64 `json:"id"`
+		} `json:"review"`
+	}](t, submitted).Review
 	res := workflowRequest(t, handler, "POST", fmt.Sprintf("/migration-reviews/%d/enqueue", review.ID), cookie, csrf, map[string]string{"idempotency_key": "unapproved"})
 	if res.Code != 409 {
 		t.Fatalf("approval bypass: %d %s", res.Code, res.Body.String())
@@ -415,7 +423,7 @@ func TestM2WorkflowHTTPEnforcesSessionCSRFAndTypedJSON(t *testing.T) {
 		t.Fatalf("invalid reversible content: %d", forbidden.Code)
 	}
 	history := workflowRequest(t, handler, "GET", fmt.Sprintf("/migrations/history?database_id=%d&hide_rollback=true", f.database), cookie, csrf, nil)
-	if history.Code != 200 || strings.TrimSpace(history.Body.String()) != "[]" {
+	if history.Code != 200 || !strings.Contains(history.Body.String(), `"executions":[]`) {
 		t.Fatalf("history: %d %s", history.Code, history.Body.String())
 	}
 	decision := workflowRequest(t, handler, "POST", fmt.Sprintf("/migration-reviews/%d/decisions", review.ID), cookie, csrf, map[string]any{"group_id": f.editors.ID, "decision": "approve", "note": ""})

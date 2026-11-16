@@ -1,5 +1,7 @@
 # Person 1 — mandatory frontend work
 
+This page records the original frontend delivery; [M2 integration](m2-integration.md) describes the current merged application.
+
 Scope follows section 6.1 / FE-01–FE-05 of the supplied Milestone 2 implementation plan. Bonus work (CodeQL, k6, Grafana and early submission) is excluded. No Go migration, authority, queue, worker or database schema code was changed.
 
 ## Implemented screens
@@ -14,15 +16,13 @@ Scope follows section 6.1 / FE-01–FE-05 of the supplied Milestone 2 implementa
 
 The navigation entry **Migration workflow** opens `/migrations?view=definitions`. The four views are `definitions`, `reviews`, `jobs` and `history`; all support `db=<database-id>`. Existing `/migrations/new` (SQL analysis and M1 execution) and `/migrations` (M1 history) remain available, with links into the new workflow. Query parameters reuse Go's existing HTML routes, so deep links do not need new page handlers.
 
-Selection parameters: `definition`, `copy`, `review`, `job`, `execution`; committed history also uses `hide_rollback=true` and an opaque `cursor`. Changing databases preserves the workflow view and drops the old selection.
+Selection parameters: `definition`, `copy`, `review`, `job`, `execution`; committed history also uses `hide_rollback=true` and a server-provided `cursor`. Changing databases preserves the workflow view and drops the old selection.
 
-## Integration status and ownership
+## Integration status
 
-The repository at implementation time only provides the M1 migration APIs. The new UI sends real same-origin API requests; it has no production fixture fallback. With the current Go server, unavailable M2 endpoints display an error and Refresh. The admin `set_leader` mutation also requires P2's backend work before it can persist a leader.
+The three implementations are now connected. The current transport contract is [m2-frontend-api.md](m2-frontend-api.md), and startup, validation and limitations are in [m2-integration.md](m2-integration.md). The original screenshots below document the initial frontend work; rerun the browser suite for current evidence. Browser fixtures remain synthetic, while Go integration tests exercise the real authority, databases, queue and worker.
 
-P2 must implement the definition, review, history and leader contracts in [m2-frontend-api.md](m2-frontend-api.md). P3 must implement jobs/status/retry and execute approved requests asynchronously. UI action flags are presentation hints; backend authorization, SQL integrity, last-active/linear order, idempotency, approval freshness and checkpoint reconciliation must be enforced by those services.
-
-The M2 screens never submit M1's `action=execute`. The retained M1 editor still uses its existing endpoint. Replacing or retiring that synchronous backend execution is a P2/P3 integration task.
+The SQL analysis editor retains M1 tools. Its synchronous HTTP execute action is rejected; migrations run through reviewed durable jobs.
 
 ## Verification and evidence
 
@@ -53,9 +53,9 @@ Recorded results on 11 November 2026:
 | `npm run verify:person1` | All 19 browser checks passed in Edge 157, with zero browser runtime errors. |
 | `git diff --check` | Passed. |
 
-Browser fixtures verify client behavior; they do not prove real leader authority, SQL safety, durable execution, concurrency, receipts or database recovery. The end-to-end M2 acceptance gate remains pending the P2/P3 implementations.
+Browser fixtures verify client behavior; they do not prove real leader authority, SQL safety, durable execution, concurrency, receipts or database recovery. Real authority, queue/worker and recovery behavior is exercised separately by the Go integration suite; see [current integration status and limitations](m2-integration.md).
 
-## Demo with real services after P2/P3 integration
+## Demo with the integrated services
 
 1. In admin **Groups**, add active members, choose **Designate leader**, and assign database grants. Try an invalid/deactivated leader and verify the API rejects it.
 2. As an editor, open **Migration workflow → Drafts & SQL**. Enter up/down SQL, or enable irreversible and supply a reason. Save, edit, save again, then submit the exact revision.

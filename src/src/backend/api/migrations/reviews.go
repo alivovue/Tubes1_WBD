@@ -12,6 +12,7 @@ import (
 	"tubes1_wbd/backend/access"
 	"tubes1_wbd/backend/api/response"
 	"tubes1_wbd/backend/migration"
+	"tubes1_wbd/database/dao"
 )
 
 func IsWorkflowRoute(path string) bool {
@@ -141,6 +142,13 @@ func (h Handler) ServeWorkflow(w http.ResponseWriter, r *http.Request, actor int
 			err = decodeWorkflow(w, r, &in)
 			if err == nil {
 				var job string
+				if header := r.Header.Get("Idempotency-Key"); header != "" {
+					if in.IdempotencyKey != "" && in.IdempotencyKey != header {
+						err = access.ErrInvalid
+						break
+					}
+					in.IdempotencyKey = header
+				}
 				job, err = workflow.Enqueue(r.Context(), actor, id, in.IdempotencyKey)
 				result = map[string]any{"job_id": job, "status": "pending", "review_id": id}
 				status = 202
@@ -178,6 +186,12 @@ func (h Handler) ServeWorkflow(w http.ResponseWriter, r *http.Request, actor int
 			case "activities":
 				result, err = workflow.Activities(r.Context(), actor, database, limit, offset)
 			case "history":
+				if raw := r.URL.Query().Get("cursor"); raw != "" {
+					offset, err = httpapi.Offset(raw)
+					if err != nil {
+						break
+					}
+				}
 				hide := false
 				if raw := r.URL.Query().Get("hide_rollback"); raw != "" {
 					hide, err = strconv.ParseBool(raw)
@@ -198,6 +212,82 @@ func (h Handler) ServeWorkflow(w http.ResponseWriter, r *http.Request, actor int
 	if err != nil {
 		response.Fail(w, r, err)
 		return
+	}
+	// Project immutable policy records into the client resource contract.
+	switch value := result.(type) {
+	case dao.MigrationRevision:
+		view, viewErr := workflow.Resources(r.Context(), actor, value.DatabaseID)
+		if viewErr != nil {
+			response.Fail(w, r, viewErr)
+			return
+		}
+		result = map[string]any{"definition": view.Definition(value)}
+	case []dao.MigrationRevision:
+		database, _, _, _ := pageInput(r)
+		view, viewErr := workflow.Resources(r.Context(), actor, database)
+		if viewErr != nil {
+			response.Fail(w, r, viewErr)
+			return
+		}
+		items := make([]map[string]any, 0, len(value))
+		for _, item := range value {
+			items = append(items, view.Definition(item))
+		}
+		result = map[string]any{"definitions": items}
+	case dao.MigrationReview:
+		view, viewErr := workflow.Resources(r.Context(), actor, value.DatabaseID)
+		if viewErr != nil {
+			response.Fail(w, r, viewErr)
+			return
+		}
+		item, viewErr := view.Review(value)
+		if viewErr != nil {
+			response.Fail(w, r, viewErr)
+			return
+		}
+		result = map[string]any{"review": item}
+	case []dao.MigrationReview:
+		database, _, _, _ := pageInput(r)
+		view, viewErr := workflow.Resources(r.Context(), actor, database)
+		if viewErr != nil {
+			response.Fail(w, r, viewErr)
+			return
+		}
+		items := make([]map[string]any, 0, len(value))
+		for _, item := range value {
+			resource, viewErr := view.Review(item)
+			if viewErr != nil {
+				response.Fail(w, r, viewErr)
+				return
+			}
+			items = append(items, resource)
+		}
+		result = map[string]any{"reviews": items}
+	case []dao.CommittedExecution:
+		database, limit, offset, _ := pageInput(r)
+		if raw := r.URL.Query().Get("cursor"); raw != "" {
+			offset, _ = httpapi.Offset(raw)
+		}
+		view, viewErr := workflow.Resources(r.Context(), actor, database)
+		if viewErr != nil {
+			response.Fail(w, r, viewErr)
+			return
+		}
+		items := make([]map[string]any, 0, len(value))
+		for _, item := range value {
+			resource, viewErr := view.Execution(item)
+			if viewErr != nil {
+				response.Fail(w, r, viewErr)
+				return
+			}
+			items = append(items, resource)
+		}
+		var next *string
+		if len(value) == limit {
+			raw := strconv.Itoa(offset + limit)
+			next = &raw
+		}
+		result = map[string]any{"executions": items, "next_cursor": next}
 	}
 	httpapi.JSON(w, r, status, result)
 }

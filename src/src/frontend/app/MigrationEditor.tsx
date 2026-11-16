@@ -22,24 +22,21 @@ export function MigrationEditor() {
   const { data, analysisState } = usePage();
   const [sql, setSQL] = useState(data.SQL);
   const [description, setDescription] = useState(data.Description);
-  const [confirmed, setConfirmed] = useState(false);
-  const [accepted, setAccepted] = useState(false);
   useEffect(() => {
     setSQL(data.SQL);
     setDescription(data.Description);
-    setConfirmed(false);
-    setAccepted(false);
   }, [data]);
   const stale = !!data.Review && data.Review.SQL !== sql;
   return (
     <>
       <Heading
         title="Create migration"
-        text="Compose → Analyze → Review → Execute. Only Execute applies changes."
+        text="Compose and analyze SQL, then request group approval through the up/down workflow."
       >
         <Link
           className="button button--primary"
           to={url("/migrations", { db: data.Database.ID, view: "definitions" })}
+          state={{ migrationDraft: { title: description, up_sql: sql } }}
         >
           Up/down approval workflow
         </Link>
@@ -100,11 +97,7 @@ export function MigrationEditor() {
                         aria-label="SQL migration"
                         required
                         value={sql}
-                        onChange={(event) => {
-                          setSQL(event.target.value);
-                          setConfirmed(false);
-                          setAccepted(false);
-                        }}
+                        onChange={(event) => setSQL(event.target.value)}
                         placeholder="ALTER TABLE ...;"
                       />
                     </div>
@@ -131,48 +124,17 @@ export function MigrationEditor() {
                           previous diff and plans no longer apply.
                         </Notice>
                       )}
-                      {!data.Review.Transactional && (
-                        <label className="check-control">
-                          <input
-                            type="checkbox"
-                            name="accept_non_atomic"
-                            checked={accepted}
-                            onChange={(event) =>
-                              setAccepted(event.target.checked)
-                            }
-                          />
-                          <span>
-                            I accept non-atomic execution. Statements may commit
-                            individually and a failure can leave partial
-                            changes.
-                          </span>
-                        </label>
-                      )}
-                      <label className="check-control">
-                        <input
-                          type="checkbox"
-                          name="confirm"
-                          checked={confirmed}
-                          onChange={(event) =>
-                            setConfirmed(event.target.checked)
-                          }
-                        />
-                        <span>
-                          I reviewed the SQL and approve applying it to{" "}
-                          {data.Database.Name}.
-                        </span>
-                      </label>
-                      <Button
-                        action="execute"
-                        danger
-                        disabled={
-                          stale ||
-                          !confirmed ||
-                          (!data.Review.Transactional && !accepted)
-                        }
+                      <Notice>
+                        Execution requires an up/down draft and approval from
+                        every access group's leader.
+                      </Notice>
+                      <Link
+                        className="button button--primary"
+                        to={url("/migrations", { db: data.Database.ID, view: "definitions" })}
+                        state={{ migrationDraft: { title: description, up_sql: sql } }}
                       >
-                        Execute migration
-                      </Button>
+                        Use SQL in approval draft
+                      </Link>
                     </div>
                   )}
                 </Form>

@@ -13,7 +13,7 @@ import {
 // Defensive presentation filter for a complete received page. The server applies
 // this across the full history before pagination, including cross-page pairs.
 export function hideRollbackPairs(executions: MigrationExecution[]) {
-  const hidden = new Set<number>();
+  const hidden = new Set<string>();
   for (const event of executions) {
     if (event.operation === "rollback" && event.target_execution_id != null) {
       hidden.add(event.id);
@@ -114,7 +114,7 @@ export function MigrationHistory() {
                 </>,
                 event.actor,
                 stamp(event.committed_at),
-                `${event.duration_ms.toLocaleString()} ms`,
+                event.duration_ms == null ? "Unavailable" : `${event.duration_ms.toLocaleString()} ms`,
                 <Link
                   to={migrationURL("jobs", data.Database.ID, {
                     job: event.job_id,
@@ -169,7 +169,7 @@ function ExecutionDetail({
   async function request(operation: "rollback" | "forward") {
     if (!confirmed) return;
     const result = await action.run((csrf) =>
-      migrationsAPI.executionReview(execution.id, operation, csrf),
+      migrationsAPI.executionReview(execution, operation, csrf),
     );
     if (result)
       navigate(

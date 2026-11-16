@@ -1,127 +1,71 @@
-# M2 frontend API contract — P1 → P2/P3
+# Integrated M2 API contract
 
-This is the concrete client contract used by the new UI, based on the plan's proposed APIs. It is a handoff for backend implementation, not a claim that those endpoints already exist. TypeScript definitions live in `src/src/frontend/app/types.ts`; calls live in `api.ts`.
+All paths include `/api`, use same-origin session cookies, and return JSON. Mutations require `Content-Type: application/json` and `X-CSRF-Token`. M1/admin page data keeps PascalCase; M2 resources use snake_case. Resource responses are objects, including empty lists, rather than bare DAO records/arrays.
 
-## Transport
+## Definitions
 
-All paths below include `/api`. JSON resource DTOs use **snake_case**; existing M1 page data and admin group DTOs retain Go's PascalCase names. Use actual JSON booleans/numbers/nested objects, rather than M1's string-valued form decoder. Responses may include `CSRF` and failures return `{ "error": "human-readable explanation" }`.
+- `GET /migration-definitions?database_id=7&limit=50&offset=0` → `{definitions: [...]}`.
+- `GET /migration-definitions/{definition_id}` → `{definition: ...}`.
+- `POST /migration-definitions` → `201 {definition: ...}`.
+- `PATCH /migration-definitions/{definition_id}` → `{definition: ...}`.
 
-Requests include same-origin cookies. Mutations send `Content-Type: application/json` and `X-CSRF-Token`; enqueue/retry also send `Idempotency-Key`. Return JSON for errors as well as success. Enqueue returns `202` promptly, before SQL runs. Never treat accepted/enqueued as a successful migration.
-
-## Definitions (P2)
-
-| Method / path | Body / response |
-| --- | --- |
-| `GET /migration-definitions?database_id=7` | `{ definitions: MigrationDefinition[] }`; include authorized frozen/executed revisions for inspection/copy. |
-| `POST /migration-definitions` | `DefinitionInput` → `{ definition: MigrationDefinition }`. |
-| `PATCH /migration-definitions/{id}` | `DefinitionInput` with `expected_revision` → `{ definition: MigrationDefinition }`; return 409 on conflict. |
+Create body:
 
 ```json
-{
-  "database_id": 7,
-  "title": "Enable a demo flag",
-  "up_sql": "UPDATE public.demo SET enabled = true;",
-  "down_sql": "UPDATE public.demo SET enabled = false;",
-  "irreversible": false,
-  "irreversibility_reason": "",
-  "batch": {
-    "template": "update_by_key",
-    "schema": "public",
-    "table": "demo",
-    "key_column": "id",
-    "batch_size": 1000,
-    "expected_rows": 5000
-  }
-}
+{"database_id":7,"title":"Add flag","up_sql":"ALTER TABLE demo ADD flag boolean;","down_sql":"ALTER TABLE demo DROP flag;","irreversible":false,"irreversible_reason":""}
 ```
 
-Use `batch: null` for ordinary SQL. `expected_rows` is optional. PostgreSQL identifiers are distinct fields, and the backend validates/quotes them. The backend must define and validate the supported UPDATE template, stable unique BIGINT key, fixed target/high-water mark and compensation semantics; the client never splits arbitrary SQL. `irreversible=true` requires a nonempty reason and empty down SQL; otherwise require down SQL. The example is synthetic and does not establish that a real data update is safely reversible.
+PATCH omits `database_id` and adds `expected_revision_id`. Resource `id` is the definition ID; `revision_id` is the immutable revision database ID; `revision` is its display sequence. Do not use these interchangeably. Responses include original SQL, `irreversibility_reason`, `definition_hash`, `status`, `editable`, actor/time, nullable `batch` and current `expected_generation`. Irreversible definitions require empty down SQL and a reason of 10–2000 characters.
 
-`MigrationDefinition` adds `id`, `revision`, `status` (`draft|submitted|executed`), `editable`, `definition_hash`, `created_by` and ISO `updated_at`. `editable` is false for a frozen/executed revision. Copying it creates a separate draft through POST and preserves the original.
+The UI's `irreversibility_reason` is mapped to the backend input `irreversible_reason` by `api.ts`. No separate mutable batch configuration is accepted with SQL. Batch settings are encoded in the immutable SQL header and projected back to `batch` for display.
 
-## Reviews (P2)
+## Reviews
 
-| Method / path | Body / response |
-| --- | --- |
-| `POST /migration-reviews` | `{ database_id, definition_id, revision, action, target_execution_id? }` → `{ review: MigrationReview }`. Draft submission sends `up` or `up_batch`; fresh reviews reuse the exact action/target. |
-| `GET /migration-reviews?database_id=7` | `{ reviews: MigrationReview[] }`; include authorized pending and completed decisions. |
-| `POST /migration-reviews/{id}/decisions` | `{ group_id, decision: "approved"|"rejected", reason }` → `{ review }`. Rejection requires a reason. |
-| `POST /migration-reviews/{id}/enqueue` | `{}` + idempotency key → `202 { job_id, status: "pending", review_id }`. |
-| `POST /migrations/{execution_id}/rollback-reviews` | `{}` → `{ review }`. Exact execution, last-active reversible only. |
-| `POST /migrations/{execution_id}/forward-reviews` | `{}` → `{ review }`. Original up SQL and linear forward eligibility. |
-| `POST /migration-jobs/{job_id}/cancel-reviews` | `{}` → `{ review }`. Approve compensation of committed batches; do not directly cancel/undo work. |
+- `POST /migration-reviews` body `{revision_id, action, expected_generation, target_execution_id?, target_job_id?}` → `201 {review: ...}`.
+- `GET /migration-reviews?database_id=7` → `{reviews: [...]}`.
+- `GET /migration-reviews/{id}` → `{review: ...}`.
+- `POST /migration-reviews/{id}/decisions` body `{group_id, decision: "approve"|"reject", note}` → `{review: ...}`. Rejection requires a note.
+- `POST /migration-reviews/{id}/enqueue` body `{}` and `Idempotency-Key` header → `202 {job_id,status:"pending",review_id}`. A body `idempotency_key` is also accepted; if both are supplied they must match. Replays return the original durable job.
+- `POST /migrations/{execution_uuid}/rollback-reviews` or `/forward-reviews`, body `{expected_generation}` → `201 {review: ...}`.
+- `POST /migration-jobs/{job_uuid}/cancel-reviews`, body `{revision_id,expected_generation}` → `201 {review: ...}`.
 
-`MigrationReview` includes `id`, `database_id`, `definition_id`, `revision`, `title`, `action` (`up|up_batch|rollback|forward|cancel_batch`), nullable `target_execution_id`, `status` (`pending_review|approved|rejected|invalidated`), `requested_by`, ISO `requested_at`, `definition_hash`, `authority_revision`, original `up_sql`/`down_sql`, `irreversible`, `irreversibility_reason`, nullable `batch`, `reason?`, `can_enqueue`, `can_resubmit`, nullable `job_id`, and `required_groups`.
+Request actions are `up`, `rollback`, `forward`, `batch_cancel`. Display actions infer `up_batch` from a signed batch template and use `cancel_batch` for compensation. The client maps these names on resubmission. Fresh cancellation reviews retain the original `target_job_id`.
 
-Each required group contains `group_id`, `group_name`, `permission` (`view_only|view_edit`), nullable `leader_user_id`/`leader_name`, `decision` (`pending|approved|rejected`), `decided_by?`, `decided_at?`, `reason?`, and `can_decide`. Resolve all current database access groups, including View Only. `can_decide` is specific to the current authenticated user and group. No required groups or a missing leader blocks queueing. A leader of multiple groups records separate decisions.
+Review resources include exact SQL/revision/hash, authority revision, expected generation, original targets, `status`, `required_groups`, `job_id`, and actor-specific `can_enqueue`/`can_resubmit`. Groups expose their current review snapshot, assigned leader, decision and actor-specific `can_decide`. Response decisions are `pending|approved|rejected`. All access groups participate, including View Only; View Only leaders can decide but cannot enqueue.
 
-The client only offers enqueue when all groups are approved, `can_enqueue=true`, and the caller has View + Edit. Rejected/invalidated reviews offer a fresh review only if `can_resubmit=true`; revising content creates a new draft. These flags do not replace backend checks.
+Capability flags guide the UI. Every mutation and worker execution independently revalidates permission, approved content, current authority and active position. Stale approvals are invalidated on revalidation.
 
-## Jobs/activity (P3)
+## Jobs and committed history
 
-| Method / path | Response |
-| --- | --- |
-| `GET /migration-jobs?database_id=7` | `{ jobs: MigrationJob[] }`; operational activity includes failed attempts and partial/uncertain jobs. |
-| `GET /migration-jobs/{id}` | `{ job: MigrationJob }`. |
-| `POST /migration-jobs/{id}/retry` | `{}` + idempotency key → `202 { job: MigrationJob }`; validate safe checkpoint/receipt recovery and approval rules. |
+- `GET /migration-jobs?database_id=7&limit=50&offset=0` → `{jobs: [...]}`.
+- `GET /migration-jobs/{uuid}` → `{job: ...}`.
+- `POST /migration-jobs/{uuid}/retry`, body `{}` → `202 {job: ...}`. Retries retain the same durable job and reconcile target receipts/checkpoints. The original requester retries ordinary failures; another editor can request reconciliation of uncertain outcomes.
+- `GET /migrations/history?database_id=7&hide_rollback=false&limit=50&cursor=50` → `{executions: [...],next_cursor: string|null}`.
+- `GET /migrations/state?database_id=7` → `{database_id,active_version,generation,active_stack,forward_stack,blocked_reason}`.
+- `GET /migrations/activities?database_id=7` retains the low-level operational attempt list.
 
-`MigrationJob` fields:
+Job resources include title, definition/revision/review IDs, actor/time, status, attempt limits, nullable `next_retry_at`, committed/reverted batch/row counters, cursor, nullable total rows, classified error and capability flags. Raw driver errors and credentials are never included. Times without evidence are null. Every progress counter is present, including zero for ordinary SQL.
+
+Execution resource `id` and `target_execution_id` are UUID strings. Events contain exact committed SQL, original revision, logical version, job/review, actor/time, nullable duration, current expected generation, and rollback/forward eligibility. Duration measures first attempt start through target commit and includes retries; unavailable evidence is null. Hide rollback filters exact successful rollback/target pairs across all history before pagination, preserving later forward events. Pagination cursors currently encode an offset; clients should follow the server value. A full last page may lead to an empty final page.
+
+Definitions, reviews and job lists support `limit`/`offset` (default 50, maximum 200). The current SPA displays the most recent page of these lists; committed history also exposes older-page navigation.
+
+## Supported batch template
+
+The UI configures schema, table, BIGINT primary-key column, BIGINT value column, nonzero integer delta, size 1–10000 and optional row estimate. It generates exactly the SQL returned by `engines.BatchSQL`: a `-- schakker:batch {...}` header followed by a parameterized integer UPDATE in both directions. The backend rejects changed headers/statements before review. This supports a constrained, compensatable integer update, rather than arbitrary SQL splitting. Target validation rejects unsafe table shapes, triggers, rules, RLS and unsupported constraints.
+
+Each batch commits data, before/after evidence, receipt and checkpoint in the target database. UI cancellation requests fresh approval; only the worker reverses committed batches, in reverse order, and refuses external-data conflicts.
+
+## Admin leaders
+
+Existing `GET /admin/groups` includes `LeaderUserID`, `LeaderName`, `LeaderValid`, membership and grants. `POST /admin/groups` uses string form values:
 
 ```json
-{
-  "job_id": "synthetic-job-id",
-  "database_id": 7,
-  "definition_id": 1,
-  "review_id": 1,
-  "title": "Demo batch",
-  "operation": "up_batch",
-  "status": "partial",
-  "requested_by": "demo.leader",
-  "created_at": "2026-11-11T03:00:00Z",
-  "started_at": "2026-11-11T03:00:01Z",
-  "completed_at": null,
-  "attempt": 1,
-  "max_attempts": 3,
-  "next_retry_at": null,
-  "committed_batches": 2,
-  "committed_rows": 2000,
-  "reverted_batches": 0,
-  "reverted_rows": 0,
-  "total_rows": 5000,
-  "last_cursor": "2000",
-  "retryable": true,
-  "can_cancel": true,
-  "blocked_reason": null,
-  "error": "Connection interrupted after a committed checkpoint"
-}
+{"action":"set_leader","id":"1","leader_user_id":"2"}
 ```
 
-Statuses: `pending|running|succeeded|failed|partial|uncertain|reverting|reverted|partially_reverted`. Numeric progress fields are always present, including zeros for ordinary jobs. Unknown totals/cursors/times are JSON null. `retryable` means the server permits this actor's safe retry; `can_cancel` permits requesting review, never direct compensation. A blocked database disables retry. Unknown commit outcomes need receipt reconciliation before retry is authorized.
+`set_group_leader` remains accepted. The response redirects to the same group with `editor=leader`. The backend requires an active member and enforces membership/activation invariants.
 
-Lists/reviews poll every 5 seconds; selected job detail every 2 seconds. Polling uses one request at a time, pauses in hidden tabs, aborts on navigation, and stops detail polling in terminal/intervention states without `next_retry_at`. Transient failures back off to 10 seconds; 401/403/404/422 need manual refresh. Failures do not erase previously observed progress; stale data disables mutation controls. No worker runs in the browser.
+## Errors
 
-## Committed history (P2)
-
-`GET /migrations/history?database_id=7&hide_rollback=false&cursor=<opaque>` → `{ executions: MigrationExecution[], next_cursor: string|null }`.
-
-Every execution is committed; failures/retries belong to jobs/activity. Required fields: `id`, `database_id`, `definition_id`, `revision`, `version`, `title`, `operation`, exact executed `sql`, `actor`, ISO `committed_at`, `duration_ms`, `job_id`, `review_id`, nullable `target_execution_id`, `irreversible`, `irreversibility_reason`, `can_rollback`, `can_forward`, optional `action_blocked_reason`.
-
-For `hide_rollback=true`, filter a successful rollback and the execution identified by its **exact** `target_execution_id` across the complete history **before pagination**. Never hide by definition/version/title or remove later forward executions. Do not delete stored records. The client applies a defensive exact-pair filter only to received events; it cannot resolve a pair outside a returned page. Action flags reflect current active/forward state, not the highest historical version.
-
-## Admin group leaders (P2)
-
-Extend existing `GET /api/admin/groups` group DTOs with `LeaderUserID: number|null` and optional `LeadershipError: string`. Group `Members` already exposes `ID`, `Username`, `DisplayName`, `Active`.
-
-The leader form reuses existing `POST /api/admin/groups` and CSRF, with M1 string fields:
-
-```json
-{ "action": "set_leader", "id": "1", "leader_user_id": "2" }
-```
-
-Return updated page data or the existing `{ location }` redirect format, preferably preserving `group=<id>&editor=leader`. Validate exactly one designated active member per group and return a useful error if membership/activation changed. Extend the backend group editor allowlist to recognize `leader` when preserving an open panel after redirect. Group/user/membership updates must enforce leader invariants and invalidate affected review authority on the server.
-
-## Failure and acceptance contract
-
-Use 401 for an expired identity, 403 for denied actions, 409 for stale state/approval or a blocked database, 422 for invalid/unsafe input, 503 for unavailable authority/infrastructure, and 404 for missing resources. The UI explains those conditions, retains form input after failed mutations and offers explicit refresh. Revalidate every mutation and execution on the server. Never accept client-provided approval flags or mutable SQL as authorization.
-
-Real API integration is complete only after the demo in [m2-person1.md](m2-person1.md) passes against P2/P3's services, with denial, authority changes and worker failures included.
+401 means expired/missing session, 403 permission/CSRF denial, 404 missing resource, 409 stale approval/position or blocked job, 422 invalid definition/template, and 503 unavailable authority/worker infrastructure. Malformed JSON, identifiers and other invalid request values use 400. The client retains failed form input and requires refresh after stale state.

@@ -1,5 +1,5 @@
 #requires -Version 5.1
-param([switch]$Admin)
+param([switch]$Admin, [switch]$Worker)
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $false
@@ -142,6 +142,7 @@ function Invoke-TestSuite([string]$Name, [string]$Package, [string]$Directory = 
 }
 
 try {
+    if ($Admin -and $Worker) { throw 'Choose either -Admin or -Worker.' }
     $sourceDirectory = Join-Path $PSScriptRoot 'src'
     $testDirectory = Join-Path $sourceDirectory 'tests'
     $applicationDirectory = if ($Admin) { Join-Path $sourceDirectory 'src-admin' } else { Join-Path $sourceDirectory 'src' }
@@ -153,6 +154,17 @@ try {
     $command = Get-Command go -CommandType Application -ErrorAction SilentlyContinue
     if (-not $command) { throw 'Install Go for Windows and reopen the terminal before starting Schakker.' }
     $goCommand = $command.Source
+    if ($Worker) {
+        $workerDirectory = Join-Path $applicationDirectory 'bin'
+        [void][IO.Directory]::CreateDirectory($workerDirectory)
+        $workerBinary = Join-Path $workerDirectory 'migration-worker.exe'
+        Set-LaunchEnvironment 'GOWORK' 'off'
+        & $goCommand build -o $workerBinary './cmd/worker'
+        if ($LASTEXITCODE -ne 0) { throw 'The migration worker could not be built.' }
+        & $workerBinary
+        $launchExitCode = $LASTEXITCODE
+        exit $launchExitCode
+    }
     $npm = Get-Command npm.cmd -CommandType Application -ErrorAction SilentlyContinue
     if (-not $npm) { throw 'Install Node.js 22.12+ (with npm) before starting Schakker.' }
     $frontendWorkspace = if ($Admin) { 'schakker-admin-frontend' } else { 'schakker-frontend' }

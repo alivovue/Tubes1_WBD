@@ -8,6 +8,9 @@ import type {
   EnqueueResponse,
   JobResponse,
   MigrationReview,
+  MigrationDefinition,
+  MigrationExecution,
+  MigrationJob,
   ReviewResponse,
 } from "./types";
 
@@ -29,27 +32,23 @@ export const migrationsAPI = {
       `/api${migrationPaths.definitions(database)}`,
       { signal },
     ),
-  save: (input: DefinitionInput, csrf: string, id?: number) =>
-    requestResource<DefinitionResponse>(
+  save: (input: DefinitionInput, csrf: string, id?: number) => {
+    const { batch: _batch, irreversibility_reason, ...fields } = input;
+    // Batch configuration is encoded in the exact SQL reviewed by all leaders.
+    const body = { ...fields, irreversible_reason: irreversibility_reason };
+    if (id) delete (body as Partial<DefinitionInput>).database_id;
+    return requestResource<DefinitionResponse>(
       `/api/migration-definitions${id ? `/${id}` : ""}`,
-      { method: id ? "PATCH" : "POST", body: input, csrf },
-    ),
-  submit: (
-    definition: {
-      id: number;
-      revision: number;
-      database_id: number;
-      batch: unknown;
-    },
-    csrf: string,
-  ) =>
+      { method: id ? "PATCH" : "POST", body, csrf },
+    );
+  },
+  submit: (definition: MigrationDefinition, csrf: string) =>
     requestResource<ReviewResponse>("/api/migration-reviews", {
       method: "POST",
       body: {
-        database_id: definition.database_id,
-        definition_id: definition.id,
-        revision: definition.revision,
-        action: definition.batch ? "up_batch" : "up",
+        revision_id: definition.revision_id,
+        expected_generation: definition.expected_generation,
+        action: "up",
       },
       csrf,
     }),
@@ -57,11 +56,16 @@ export const migrationsAPI = {
     requestResource<ReviewResponse>("/api/migration-reviews", {
       method: "POST",
       body: {
-        database_id: review.database_id,
-        definition_id: review.definition_id,
-        revision: review.revision,
-        action: review.action,
+        revision_id: review.revision_id,
+        expected_generation: review.expected_generation,
+        action:
+          review.action === "up_batch"
+            ? "up"
+            : review.action === "cancel_batch"
+              ? "batch_cancel"
+              : review.action,
         target_execution_id: review.target_execution_id,
+        target_job_id: review.target_job_id,
       },
       csrf,
     }),
@@ -74,7 +78,11 @@ export const migrationsAPI = {
   ) =>
     requestResource<ReviewResponse>(`/api/migration-reviews/${id}/decisions`, {
       method: "POST",
-      body: { group_id: group, decision, reason },
+      body: {
+        group_id: group,
+        decision: decision === "approved" ? "approve" : "reject",
+        note: reason,
+      },
       csrf,
     }),
   enqueue: (id: number, csrf: string, key: string) =>
@@ -91,19 +99,30 @@ export const migrationsAPI = {
       csrf,
       idempotencyKey: key,
     }),
-  cancelReview: (id: string, csrf: string) =>
+  cancelReview: (job: MigrationJob, csrf: string) =>
     requestResource<ReviewResponse>(
-      `/api${migrationPaths.job(id)}/cancel-reviews`,
-      { method: "POST", body: {}, csrf },
+      `/api${migrationPaths.job(job.job_id)}/cancel-reviews`,
+      {
+        method: "POST",
+        body: {
+          revision_id: job.revision_id,
+          expected_generation: job.expected_generation,
+        },
+        csrf,
+      },
     ),
   executionReview: (
-    execution: number,
+    execution: MigrationExecution,
     operation: "rollback" | "forward",
     csrf: string,
   ) =>
     requestResource<ReviewResponse>(
-      `/api/migrations/${execution}/${operation}-reviews`,
-      { method: "POST", body: {}, csrf },
+      `/api/migrations/${encodeURIComponent(execution.id)}/${operation}-reviews`,
+      {
+        method: "POST",
+        body: { expected_generation: execution.expected_generation },
+        csrf,
+      },
     ),
 };
 // This application's client always targets its own public API origin.

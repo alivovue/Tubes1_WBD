@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"tubes1_wbd/backend/access"
+	"tubes1_wbd/backend/migration/engines"
 	"tubes1_wbd/database/dao"
 )
 
@@ -18,6 +19,9 @@ type DefinitionInput struct {
 
 // ValidateDefinition checks both directions without executing target SQL.
 func ValidateDefinition(input DefinitionInput) error {
+	if _, err := engines.ParseBatch(input.UpSQL, input.DownSQL); err != nil {
+		return ErrDefinitionInvalid
+	}
 	if strings.TrimSpace(input.Title) == "" || len(input.Title) > 255 || len(input.UpSQL) > 2<<20 || len(input.DownSQL) > 2<<20 {
 		return ErrDefinitionInvalid
 	}

@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { migrationPaths, migrationsAPI } from "./api";
 import type {
   DefinitionInput,
@@ -7,7 +7,7 @@ import type {
   MigrationDefinition,
 } from "./types";
 import { Button, Field, Notice, Panel, stamp, usePage } from "./ui";
-import { MigrationBatch } from "./MigrationBatch";
+import { MigrationBatch, batchSQL } from "./MigrationBatch";
 import {
   MigrationStatus,
   ResourceState,
@@ -107,16 +107,20 @@ function DefinitionEditor({
 }) {
   const { data } = usePage();
   const navigate = useNavigate();
+  const location = useLocation();
+  const carried = location.state?.migrationDraft as
+    | { title?: string; up_sql?: string }
+    | undefined;
   const original = definition || source;
   const baseline: DefinitionInput = {
     database_id: data.Database.ID,
-    title: original?.title || "",
-    up_sql: original?.up_sql || "",
+    title: original?.title ?? carried?.title ?? "",
+    up_sql: original?.up_sql ?? carried?.up_sql ?? "",
     down_sql: original?.down_sql || "",
     irreversible: original?.irreversible || false,
     irreversibility_reason: original?.irreversibility_reason || "",
     batch: original?.batch || null,
-    ...(definition ? { expected_revision: definition.revision } : {}),
+    ...(definition ? { expected_revision_id: definition.revision_id } : {}),
   };
   const [input, setInput] = useState<DefinitionInput>(baseline);
   const [confirmed, setConfirmed] = useState(false);
@@ -192,6 +196,7 @@ function DefinitionEditor({
             rows={10}
             wrap="off"
             value={input.up_sql}
+            readOnly={!!input.batch}
             onChange={(event) =>
               setInput({ ...input, up_sql: event.target.value })
             }
@@ -202,6 +207,7 @@ function DefinitionEditor({
           <input
             type="checkbox"
             checked={input.irreversible}
+            disabled={!!input.batch}
             onChange={(event) =>
               setInput({
                 ...input,
@@ -239,6 +245,7 @@ function DefinitionEditor({
               rows={7}
               wrap="off"
               value={input.down_sql}
+              readOnly={!!input.batch}
               onChange={(event) =>
                 setInput({ ...input, down_sql: event.target.value })
               }
@@ -252,7 +259,19 @@ function DefinitionEditor({
         {postgres && (
           <MigrationBatch
             value={input.batch}
-            onChange={(batch) => setInput({ ...input, batch })}
+            onChange={(batch) =>
+              setInput({
+                ...input,
+                batch,
+                ...(batch
+                  ? {
+                      ...batchSQL(batch),
+                      irreversible: false,
+                      irreversibility_reason: "",
+                    }
+                  : {}),
+              })
+            }
             disabled={!editable}
           />
         )}

@@ -37,7 +37,7 @@ func (h Handler) Load(r *http.Request, data *response.Data) error {
 			}
 		}
 		switch view.Editor {
-		case "membership", "access", "information":
+		case "membership", "access", "information", "leader":
 		default:
 			view.Editor = ""
 		}
@@ -67,7 +67,9 @@ func (h Handler) Load(r *http.Request, data *response.Data) error {
 }
 func groupEditor(action string) string {
 	switch action {
-	case "membership", "set_group_leader":
+	case "set_leader", "set_group_leader":
+		return "leader"
+	case "membership":
 		return "membership"
 	case "set_grant", "set_grants":
 		return "access"
@@ -99,7 +101,7 @@ func (h Handler) Action(w http.ResponseWriter, r *http.Request, data *response.D
 		} else {
 			err = h.Access.SaveGroup(r.Context(), actor, id, form.Get("name"), form.Get("description"))
 		}
-	case "set_group_leader":
+	case "set_leader", "set_group_leader":
 		leader, e := httpapi.ID(form.Get("leader_user_id"))
 		if e != nil {
 			return e

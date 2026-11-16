@@ -40,6 +40,25 @@ type BatchProgress struct {
 	RevertedRows    int64  `json:"reverted_rows"`
 }
 
+func (d *Store) JobTimes(ctx context.Context, id string) (started, completed *time.Time, err error) {
+	err = d.q.QueryRowContext(ctx, `SELECT min(a.started_at), CASE WHEN j.status IN ('succeeded','failed','reverted') THEN max(a.finished_at) END FROM migration_jobs j LEFT JOIN migration_job_attempts a ON a.job_id=j.id WHERE j.id=$1 GROUP BY j.status`, id).Scan(&started, &completed)
+	return started, completed, classify(err)
+}
+
+func (d *Store) Jobs(ctx context.Context, database int64, limit, offset int) ([]MigrationJob, error) {
+	ids, err := workflowList[MigrationJob](ctx, d, `SELECT row_to_json(x) FROM (SELECT id AS job_id FROM migration_jobs WHERE database_id=$1 ORDER BY created_at DESC,id DESC LIMIT $2 OFFSET $3) x`, database, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	for i := range ids {
+		ids[i], err = d.Job(ctx, ids[i].ID)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return ids, nil
+}
+
 func (d *Store) BatchProgress(ctx context.Context, id string) (BatchProgress, error) {
 	var p BatchProgress
 	err := d.workflowOne(ctx, &p, `SELECT row_to_json(p) FROM migration_batch_progress p WHERE job_id=$1`, id)
