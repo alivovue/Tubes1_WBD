@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"schakker_shared/config"
+	"schakker_shared/observability"
 
 	"tubes1_wbd/backend/access"
 	"tubes1_wbd/backend/controlplane"
@@ -19,11 +20,12 @@ import (
 )
 
 type Runtime struct {
-	DB         *sql.DB
-	Store      *dao.Store
-	Access     *access.Service
-	Key        []byte
-	Production bool
+	DB          *sql.DB
+	Store       *dao.Store
+	Access      *access.Service
+	Key         []byte
+	Production  bool
+	stopMetrics func()
 }
 
 // Open connects to externally provisioned metadata and validates its schema.
@@ -65,9 +67,16 @@ func Open(root string) (*Runtime, error) {
 	if err != nil {
 		return fail(err)
 	}
-	return &Runtime{DB: db, Store: store, Access: auth, Key: key, Production: production}, nil
+	stopPool := observability.DefaultMetrics.RegisterPool("platform", db)
+	stopQueue := observability.DefaultMetrics.RegisterQueue(store.QueueMetrics)
+	return &Runtime{DB: db, Store: store, Access: auth, Key: key, Production: production, stopMetrics: func() { stopQueue(); stopPool() }}, nil
 }
-func (r *Runtime) Close() error { return r.DB.Close() }
+func (r *Runtime) Close() error {
+	if r.stopMetrics != nil {
+		r.stopMetrics()
+	}
+	return r.DB.Close()
+}
 
 // MasterKey reads supplied configuration. It does not generate or write keys.
 func MasterKey(directory string, production bool) ([]byte, error) {

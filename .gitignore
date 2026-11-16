@@ -21,3 +21,12 @@ node_modules/
 /src/src-admin/bin/
 
 !/src/src-admin/.env.example
+
+# Disposable bonus fixtures, observability state, and local scan databases.
+/src/observability/secrets/
+/src/observability/data/
+/src/tests/k6/fixture.json
+/src/tests/k6/summary.json
+/codeql-results/
+/.codeql/
+__pycache__/

@@ -34,6 +34,11 @@ func run() error {
 	}()
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	stopMetrics, err := observability.StartMetrics(ctx, "127.0.0.1:9464")
+	if err != nil {
+		return err
+	}
+	defer stopMetrics()
 	handler, err := backend.NewHandler(".")
 	if err != nil {
 		return err

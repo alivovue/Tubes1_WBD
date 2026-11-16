@@ -28,11 +28,17 @@ type Services struct {
 }
 
 type runtime struct {
-	db       *sql.DB
-	internal http.Handler
+	db          *sql.DB
+	internal    http.Handler
+	stopMetrics func()
 }
 
-func (r *runtime) Close() error                         { return r.db.Close() }
+func (r *runtime) Close() error {
+	if r.stopMetrics != nil {
+		r.stopMetrics()
+	}
+	return r.db.Close()
+}
 func (h *managedHandler) InternalHandler() http.Handler { return h.runtime.internal }
 
 func servicesFromEnvironment(root string) (Services, *runtime, error) {
@@ -81,7 +87,7 @@ func servicesFromEnvironment(root string) (Services, *runtime, error) {
 	if err != nil {
 		return fail(err)
 	}
-	return Services{Authentication: auth, Access: auth, Connections: connections, Production: production}, &runtime{db: db, internal: internal}, nil
+	return Services{Authentication: auth, Access: auth, Connections: connections, Production: production}, &runtime{db: db, internal: internal, stopMetrics: observability.DefaultMetrics.RegisterPool("admin", db)}, nil
 }
 func adminMasterKey() ([]byte, error) {
 	encoded := strings.TrimSpace(os.Getenv("SCHAKKER_ADMIN_MASTER_KEY"))

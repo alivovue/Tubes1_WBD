@@ -204,8 +204,6 @@ func TestServerStartupRejectsEmptySchemasWithoutInitializingData(t *testing.T) {
 	}
 }
 func TestStandaloneAdminBinaryRunsWithoutTheUserModule(t *testing.T) {
-	f := newFixture(t, true)
-	dsn := provisionAdminRole(t, f)
 	root := t.TempDir()
 	source, err := filepath.Abs(filepath.Join(repositoryRoot(t), "src-admin"))
 	must(t, err)
@@ -213,12 +211,17 @@ func TestStandaloneAdminBinaryRunsWithoutTheUserModule(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		binary += ".exe"
 	}
-	build := exec.CommandContext(f.ctx, "go", "build", "-o", binary, ".")
+	buildContext, stopBuild := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer stopBuild()
+	build := exec.CommandContext(buildContext, "go", "build", "-o", binary, ".")
 	build.Dir = source
 	build.Env = append(os.Environ(), "GOWORK=off", "CGO_ENABLED=0")
 	if out, err := build.CombinedOutput(); err != nil {
 		t.Fatalf("standalone build: %v %s", err, out)
 	}
+	// Start the database/runtime deadline after a potentially cold toolchain build.
+	f := newFixture(t, true)
+	dsn := provisionAdminRole(t, f)
 	must(t, os.MkdirAll(filepath.Join(root, "frontend", "dist"), 0700))
 	must(t, os.WriteFile(filepath.Join(root, "frontend", "dist", "index.html"), []byte(`<div id="root"></div>`), 0600))
 	reserve := func() string {
@@ -231,7 +234,7 @@ func TestStandaloneAdminBinaryRunsWithoutTheUserModule(t *testing.T) {
 	_, port, _ := net.SplitHostPort(public)
 	command := exec.CommandContext(f.ctx, binary)
 	command.Dir = root
-	command.Env = append(os.Environ(), "SCHAKKER_ADMIN_DATABASE_URL="+dsn, "SCHAKKER_ADMIN_MASTER_KEY="+hex.EncodeToString(bytes.Repeat([]byte{21}, 32)), "SCHAKKER_INTERNAL_TOKEN="+strings.Repeat("private-service-token-", 3), "SCHAKKER_ADMIN_PORT="+port, "SCHAKKER_ADMIN_INTERNAL_ADDR="+private, "SCHAKKER_ADMIN_ENV=", "SCHAKKER_ADMIN_INTERNAL_TLS_CERT=", "SCHAKKER_ADMIN_INTERNAL_TLS_KEY=", "SCHAKKER_PLATFORM_DATABASE_URL=postgres://invalid.invalid/platform", "SCHAKKER_MASTER_KEY=")
+	command.Env = append(os.Environ(), "SCHAKKER_METRICS_ADDR=127.0.0.1:0", "SCHAKKER_ADMIN_DATABASE_URL="+dsn, "SCHAKKER_ADMIN_MASTER_KEY="+hex.EncodeToString(bytes.Repeat([]byte{21}, 32)), "SCHAKKER_INTERNAL_TOKEN="+strings.Repeat("private-service-token-", 3), "SCHAKKER_ADMIN_PORT="+port, "SCHAKKER_ADMIN_INTERNAL_ADDR="+private, "SCHAKKER_ADMIN_ENV=", "SCHAKKER_ADMIN_INTERNAL_TLS_CERT=", "SCHAKKER_ADMIN_INTERNAL_TLS_KEY=", "SCHAKKER_PLATFORM_DATABASE_URL=postgres://invalid.invalid/platform", "SCHAKKER_MASTER_KEY=")
 	var output bytes.Buffer
 	command.Stdout = &output
 	command.Stderr = &output

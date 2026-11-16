@@ -79,10 +79,14 @@ func (r *Runner) RunOnce(ctx context.Context) (claimed bool, err error) {
 		return false, err
 	}
 	claimed = true
+	started := time.Now()
 	ctx = observability.Extract(ctx, j.TraceContext)
 	ctx = observability.WithActor(ctx, j.ActorID, j.DatabaseID)
 	ctx, span := observability.Start(ctx, "worker.execute")
 	defer span.End()
+	if j.Attempt == 1 {
+		observability.QueueWait(ctx, j.Operation, started.Sub(j.CreatedAt))
+	}
 	ctx, cancel := context.WithTimeout(ctx, r.JobTimeout)
 	defer cancel()
 	stopHeartbeat := make(chan struct{})
@@ -223,6 +227,7 @@ func (r *Runner) RunOnce(ctx context.Context) (claimed bool, err error) {
 	if finishErr != nil {
 		return true, finishErr
 	}
+	observability.DefaultMetrics.ObserveAttempt(ctx, j.Operation, status, time.Since(started))
 	return true, err
 }
 func loadRequest(ctx context.Context, store *dao.Store, j dao.MigrationJob) (engines.JobRequest, error) {

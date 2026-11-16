@@ -60,7 +60,7 @@ Set `TMPDIR` to a spacious writable directory when the root disk is nearly full.
 - Focused real API tests passed for definition/revision separation, all-group approval, idempotency headers, worker execution, UUID rollback/forward, history filtering/pagination, batch-template integrity, leader assignment and partial-batch cancellation.
 - Go vet, Bash launcher syntax and `git diff --check` passed.
 - All 20 Chromium UI checks passed, including SQL analysis → approval draft and desktop/mobile layouts. Generated evidence is in `/home/audric/go-tmp/schakker-integration/browser/` for this verification run; the original tracked screenshots were preserved.
-- Windows launchers were reviewed but not executed on this Linux host. The optional benchmark and bonus tooling were not run.
+- Windows launchers were reviewed but not executed on this Linux host. This integration checkpoint preceded the bonus work; see [M2 bonuses](m2-bonuses.md) for the subsequent real stack, k6 and CodeQL results.
 
 ## Remaining scope limits
 
@@ -69,6 +69,6 @@ Set `TMPDIR` to a spacious writable directory when the root disk is nearly full.
 - The batch template updates one BIGINT column by a fixed nonzero integer using a BIGINT primary key. Arbitrary batch SQL and unsupported table shapes are rejected.
 - Submitted/frozen revisions are inspected or copied into new drafts in the UI. Original executed SQL is preserved.
 - JSON logs and stdout OpenTelemetry traces are wired. SQL/parameter values are redacted and SQL hashes retained; this is not evidence of full literal-SQL logging compliance.
-- Collector/Prometheus/Grafana, k6 and CodeQL bonus automation are absent. The existing batch benchmark evidence is under `src/tests/fixtures/postgre/p3-batch-results.json`; running the optional benchmark requires `SCHAKKER_RUN_BATCH_BENCHMARK=1` and is separate from the normal suite.
+- Collector/Prometheus/Grafana, k6 and CodeQL bonus automation and measured evidence are now provided in [M2 bonuses](m2-bonuses.md). The existing mandatory large-dataset batch benchmark evidence is under `src/tests/fixtures/postgre/p3-batch-results.json`; running that optional benchmark requires `SCHAKKER_RUN_BATCH_BENCHMARK=1` and is separate from both the normal suite and the smaller k6 fixture.
 
 This integration is not a sign-off on every item in the external implementation proposal. The limitations above remain visible so further milestone work can be scoped explicitly.

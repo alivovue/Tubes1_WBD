@@ -1,0 +1,16 @@
+{
+  "os": "Linux",
+  "architecture": "x86_64",
+  "cpu": "AMD Ryzen 7 7840U w/ Radeon(TM) 780M Graphics",
+  "logical_cpus": 16,
+  "ram_bytes": 16033816576,
+  "go": "go version go1.27.3 linux/amd64",
+  "k6": "2.4.0",
+  "collector": "0.165.0",
+  "grafana": "13.3.1",
+  "postgresql": "PostgreSQL 14.24 (Ubuntu 14.24-0ubuntu0.22.04.1)",
+  "workload": "three isolated PostgreSQL targets, real authority and four-concurrency worker",
+  "normal_vus": 5,
+  "stress_target_vus": 24,
+  "caveat": "Shared development workstation, not an isolated capacity benchmark."
+}

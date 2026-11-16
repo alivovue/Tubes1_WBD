@@ -109,7 +109,20 @@ Schema lengkap saat ini ada di `src/tests/fixtures/website/schema.sql` dan `src/
 
 Batch mendukung penambahan/pengurangan nilai tetap pada kolom BIGINT dengan primary key BIGINT. UI menghasilkan pasangan SQL yang sama dengan `engines.BatchSQL`; pengaturan batch menjadi bagian dari SQL immutable yang disetujui. Riwayat committed memakai active/forward stack, sedangkan kegagalan dan progres parsial tampil di Jobs. SQL editor lama tetap tersedia untuk analisis; aksi HTTP `execute` ditolak agar tidak melewati approval.
 
-Batasan dan prosedur recovery ada di [M2 integration](docs/m2-integration.md). Bonus CodeQL/k6/Grafana belum disediakan dalam repo ini.
+Batasan dan prosedur recovery ada di [M2 integration](docs/m2-integration.md). Implementasi dan bukti bonus tersedia di [M2 bonuses](docs/m2-bonuses.md): Collector → Loki/Tempo, Prometheus/Grafana, stress test k6 dengan job ber-approval, serta CodeQL Go dan JS/TS. Template GitHub Actions disimpan nonaktif di [temp/workflows](temp/README.md), di luar `.github`; bukti scan lokal tetap tersedia. Bonus pengumpulan cepat tetap membutuhkan pengiriman form sebelum 23 November 2026, 13:10 WIB.
+
+### Hasil stress test bonus
+
+Pengujian lokal menggunakan 5 target VU normal, naik ke 12 lalu 24, kemudian turun dan bertahan di 5. Ketiga skenario berjalan bersamaan: pembacaan API, enqueue idempotent pada database yang sama, dan migration pada dua database lain. Semua 55 job yang diterima selesai melalui worker; HTTP 202 tidak dihitung sebagai migration sukses. API error dan job failure 0%, tetapi threshold API p95 <750 ms **gagal**. Nilai berikut adalah hasil pengukuran, bukan klaim kapasitas production.
+
+| Fase | API p50 / p95 (ms) | Request/s | API error | Queue p95 (ms) | Migration p95 (ms) | Job selesai | Job/s |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Normal, 10 s | 54.86 / 367.26 | 31.40 | 0% | 186.00 | 2707.00 | 9 | 0.90 |
+| Load, 15 s | 98.40 / 809.77 | 24.13 | 0% | 210.00 | 3775.00 | 11 | 0.73 |
+| Stress, 20 s | 216.44 / 1758.31 | 19.60 | 0% | 215.10 | 5842.45 | 10 | 0.50 |
+| Recovery + drain, 32.79 s | 67.39 / 1050.87 | 20.77 | 0% | 196.60 | 5463.80 | 25 | 0.76 |
+
+Normal memenuhi objective latency. Saat load dan stress, p95 meningkat dan throughput request/job menurun walaupun tidak ada kegagalan; menaikkan konkurensi belum meningkatkan kapasitas pada lingkungan ini. Pada recovery, median API mendekati normal dan throughput job membaik, tetapi tail latency belum pulih ke baseline. Fase recovery juga menyelesaikan job yang sudah diterima sebelumnya. Angka queue dan durasi migration dikelompokkan saat job selesai sehingga dapat mencakup pekerjaan dari fase sebelumnya. Fixture menyiapkan approval baru secara serial per database sesuai generation aktif; contention fixture dicatat terpisah. Pengujian singkat di workstation bersama ini belum membuktikan steady-state production atau akar bottleneck. Lihat [script dan cara menjalankan](src/tests/k6/README.md), [JSON hasil asli](docs/evidence/bonuses/k6.json), serta [analisis dan batasan lengkap](docs/m2-bonuses.md).
 
 ## Query Plan
 

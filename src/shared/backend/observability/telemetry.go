@@ -13,11 +13,15 @@ import (
 	"strings"
 	"time"
 
+	"go.opentelemetry.io/contrib/bridges/otelslog"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
 	"go.opentelemetry.io/otel/propagation"
+	sdklog "go.opentelemetry.io/otel/sdk/log"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/trace"
@@ -58,20 +62,103 @@ func Configure(service string, logs, spans io.Writer) (func(context.Context) err
 		}
 		return a
 	}})
-	slog.SetDefault(slog.New(correlatedHandler{base}))
 	exporter, err := stdouttrace.New(stdouttrace.WithWriter(spans))
 	if err != nil {
 		return nil, err
 	}
-	provider := sdktrace.NewTracerProvider(sdktrace.WithResource(resource.NewSchemaless(attribute.String("service.name", service))), sdktrace.WithBatcher(exporter))
+	res := resource.NewSchemaless(attribute.String("service.name", service))
+	traceOptions := []sdktrace.TracerProviderOption{sdktrace.WithResource(res), sdktrace.WithBatcher(exporter)}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") != "" || os.Getenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT") != "" {
+		remote, err := otlptracehttp.New(ctx)
+		if err != nil {
+			return nil, err
+		}
+		traceOptions = append(traceOptions, sdktrace.WithBatcher(remote))
+	}
+	var logsProvider *sdklog.LoggerProvider
+	var handler slog.Handler = base
+	if os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") != "" || os.Getenv("OTEL_EXPORTER_OTLP_LOGS_ENDPOINT") != "" {
+		remote, err := otlploghttp.New(ctx)
+		if err != nil {
+			return nil, err
+		}
+		logsProvider = sdklog.NewLoggerProvider(sdklog.WithResource(res), sdklog.WithProcessor(sdklog.NewBatchProcessor(remote)))
+		handler = fanoutHandler{base, otelslog.NewHandler(service, otelslog.WithLoggerProvider(logsProvider))}
+	}
+	// Redact before fan-out so both console and OTLP see the same safe attributes.
+	slog.SetDefault(slog.New(correlatedHandler{handler}))
+	provider := sdktrace.NewTracerProvider(traceOptions...)
 	otel.SetTracerProvider(provider)
 	otel.SetTextMapPropagator(propagation.TraceContext{})
-	return provider.Shutdown, nil
+	return func(ctx context.Context) error {
+		var logsErr error
+		if logsProvider != nil {
+			logsErr = logsProvider.Shutdown(ctx)
+		}
+		return errors.Join(logsErr, provider.Shutdown(ctx))
+	}, nil
+}
+
+type fanoutHandler []slog.Handler
+
+func (h fanoutHandler) Enabled(ctx context.Context, level slog.Level) bool {
+	for _, next := range h {
+		if next.Enabled(ctx, level) {
+			return true
+		}
+	}
+	return false
+}
+func (h fanoutHandler) Handle(ctx context.Context, record slog.Record) error {
+	var err error
+	for _, next := range h {
+		if next.Enabled(ctx, record.Level) {
+			err = errors.Join(err, next.Handle(ctx, record))
+		}
+	}
+	return err
+}
+func (h fanoutHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+	out := make(fanoutHandler, 0, len(h))
+	for _, next := range h {
+		out = append(out, next.WithAttrs(attrs))
+	}
+	return out
+}
+func (h fanoutHandler) WithGroup(name string) slog.Handler {
+	out := make(fanoutHandler, 0, len(h))
+	for _, next := range h {
+		out = append(out, next.WithGroup(name))
+	}
+	return out
+}
+func redact(a slog.Attr) slog.Attr {
+	key := strings.ToLower(a.Key)
+	for _, secret := range []string{"password", "secret", "cookie", "authorization", "token", "dsn"} {
+		if strings.Contains(key, secret) {
+			return slog.String(a.Key, "[redacted]")
+		}
+	}
+	a.Value = a.Value.Resolve()
+	if a.Value.Kind() == slog.KindGroup {
+		attrs := a.Value.Group()
+		safe := make([]slog.Attr, len(attrs))
+		for i, attr := range attrs {
+			safe[i] = redact(attr)
+		}
+		a.Value = slog.GroupValue(safe...)
+	}
+	return a
 }
 
 type correlatedHandler struct{ slog.Handler }
 
 func (h correlatedHandler) Handle(ctx context.Context, r slog.Record) error {
+	safe := slog.NewRecord(r.Time, r.Level, r.Message, r.PC)
+	r.Attrs(func(a slog.Attr) bool { safe.AddAttrs(redact(a)); return true })
+	r = safe
 	hasTrace := false
 	r.Attrs(func(a slog.Attr) bool {
 		if a.Key == "trace_id" {
@@ -86,7 +173,11 @@ func (h correlatedHandler) Handle(ctx context.Context, r slog.Record) error {
 	return h.Handler.Handle(ctx, r)
 }
 func (h correlatedHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
-	return correlatedHandler{h.Handler.WithAttrs(attrs)}
+	safe := make([]slog.Attr, len(attrs))
+	for i, a := range attrs {
+		safe[i] = redact(a)
+	}
+	return correlatedHandler{h.Handler.WithAttrs(safe)}
 }
 func (h correlatedHandler) WithGroup(name string) slog.Handler {
 	return correlatedHandler{h.Handler.WithGroup(name)}
@@ -229,5 +320,6 @@ func Middleware(next http.Handler) http.Handler {
 			failure = errors.New("HTTP request rejected")
 		}
 		Event(ctx, "http.finished", failure, "method", r.Method, "http_status", status, "duration_ms", time.Since(start).Milliseconds())
+		httpMetric(r.Method, status, time.Since(start))
 	})
 }

@@ -1,0 +1,195 @@
+{
+  "service": "schakker-load-fixture",
+  "collector": "0.165.0",
+  "loki": "3.7.10",
+  "tempo": "2.10.3",
+  "prometheus": "3.16.0",
+  "grafana": "13.3.1",
+  "trace_id": "4f39cd2d20b5e17fdb13a2948a768f29",
+  "span_count": 164,
+  "span_names": [
+    "authority.http",
+    "authority.request",
+    "database.commit",
+    "database.exec",
+    "database.query",
+    "database.query_row",
+    "http.POST",
+    "migration.approval.revalidate",
+    "migration.history.commit",
+    "migration.query",
+    "migration.review.enqueue",
+    "queue.publish",
+    "target.lock.wait",
+    "worker.database_lock",
+    "worker.execute"
+  ],
+  "indexed_log_labels": [
+    "__stream_shard__",
+    "service_name"
+  ],
+  "metric_exemplar": {
+    "series": {
+      "__name__": "schakker_migration_duration_seconds_bucket",
+      "instance": "127.0.0.1:9464",
+      "job": "schakker-user",
+      "le": "2.5",
+      "operation": "up",
+      "status": "succeeded"
+    },
+    "value_seconds": "2.320754809",
+    "trace_id": "4f39cd2d20b5e17fdb13a2948a768f29"
+  },
+  "matching_log_streams": 1,
+  "dashboard": {
+    "uid": "schakker-migrations",
+    "title": "Schakker \u2014 queue, migrations and connection pools",
+    "panels": 12,
+    "provisioned": true
+  },
+  "log_examples": [
+    {
+      "timestamp_ns": "1794846862435391092",
+      "body": "worker.finished",
+      "metadata": {
+        "attempt": "1",
+        "event": "worker.finished",
+        "job_id": "9bf6cd69-9db1-4ca1-b429-e1021dbcfb58",
+        "service_name": "schakker-load-fixture",
+        "severity_text": "INFO",
+        "span_id": "4c3ae07fdaab7098",
+        "status": "succeeded",
+        "trace_id": "4f39cd2d20b5e17fdb13a2948a768f29"
+      }
+    }
+  ],
+  "span_examples": [
+    {
+      "traceId": "TznNLSC14X/bE6KUinaPKQ==",
+      "spanId": "fgguF9FSxAk=",
+      "name": "http.POST",
+      "startTimeUnixNano": "1794846859727838718",
+      "endTimeUnixNano": "1794846859971768706"
+    },
+    {
+      "traceId": "TznNLSC14X/bE6KUinaPKQ==",
+      "spanId": "o4rPmnhxL8E=",
+      "parentSpanId": "fgguF9FSxAk=",
+      "name": "database.exec",
+      "startTimeUnixNano": "1794846859773957527",
+      "endTimeUnixNano": "1794846859780679206"
+    },
+    {
+      "traceId": "TznNLSC14X/bE6KUinaPKQ==",
+      "spanId": "/uP8ekbISFs=",
+      "parentSpanId": "fgguF9FSxAk=",
+      "name": "database.exec",
+      "startTimeUnixNano": "1794846859780713110",
+      "endTimeUnixNano": "1794846859784979230"
+    },
+    {
+      "traceId": "TznNLSC14X/bE6KUinaPKQ==",
+      "spanId": "rqEgxWdWHlw=",
+      "parentSpanId": "fgguF9FSxAk=",
+      "name": "database.commit",
+      "startTimeUnixNano": "1794846859785012122",
+      "endTimeUnixNano": "1794846859791403076"
+    },
+    {
+      "traceId": "TznNLSC14X/bE6KUinaPKQ==",
+      "spanId": "bY7U8seGMvc=",
+      "parentSpanId": "q0jkkV6MfmA=",
+      "name": "database.exec",
+      "startTimeUnixNano": "1794846859825392429",
+      "endTimeUnixNano": "1794846859831900113"
+    },
+    {
+      "traceId": "TznNLSC14X/bE6KUinaPKQ==",
+      "spanId": "z4Y4aRGZ7CU=",
+      "parentSpanId": "q0jkkV6MfmA=",
+      "name": "queue.publish",
+      "startTimeUnixNano": "1794846859918741876",
+      "endTimeUnixNano": "1794846859957464562"
+    },
+    {
+      "traceId": "TznNLSC14X/bE6KUinaPKQ==",
+      "spanId": "L5IF0I/5fms=",
+      "parentSpanId": "q0jkkV6MfmA=",
+      "name": "database.exec",
+      "startTimeUnixNano": "1794846859957531569",
+      "endTimeUnixNano": "1794846859966564244"
+    },
+    {
+      "traceId": "TznNLSC14X/bE6KUinaPKQ==",
+      "spanId": "E9HlW/hIVOs=",
+      "parentSpanId": "q0jkkV6MfmA=",
+      "name": "database.commit",
+      "startTimeUnixNano": "1794846859966599841",
+      "endTimeUnixNano": "1794846859971153103"
+    },
+    {
+      "traceId": "TznNLSC14X/bE6KUinaPKQ==",
+      "spanId": "TDrgf9qrcJg=",
+      "parentSpanId": "z4Y4aRGZ7CU=",
+      "name": "worker.execute",
+      "startTimeUnixNano": "1794846860114992176",
+      "endTimeUnixNano": "1794846862435877992"
+    },
+    {
+      "traceId": "TznNLSC14X/bE6KUinaPKQ==",
+      "spanId": "09tSgCOtn2U=",
+      "parentSpanId": "TDrgf9qrcJg=",
+      "name": "worker.database_lock",
+      "startTimeUnixNano": "1794846860115339412",
+      "endTimeUnixNano": "1794846862426768573"
+    },
+    {
+      "traceId": "TznNLSC14X/bE6KUinaPKQ==",
+      "spanId": "bvG27Ub/d+4=",
+      "parentSpanId": "TDrgf9qrcJg=",
+      "name": "database.exec",
+      "startTimeUnixNano": "1794846860157007682",
+      "endTimeUnixNano": "1794846860161652236"
+    },
+    {
+      "traceId": "TznNLSC14X/bE6KUinaPKQ==",
+      "spanId": "t8uueJTajnY=",
+      "parentSpanId": "HCVSGQMDsts=",
+      "name": "database.exec",
+      "startTimeUnixNano": "1794846860284951907",
+      "endTimeUnixNano": "1794846860288695008"
+    },
+    {
+      "traceId": "TznNLSC14X/bE6KUinaPKQ==",
+      "spanId": "ic4Q51+BZYE=",
+      "parentSpanId": "HCVSGQMDsts=",
+      "name": "database.commit",
+      "startTimeUnixNano": "1794846860326483739",
+      "endTimeUnixNano": "1794846860331082297"
+    },
+    {
+      "traceId": "TznNLSC14X/bE6KUinaPKQ==",
+      "spanId": "mhuVQh7BkPo=",
+      "parentSpanId": "TDrgf9qrcJg=",
+      "name": "database.exec",
+      "startTimeUnixNano": "1794846860331323803",
+      "endTimeUnixNano": "1794846860353080526"
+    },
+    {
+      "traceId": "TznNLSC14X/bE6KUinaPKQ==",
+      "spanId": "r3qGydZOYdo=",
+      "parentSpanId": "QDOfB0gTTYA=",
+      "name": "database.exec",
+      "startTimeUnixNano": "1794846861253984016",
+      "endTimeUnixNano": "1794846861255312666"
+    },
+    {
+      "traceId": "TznNLSC14X/bE6KUinaPKQ==",
+      "spanId": "ar3KAoIuO8Y=",
+      "parentSpanId": "QDOfB0gTTYA=",
+      "name": "database.commit",
+      "startTimeUnixNano": "1794846861274923616",
+      "endTimeUnixNano": "1794846861276427847"
+    }
+  ]
+}
