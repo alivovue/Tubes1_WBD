@@ -8,7 +8,7 @@ import {
   Form,
   Heading,
   Hidden,
-  initials,
+  Icon,
   Notice,
   Panel,
   permission,
@@ -28,6 +28,7 @@ export function Users({
     <>
       <Heading
         title={administrators ? "Administrators" : "Employees"}
+        icon={administrators ? "shield" : "users"}
         text={
           administrators
             ? "Kelola akun admin dan sesi dalam database autentikasi admin."
@@ -133,6 +134,7 @@ export function Groups() {
     <>
       <Heading
         title="Groups"
+        icon="users"
         text="Kelola grup, anggota, dan akses database dalam satu halaman."
       >
         <Link className="button button--secondary" to="/admin/connections">
@@ -214,9 +216,12 @@ function GroupCard({
       tabIndex={-1}
     >
       <header>
-        <div>
-          <h2>{group.Name}</h2>
-          <p>{group.Description || "No description."}</p>
+        <div className="group-card__identity">
+          <Icon name="users" />
+          <div>
+            <h2>{group.Name}</h2>
+            <p>{group.Description || "No description."}</p>
+          </div>
         </div>
         <span className="badge badge--neutral">
           {group.Members?.length || 0} members
@@ -452,6 +457,7 @@ export function Connections() {
     <>
       <Heading
         title="Database Connections"
+        icon="server"
         text="Daftarkan target PostgreSQL atau MariaDB. Konfigurasi disimpan untuk aplikasi pengguna."
       />
       <Panel
@@ -468,7 +474,7 @@ export function Connections() {
           >
             <div className="connection-card__main">
               <span className="db-mark db-mark--blue">
-                {initials(database.Name)}
+                <Icon name="database" />
               </span>
               <div>
                 <h2>{database.Name}</h2>

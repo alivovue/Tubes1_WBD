@@ -1,4 +1,4 @@
-import { useNavigation } from "@schakker/ui";
+import { AeroScene, useNavigation } from "@schakker/ui";
 import {
   createContext,
   useCallback,
@@ -180,6 +180,7 @@ function Login() {
             </li>
           </ul>
         </div>
+        <AeroScene people />
         <p className="auth-showcase__footer">
           Schakker Technologies · Internal systems
         </p>
@@ -188,6 +189,9 @@ function Login() {
         <div className="auth-card">
           <div className="auth-card__mobile-brand">
             <Brand />
+          </div>
+          <div className="auth-card__emblem" aria-hidden="true">
+            <Icon name="users" />
           </div>
           <p className="eyebrow">Administration portal</p>
           <h2 id="login-title">Welcome back</h2>
@@ -305,8 +309,8 @@ function Layout() {
           <nav className="sidebar__nav">
             <p className="nav-label">Administration</p>
             {nav("/admin/users", "Employees", "users")}
-            {nav("/admin/administrators", "Administrators", "users")}
-            {nav("/admin/groups", "Groups", "layers")}
+            {nav("/admin/administrators", "Administrators", "shield")}
+            {nav("/admin/groups", "Groups", "users")}
             {nav("/admin/connections", "DB Connections", "server")}
           </nav>
           <div className="sidebar__footer">

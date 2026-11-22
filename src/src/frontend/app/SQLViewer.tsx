@@ -35,6 +35,7 @@ export function SQLViewer() {
     <>
       <Heading
         title="SQL Viewer"
+        icon="code"
         text="Build or write a SELECT query, then explore the results."
       >
         <span className="badge badge--view">Read only</span>

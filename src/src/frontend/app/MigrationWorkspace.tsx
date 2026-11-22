@@ -21,6 +21,7 @@ export function MigrationWorkspace() {
     <>
       <Heading
         title="Migration workflow"
+        icon="layers"
         text="Draft → Group review → Approved → Queued → Running → Completed"
       >
         <Link

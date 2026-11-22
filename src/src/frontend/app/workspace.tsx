@@ -7,7 +7,7 @@ import {
   Form,
   Heading,
   Hidden,
-  initials,
+  Icon,
   Pagination,
   Panel,
   permission,
@@ -24,6 +24,7 @@ export function Dashboard() {
     <>
       <Heading
         title={`Welcome, ${data.User.DisplayName}.`}
+        icon="grid"
         text="Ringkasan database dan perubahan yang dapat Anda akses."
       />
       <section className="metrics-grid" aria-label="Ringkasan">
@@ -32,12 +33,26 @@ export function Dashboard() {
             "Accessible databases",
             data.Databases?.length || 0,
             "Based on group permissions",
+            "database",
           ],
-          ["Editable databases", data.EditableCount, "View + Edit"],
-          ["Account role", "Employee", "Database access is granted separately"],
-          ["Session expires", stamp(data.Expires), "Idle timeout: 30 minutes"],
-        ].map(([label, value, detail]) => (
+          ["Editable databases", data.EditableCount, "View + Edit", "edit"],
+          [
+            "Account role",
+            "Employee",
+            "Database access is granted separately",
+            "users",
+          ],
+          [
+            "Session expires",
+            stamp(data.Expires),
+            "Idle timeout: 30 minutes",
+            "history",
+          ],
+        ].map(([label, value, detail, icon]) => (
           <article className="metric-card" key={label}>
+            <span className="metric-card__icon">
+              <Icon name={String(icon)} />
+            </span>
             <div>
               <span>{label}</span>
               <strong
@@ -101,6 +116,7 @@ export function Databases() {
     <>
       <Heading
         title="My Databases"
+        icon="database"
         text="Database yang dapat Anda akses berdasarkan keanggotaan grup."
       >
         <Link className="button button--secondary" to="/migrations">
@@ -121,7 +137,9 @@ export function Databases() {
         {databases.map((db) => (
           <article className="database-card" key={db.ID}>
             <div className="database-card__top">
-              <span className="db-mark db-mark--blue">{initials(db.Name)}</span>
+              <span className="db-mark db-mark--blue">
+                <Icon name="database" />
+              </span>
               <span className="badge badge--neutral">{db.DBMS}</span>
             </div>
             <h2>{db.Name}</h2>
@@ -190,6 +208,7 @@ export function Explorer() {
     <>
       <Heading
         title={data.Database.Name || "Database Explorer"}
+        icon="table"
         text={`${data.Database.DBMS || ""} · ${permission(data.Database.Permission)}`}
       >
         <Link className="button button--secondary" to="/databases">
@@ -448,6 +467,7 @@ export function History() {
     <>
       <Heading
         title="Changelog"
+        icon="history"
         text="Linear history of execution attempts for each database."
       >
         <Link

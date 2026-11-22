@@ -31,6 +31,7 @@ export function MigrationEditor() {
     <>
       <Heading
         title="Create migration"
+        icon="code"
         text="Compose and analyze SQL, then request group approval through the up/down workflow."
       >
         <Link

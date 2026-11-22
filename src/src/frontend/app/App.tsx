@@ -1,4 +1,4 @@
-import { useNavigation } from "@schakker/ui";
+import { AeroScene, useNavigation } from "@schakker/ui";
 import {
   createContext,
   useCallback,
@@ -175,20 +175,7 @@ function Login() {
             </li>
           </ul>
         </div>
-        <div className="code-window">
-          <div className="code-window__bar">
-            <i />
-            <i />
-            <i />
-            <span>migration_042.sql</span>
-          </div>
-          <pre>
-            {
-              "ALTER TABLE employees\n  ADD COLUMN last_login_at TIMESTAMPTZ;\n\nCREATE INDEX idx_employee_login\n  ON employees(last_login_at);"
-            }
-          </pre>
-          <div className="code-window__status">Analyze · Review · Execute</div>
-        </div>
+        <AeroScene />
         <p className="auth-showcase__footer">
           Schakker Technologies · Internal systems
         </p>
@@ -197,6 +184,9 @@ function Login() {
         <div className="auth-card">
           <div className="auth-card__mobile-brand">
             <Brand />
+          </div>
+          <div className="auth-card__emblem" aria-hidden="true">
+            <Icon name="database" />
           </div>
           <p className="eyebrow">Employee portal</p>
           <h2 id="login-title">Welcome back</h2>

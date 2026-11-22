@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Icon } from "./Icon";
 export function Notice({
   children,
   error = false,
@@ -18,17 +19,26 @@ export function Notice({
 export function Heading({
   title,
   text,
+  icon,
   children,
 }: {
   title: string;
   text?: string;
+  icon?: string;
   children?: ReactNode;
 }) {
   return (
     <section className="page-heading">
-      <div>
-        <h1>{title}</h1>
-        {text && <p>{text}</p>}
+      <div className="page-heading__intro">
+        {icon && (
+          <span className="page-heading__icon">
+            <Icon name={icon} />
+          </span>
+        )}
+        <div>
+          <h1>{title}</h1>
+          {text && <p>{text}</p>}
+        </div>
       </div>
       <div className="heading-actions">{children}</div>
     </section>
