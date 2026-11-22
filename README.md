@@ -1,5 +1,13 @@
 # Schakker
 
+Untuk langsung menjalankan development lokal dari root repositori pada Windows:
+
+```powershell
+.\run-dev.bat
+```
+
+Perintah ini menyiapkan database lokal terpisah, akun awal dan key, lalu menjalankan admin (`http://localhost:3001`), aplikasi pengguna (`http://localhost:3000`) dan worker. Login admin `dev.admin`, pengguna `dev.editor`, dan leader View Only `dev.reader`; password hasil generate ada di `src/.schakker/dev/credentials.txt`. Git Bash dapat memakai `bash ./run-dev.sh`. Hentikan dengan Ctrl+C atau `.\run-dev.bat -Stop`. Data development tersimpan untuk pemakaian berikutnya. Lihat [panduan development lokal](docs/m2-integration.md#run-locally-without-team-credentials). Koneksi database tim tetap memakai konfigurasi `.env` tim melalui launcher standar di bawah.
+
 Milestone 2 sudah menghubungkan kedua SPA, authority/group leader, immutable revision dan approval, durable queue, worker PostgreSQL, batch/recovery, serta committed history. Buka **Migration workflow** untuk alur draft → review → queue → execution; gunakan admin **Groups** untuk menunjuk leader. Lihat [panduan integrasi dan batasan](docs/m2-integration.md) serta [kontrak API aktual](docs/m2-frontend-api.md).
 
 Source workspace Schakker berada di folder `src/` repositori. Di dalamnya terdapat aplikasi pengguna (`src/src/` dari root repositori), aplikasi administrasi (`src/src-admin/`), library bersama (`src/shared/`), serta konfigurasi Go/npm dan test integrasi. Launcher Bash dan Windows berada di root repositori.
@@ -22,7 +30,7 @@ Akun admin dan pengguna biasa adalah identitas terpisah, termasuk bila username 
 
 ## Penyiapan dan konfigurasi
 
-Database, schema, role PostgreSQL terbatas, akun administrator pertama, key yang sudah ada dan token layanan harus disediakan di luar aplikasi. Startup tidak membuat database, schema, role, akun, seed data atau key, dan tidak menjalankan upgrade data.
+Untuk koneksi database tim, database, schema, role PostgreSQL terbatas, akun administrator pertama, key yang sudah ada dan token layanan disediakan di luar aplikasi. Startup aplikasi dan launcher standar hanya memvalidasi konfigurasi tersebut. Launcher development `run-dev` menyediakan lingkungan lokal terpisah seperti dijelaskan di atas.
 
 Panduan startup, kontrak schema, worker, recovery dan verifikasi tersedia di [M2 integration](docs/m2-integration.md).
 
@@ -99,7 +107,7 @@ GOWORK=off go -C src/tests test ./unit/...
 
 Go unit suite dapat dipilih melalui `./unit/src/...`, `./unit/src-admin/...`, dan `./unit/shared/...` dari `src/tests/`. `go.work` menyertakan modul test tersebut; production build kedua aplikasi tidak bergantung padanya. npm hanya digunakan untuk instalasi, build dan pengembangan frontend.
 
-Setup database, seed data dan bootstrap akun hanya ada dalam test support. Fixture hanya menyimpan schema database aplikasi saat ini dan data contoh PostgreSQL/MariaDB; schema lama beserta helper dan test cutover telah dihapus. PostgreSQL server/client tools diperlukan untuk fixture lokal (`SCHAKKER_POSTGRES_BIN`); MariaDB server tools opsional (`SCHAKKER_MARIADB_BIN`). Launcher root tetap menawarkan unit/integration test sebelum menjalankan aplikasi, dengan laporan di `src/tests/output/user/` atau `src/tests/output/admin/`. Database aplikasi tidak dimulai atau dimigrasikan oleh launcher.
+Setup database, seed data dan bootstrap akun tersedia dalam test support, yang juga dipakai oleh launcher development eksplisit di `src/tests/cmd/devserver/`. Fixture menyimpan schema database aplikasi saat ini dan data contoh PostgreSQL/MariaDB. PostgreSQL server/client tools diperlukan untuk fixture dan development lokal (`SCHAKKER_POSTGRES_BIN`); MariaDB server tools opsional (`SCHAKKER_MARIADB_BIN`). Launcher standar tetap menawarkan unit/integration test sebelum menjalankan aplikasi, dengan laporan di `src/tests/output/user/` atau `src/tests/output/admin/`. Launcher standar tidak menyiapkan database tim.
 
 ## Milestone 2 terintegrasi
 

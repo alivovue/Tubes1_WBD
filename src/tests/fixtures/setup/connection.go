@@ -1,4 +1,5 @@
-// Package setup provides isolated PostgreSQL initialization for tests only.
+// Package setup provides isolated PostgreSQL initialization for tests and the
+// explicitly invoked local development launcher, never production startup.
 package setup
 
 import (

@@ -15,7 +15,6 @@ node_modules/
 !/src/tests/output/.gitkeep
 /src/src/frontend/public/*
 !/src/src/frontend/public/sc logo.png
-/.gitattributes
 
 /src/src-admin/frontend/dist/
 /src/src-admin/bin/

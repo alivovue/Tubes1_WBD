@@ -11,6 +11,14 @@ case "${1:-}" in
 esac
 
 repository_directory="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+case "$(uname -s)" in
+    MINGW*|MSYS*|CYGWIN*)
+        windows_arguments=()
+        if [[ "$application_mode" == admin ]]; then windows_arguments+=(-Admin); fi
+        if [[ "$application_mode" == worker ]]; then windows_arguments+=(-Worker); fi
+        MSYS_NO_PATHCONV=1 exec powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "$(cygpath -w "$repository_directory/run.ps1")" "${windows_arguments[@]}"
+        ;;
+esac
 project_directory="$repository_directory/src"
 application_directory="$project_directory/src"
 if [[ "$application_mode" == admin ]]; then application_directory="$project_directory/src-admin"; fi
@@ -19,6 +27,11 @@ if [[ -f .env ]]; then
     set -a
     source .env
     set +a
+fi
+if [[ "$application_mode" == admin && -z "${SCHAKKER_ADMIN_DATABASE_URL:-}" ]] ||
+   [[ "$application_mode" != admin && -z "${SCHAKKER_PLATFORM_DATABASE_URL:-}${SCHAKKER_DATABASE_URL:-}${DATABASE_URL:-}" ]]; then
+    printf '%s\n' 'Database configuration is empty. Use bash ./run-dev.sh for local development, or supply the team database configuration in the application .env.' >&2
+    exit 1
 fi
 if [[ "$application_mode" != admin && -n "${SCHAKKER_STATE_DIR:-}" && "$SCHAKKER_STATE_DIR" != /* ]]; then
     export SCHAKKER_STATE_DIR="$application_directory/$SCHAKKER_STATE_DIR"

@@ -2,6 +2,44 @@
 
 The merged application connects both React SPAs to the Go authority, workflow, durable queue and PostgreSQL worker. API projections translate persistence records into the client resource contract without letting browser flags or submitted SQL authorize execution.
 
+## Run locally without team credentials
+
+For a working local development environment, run this from the repository root in PowerShell:
+
+```powershell
+.\run-dev.bat
+```
+
+Git Bash on Windows can use `bash ./run-dev.sh`; it delegates to the same PowerShell launcher. Linux/WSL uses `bash ./run-dev.sh` with Go, Node/npm and PostgreSQL server tools installed in that environment. Windows does not require WSL. Shell scripts use LF line endings, enforced by `.gitattributes`.
+
+The development launcher builds both SPAs and the actual admin, user API and worker binaries. It creates a private PostgreSQL cluster on an available loopback port, separate admin/platform/target databases, restricted application roles, persistent random keys and an initial administrator. It registers a demo target with `employees` and `demo_counters` tables and creates two access groups with separate editor and View Only leaders. Then it runs all three application processes. Public development listeners bind to `127.0.0.1`; the application ports are 3000 and 3001, authority 3002, and metrics 9464–9466.
+
+Open:
+
+- User application: http://localhost:3000 — username `dev.editor`.
+- Administrator: http://localhost:3001 — username `dev.admin`.
+- View Only approval leader: http://localhost:3000 — username `dev.reader`.
+
+The generated password for these local accounts is stored privately in `src/.schakker/dev/credentials.txt`. Read it with:
+
+```powershell
+notepad .\src\.schakker\dev\credentials.txt
+```
+
+Use the same hostname consistently during a session: `localhost` and `127.0.0.1` have separate cookies. The local data, keys and history persist under the Git-ignored `src/.schakker/dev/` directory. Keep this directory to retain the same database and encryption keys on restart. Service activity is in `admin.log`, `user.log`, `worker.log` and `setup.log` in that directory. The private cluster is stopped with the applications; the installed Windows PostgreSQL service is separate.
+
+Press Ctrl+C in the launcher terminal to stop, or use another terminal:
+
+```powershell
+.\run-dev.bat -Stop
+```
+
+Git Bash also accepts `bash ./run-dev.sh --stop`. Use `-SkipBuild` on Windows (or `--skip-build` in Bash) to reuse the last compiled binaries. Rebuild after source changes. `-Check` / `--check` starts the real services, authenticates all three accounts, submits a reversible migration, collects both leader approvals, waits for the worker commit, then approves and executes rollback and stops. Check history remains in the local development database.
+
+This mode uses its own private configuration and leaves the existing application `.env` files and team databases alone. To connect to team databases, use the standard three-process launchers below with the actual team URLs, original keys and shared service token. Copying `.env.example` alone leaves the required values empty. Standard launchers now detect an empty database URL before installing/building and point to the local launcher.
+
+Verified on Windows on 22 November 2026: PowerShell and Git Bash launch paths; restart with persistent accounts/data; stop command; all eight backend unit-test packages; five focused real PostgreSQL integration tests for startup/schema/SPA migration/batching; `go vet` for the development command; and real browser admin/editor login with the actual Groups and migration workspace pages. A real two-leader approval → enqueue → worker commit → approved rollback completed on the local cluster. The browser pages loaded without runtime exceptions. Linux/WSL was not executed in this Windows verification.
+
 ## Start all three processes
 
 Provision two separate application databases, restricted runtime roles, an initial administrator, existing master keys and a shared internal service token outside the application. Use `src/src/.env.example` and `src/src-admin/.env.example`; both `.env` files are ignored by Git. The complete fresh schemas are `src/tests/fixtures/website/schema.sql` and `src/tests/fixtures/admin/schema.sql`. These scripts create tables and should only be applied to empty application databases with suitable ownership/grants. They do not bootstrap the initial administrator.

@@ -148,6 +148,11 @@ try {
     $applicationDirectory = if ($Admin) { Join-Path $sourceDirectory 'src-admin' } else { Join-Path $sourceDirectory 'src' }
     Set-Location -LiteralPath $applicationDirectory
     Import-LaunchEnvironment (Join-Path $applicationDirectory '.env')
+    $devDatabaseNames = if ($Admin) { @('SCHAKKER_ADMIN_DATABASE_URL') } else { @('SCHAKKER_PLATFORM_DATABASE_URL', 'SCHAKKER_DATABASE_URL', 'DATABASE_URL') }
+    $devHasDatabaseURL = @($devDatabaseNames | Where-Object { -not [string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($_, 'Process')) }).Count -gt 0
+    if (-not $devHasDatabaseURL) {
+        throw "Database configuration is empty in $applicationDirectory\.env. For a complete local development environment, run .\run-dev.bat from the repository root. For team databases, supply the team's existing configuration."
+    }
     if (-not $Admin -and $env:SCHAKKER_STATE_DIR -and -not [IO.Path]::IsPathRooted($env:SCHAKKER_STATE_DIR)) {
         Set-LaunchEnvironment 'SCHAKKER_STATE_DIR' ([IO.Path]::GetFullPath((Join-Path $applicationDirectory $env:SCHAKKER_STATE_DIR)))
     }

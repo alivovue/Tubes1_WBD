@@ -52,7 +52,7 @@ func run() error {
 	if port == "" {
 		port = "3001"
 	}
-	server := &http.Server{Addr: ":" + port, Handler: handler, ReadHeaderTimeout: 10 * time.Second, ReadTimeout: 30 * time.Second, WriteTimeout: 3 * time.Minute, IdleTimeout: 90 * time.Second}
+	server := &http.Server{Addr: net.JoinHostPort(os.Getenv("SCHAKKER_HTTP_HOST"), port), Handler: handler, ReadHeaderTimeout: 10 * time.Second, ReadTimeout: 30 * time.Second, WriteTimeout: 3 * time.Minute, IdleTimeout: 90 * time.Second}
 	internalAddr := os.Getenv("SCHAKKER_ADMIN_INTERNAL_ADDR")
 	if internalAddr == "" {
 		internalAddr = "127.0.0.1:3002"
