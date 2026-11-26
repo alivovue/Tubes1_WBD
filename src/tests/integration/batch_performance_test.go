@@ -12,11 +12,11 @@ import (
 	"tubes1_wbd/backend/migration/engines"
 )
 
-func TestP3BatchPerformanceEvidence(t *testing.T) {
+func TestBatchPerformanceEvidence(t *testing.T) {
 	if os.Getenv("SCHAKKER_RUN_BATCH_BENCHMARK") != "1" {
 		t.Skip("set SCHAKKER_RUN_BATCH_BENCHMARK=1 for the real >1s baseline")
 	}
-	f, jobs, r := p3Fixture(t)
+	f, jobs, r := newWorkerFixture(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 	f.ctx = ctx

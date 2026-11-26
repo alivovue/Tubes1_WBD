@@ -250,9 +250,6 @@ func (s *testAccess) UpdateUser(ctx context.Context, actor, id int64, display st
 func (s *testAccess) SaveGroup(ctx context.Context, actor, id int64, name, description string) error {
 	return s.admin.SaveGroup(ctx, actor, id, name, description)
 }
-func (s *testAccess) DeleteGroup(ctx context.Context, actor, id int64) error {
-	return s.admin.DeleteGroup(ctx, actor, id)
-}
 func (s *testAccess) SetMembership(ctx context.Context, actor, user, group int64, member bool) error {
 	return s.admin.SetMembership(ctx, actor, user, group, member)
 }

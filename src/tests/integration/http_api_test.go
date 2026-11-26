@@ -145,7 +145,7 @@ func TestSPAAuthenticationLoginLogoutAndExpiration(t *testing.T) {
 	}
 }
 
-func TestMigrationAPIAnalysisSavesThroughM2DefinitionsAndRejectsRetiredActions(t *testing.T) {
+func TestMigrationAnalysisSavesDefinitionsAndRejectsRetiredActions(t *testing.T) {
 	f := newFixture(t, true)
 	reader := f.user(t, "spa.reader")
 	target := f.register(t)
@@ -180,7 +180,7 @@ func TestMigrationAPIAnalysisSavesThroughM2DefinitionsAndRejectsRetiredActions(t
 	payload["down_sql"] = "ALTER TABLE public.employees DROP COLUMN spa_note;"
 	created := workflowRequest(t, handler, http.MethodPost, "/migration-definitions", cookie, csrf, payload)
 	if created.Code != http.StatusCreated {
-		t.Fatalf("analysis SQL did not save through M2 definitions: %d %s", created.Code, created.Body.String())
+		t.Fatalf("analysis SQL did not save through migration definitions: %d %s", created.Code, created.Body.String())
 	}
 	definition := decodeAPI[struct {
 		Definition definitionResource `json:"definition"`

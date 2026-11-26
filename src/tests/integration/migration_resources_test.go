@@ -41,8 +41,8 @@ type executionResource struct {
 	CanForward  bool   `json:"can_forward"`
 }
 
-func TestM2SPAResourcesExecuteRollbackForwardThroughHTTP(t *testing.T) {
-	f, jobs, runner := p3Fixture(t)
+func TestSPAResourcesExecuteRollbackForwardThroughHTTP(t *testing.T) {
+	f, jobs, runner := newWorkerFixture(t)
 	handler := http.StripPrefix("/api", api.NewHandler(f.userAccess, f.databases, f.migrations, false, jobs))
 	identity, cookie := f.login(t, "it.editor")
 	csrf, err := f.access.CSRFToken(identity)
@@ -162,8 +162,8 @@ func TestM2SPAResourcesExecuteRollbackForwardThroughHTTP(t *testing.T) {
 	}
 }
 
-func TestM2BatchResourcesPreserveApprovedConfiguration(t *testing.T) {
-	f, jobs, _ := p3Fixture(t)
+func TestBatchResourcesPreserveApprovedConfiguration(t *testing.T) {
+	f, jobs, _ := newWorkerFixture(t)
 	handler := http.StripPrefix("/api", api.NewHandler(f.userAccess, f.databases, f.migrations, false, jobs))
 	identity, cookie := f.login(t, "it.editor")
 	csrf, err := f.access.CSRFToken(identity)

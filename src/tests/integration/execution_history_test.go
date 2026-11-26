@@ -11,20 +11,20 @@ import (
 	"tubes1_wbd/database/setup"
 )
 
-func TestM2HistoryShowsFailuresAndDashboardShowsCommittedEvents(t *testing.T) {
-	f, jobs, runner := p3Fixture(t)
+func TestHistoryShowsFailuresAndDashboardShowsCommittedEvents(t *testing.T) {
+	f, jobs, runner := newWorkerFixture(t)
 	must(t, setup.ValidateSchema(f.ctx, f.dbs.Website))
 	var oldTable bool
 	must(t, f.dbs.Website.QueryRowContext(f.ctx, `SELECT to_regclass('public.migration_executions') IS NOT NULL`).Scan(&oldTable))
 	if oldTable {
-		t.Fatal("fresh schema still provisions M1 history")
+		t.Fatal("fresh schema still provisions retired synchronous history")
 	}
 	version, err := f.runtimeStore.MigrationVersion(f.ctx, f.database)
 	must(t, err)
 	if version != 0 {
 		t.Fatal("fresh database has a migration version")
 	}
-	success := enqueueP3(t, f, "committed_summary")
+	success := enqueueMigration(t, f, "committed_summary")
 	_, err = runner.RunOnce(f.ctx)
 	must(t, err)
 	committed := assertJob(t, f, success, "succeeded")
@@ -55,7 +55,7 @@ func TestM2HistoryShowsFailuresAndDashboardShowsCommittedEvents(t *testing.T) {
 		}
 		recent := decodeAPI[struct{ Recent []summary }](t, dashboard).Recent
 		if len(recent) != 1 || recent[0].ID != committed.ExecutionID || recent[0].DatabaseID != f.database || recent[0].DatabaseName == "" || recent[0].Title != "committed_summary" || recent[0].Actor != "it.editor" || recent[0].Operation != "up" || recent[0].CommittedAt.IsZero() || recent[0].Version != 1 {
-			t.Fatalf("dashboard did not project the committed M2 job: %+v", recent)
+			t.Fatalf("dashboard did not project the committed migration job: %+v", recent)
 		}
 		history := apiRequest(t, handler, http.MethodGet, fmt.Sprintf("/migrations/history?database_id=%d", f.database), cookie, nil)
 		if history.Code != http.StatusOK {
@@ -86,7 +86,7 @@ func TestM2HistoryShowsFailuresAndDashboardShowsCommittedEvents(t *testing.T) {
 		t.Fatalf("Jobs lost the execution attempts: %+v", attempts)
 	}
 	if retired := apiRequest(t, handler, http.MethodGet, "/migrations", editorCookie, nil); retired.Code != http.StatusNotFound {
-		t.Fatalf("retired M1 history API returned %d", retired.Code)
+		t.Fatalf("retired retired synchronous history API returned %d", retired.Code)
 	}
 	outsider := f.user(t, "history.outsider")
 	_, outsiderCookie := f.login(t, outsider.Username)
@@ -109,7 +109,7 @@ func TestM2HistoryShowsFailuresAndDashboardShowsCommittedEvents(t *testing.T) {
 	version, err = f.runtimeStore.MigrationVersion(f.ctx, f.database)
 	must(t, err)
 	if version != 0 {
-		t.Fatal("analysis version ignored the M2 rollback")
+		t.Fatal("analysis version ignored the approved rollback")
 	}
 	dashboard = apiRequest(t, handler, http.MethodGet, "/dashboard", editorCookie, nil)
 	recent := decodeAPI[struct{ Recent []summary }](t, dashboard).Recent

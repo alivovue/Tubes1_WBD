@@ -16,7 +16,7 @@ import (
 
 func receiptFixture(t *testing.T) (*workflowFixture, *worker.Runner, dao.MigrationJob) {
 	t.Helper()
-	f, _, runner := p3Fixture(t)
+	f, _, runner := newWorkerFixture(t)
 	id := enqueueDefinition(t, f, migration.DefinitionInput{Title: "Receipt guard", UpSQL: "CREATE TABLE public.receipt_guard_demo(id integer PRIMARY KEY,note text)", DownSQL: "DROP TABLE public.receipt_guard_demo"})
 	_, err := runner.RunOnce(f.ctx)
 	must(t, err)

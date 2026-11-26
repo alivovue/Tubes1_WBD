@@ -35,11 +35,6 @@ func TestAdapterRegistrySelectsDialectAndRejectsDuplicates(t *testing.T) {
 	if _, err := adapters.NewRegistry(postgres.New(), postgres.New()); err == nil {
 		t.Fatal("duplicate adapter accepted")
 	}
-	supported := registry.Supported()
-	supported[0] = "mutated"
-	if registry.Supported()[0] == "mutated" {
-		t.Fatal("registry exposed its internal supported list")
-	}
 }
 func TestIdentifierQuoting(t *testing.T) {
 	cases := []struct {

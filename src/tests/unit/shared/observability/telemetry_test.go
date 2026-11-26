@@ -15,7 +15,7 @@ import (
 	"schakker_shared/observability"
 )
 
-func TestP3ConsoleTraceCrossesQueueAndRedactsSecrets(t *testing.T) {
+func TestConsoleTraceCrossesQueueAndRedactsSecrets(t *testing.T) {
 	previousLogger := slog.Default()
 	previousProvider := otel.GetTracerProvider()
 	previousPropagator := otel.GetTextMapPropagator()

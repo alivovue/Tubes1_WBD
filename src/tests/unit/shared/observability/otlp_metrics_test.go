@@ -22,7 +22,7 @@ import (
 	"schakker_shared/observability"
 )
 
-func TestBonusOTLPExportsCorrelatedRedactedLogsAndTraces(t *testing.T) {
+func TestOTLPExportsCorrelatedRedactedLogsAndTraces(t *testing.T) {
 	previousLogger, previousProvider, previousPropagator := slog.Default(), otel.GetTracerProvider(), otel.GetTextMapPropagator()
 	t.Cleanup(func() {
 		slog.SetDefault(previousLogger)
@@ -95,7 +95,7 @@ func (metricsConn) Close() error                        { return nil }
 func (metricsConn) Begin() (driver.Tx, error)           { return nil, errors.New("unused") }
 func init()                                             { sql.Register("schakker-metrics-test", metricsDriver{}) }
 
-func TestBonusMetricsExposeDurableQueueAndRealPoolWaitWithoutIdentityLabels(t *testing.T) {
+func TestMetricsExposeDurableQueueAndRealPoolWaitWithoutIdentityLabels(t *testing.T) {
 	db, err := sql.Open("schakker-metrics-test", "")
 	if err != nil {
 		t.Fatal(err)
@@ -135,7 +135,7 @@ func TestBonusMetricsExposeDurableQueueAndRealPoolWaitWithoutIdentityLabels(t *t
 		t.Fatal("queue collection not reported")
 	}
 }
-func TestBonusOperationalListenerRejectsUnprotectedRemoteBind(t *testing.T) {
+func TestOperationalListenerRejectsUnprotectedRemoteBind(t *testing.T) {
 	t.Setenv("SCHAKKER_METRICS_ADDR", "0.0.0.0:0")
 	t.Setenv("SCHAKKER_METRICS_TOKEN", "")
 	if stop, err := observability.StartMetrics(context.Background(), "127.0.0.1:0"); err == nil {

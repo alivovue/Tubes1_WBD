@@ -70,7 +70,7 @@ func TestLoginCreatesBoundedSessionAndHashesOpaqueToken(t *testing.T) {
 		storedHash = append([]byte(nil), hashArgument(t, args[1].Value)...)
 		wantArg(t, args, 2, testTime)
 	}
-	_, store, _ := newSQLStub(t, credentialsStep(string(hash), true), sqlStep{kind: "begin"}, scalarStep("FOR SHARE", true), userStep(false, true), revoke, create, insert, sqlStep{kind: "commit"})
+	_, store, _ := newSQLStub(t, credentialsStep(string(hash), true), sqlStep{kind: "begin"}, scalarStep("FOR SHARE", true), adminIdentityStep(true), revoke, create, insert, sqlStep{kind: "commit"})
 	service := newAccess(t, store, nil)
 	identity, raw, err := service.Login(context.Background(), "employee", testPassword, "previous-browser-token")
 	if err != nil {
@@ -137,7 +137,7 @@ func TestAuthenticationSessionLifecycle(t *testing.T) {
 			}
 			steps := []sqlStep{{kind: "begin"}, lock, queryStep("SELECT issued_at,replaced_at,grace_expires_at", []string{"issued", "replaced", "grace"}, []driver.Value{tc.issued, replaced, grace})}
 			if !tc.reject || tc.disabled {
-				steps = append(steps, userStep(false, !tc.disabled))
+				steps = append(steps, adminIdentityStep(!tc.disabled))
 			}
 			var replacementHash []byte
 			if tc.rotate {

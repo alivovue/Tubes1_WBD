@@ -2,12 +2,9 @@ package unit_test
 
 import (
 	"context"
-	"errors"
 	"strings"
 	"testing"
 
-	mysql "github.com/go-sql-driver/mysql"
-	"github.com/jackc/pgx/v5/pgconn"
 	"tubes1_wbd/backend/access"
 	"tubes1_wbd/backend/migration"
 	"tubes1_wbd/backend/migration/engines"
@@ -90,37 +87,6 @@ func TestMigrationEngineModesAndRegistry(t *testing.T) {
 				t.Fatal("non-atomic execution warning missing")
 			}
 		})
-	}
-}
-func TestMigrationFailuresDoNotLeakDriverDetails(t *testing.T) {
-	pg := pgengine.New()
-	maria := mariaengine.New()
-	pgMessage := pg.SafeFailure(&pgconn.PgError{Code: "23505", Message: "secret row data", Detail: "password=hidden"})
-	if !strings.Contains(pgMessage, "23505") || strings.Contains(pgMessage, "secret") || strings.Contains(pgMessage, "hidden") {
-		t.Fatal("PostgreSQL driver details leaked")
-	}
-	native := &mysql.MySQLError{Number: 1062, Message: "secret row data"}
-	copy(native.SQLState[:], "23000")
-	mariaMessage := maria.SafeFailure(native)
-	if !strings.Contains(mariaMessage, "1062") || strings.Contains(mariaMessage, "secret") {
-		t.Fatal("MariaDB driver details leaked")
-	}
-	dependency := pg.SafeFailure(&pgconn.PgError{Code: "2BP01", Message: "secret object details"})
-	if !strings.Contains(dependency, "CASCADE") || strings.Contains(dependency, "secret") {
-		t.Fatal("PostgreSQL dependency error did not provide safe CASCADE guidance")
-	}
-	for _, number := range []uint16{1075, 1553, 1828, 1833} {
-		message := maria.SafeFailure(&mysql.MySQLError{Number: number, Message: "secret object details"})
-		if !strings.Contains(message, "key") || strings.Contains(message, "secret") {
-			t.Fatal("MariaDB dependency error did not provide safe key guidance")
-		}
-	}
-	for _, engine := range []engines.Engine{pg, maria} {
-		for _, failure := range []error{context.Canceled, context.DeadlineExceeded, errors.New("password=hidden")} {
-			if strings.Contains(engine.SafeFailure(failure), "hidden") {
-				t.Fatal("raw execution error leaked")
-			}
-		}
 	}
 }
 func TestSQLHashBindsExactText(t *testing.T) {

@@ -10,7 +10,7 @@ import (
 	"tubes1_wbd/backend/access"
 )
 
-func TestIT01CreateAdminAndLogin(t *testing.T) {
+func TestCreateAdminAndLogin(t *testing.T) {
 	f := newFixture(t, false)
 	var before int
 	must(t, f.adminDB.QueryRowContext(f.ctx, `SELECT count(*) FROM admin_users`).Scan(&before))
@@ -47,7 +47,7 @@ func TestIT01CreateAdminAndLogin(t *testing.T) {
 		t.Fatal("returned token does not authenticate")
 	}
 }
-func TestIT02IncorrectCredentialsCreateNoSession(t *testing.T) {
+func TestIncorrectCredentialsCreateNoSession(t *testing.T) {
 	f := newFixture(t, true)
 	for _, input := range []struct{ username, password string }{{"it.admin", "incorrect-password"}, {"missing.user", password}} {
 		identity, raw, err := f.adminAuth.Login(f.ctx, input.username, input.password, "")
@@ -64,7 +64,7 @@ func TestIT02IncorrectCredentialsCreateNoSession(t *testing.T) {
 		}
 	}
 }
-func TestIT03LogoutInvalidatesPersistedSession(t *testing.T) {
+func TestLogoutInvalidatesPersistedSession(t *testing.T) {
 	f := newFixture(t, true)
 	identity, raw := f.login(t, "it.admin")
 	_, _, err := f.adminAuth.Authenticate(f.ctx, raw)
@@ -78,7 +78,7 @@ func TestIT03LogoutInvalidatesPersistedSession(t *testing.T) {
 		t.Fatal("logout did not persist session revocation")
 	}
 }
-func TestIT04DeactivateUserInvalidatesSessions(t *testing.T) {
+func TestDeactivateUserInvalidatesSessions(t *testing.T) {
 	f := newFixture(t, true)
 	user := f.user(t, "it.employee")
 	identity, raw := f.login(t, user.Username)
@@ -98,7 +98,7 @@ func TestIT04DeactivateUserInvalidatesSessions(t *testing.T) {
 		t.Fatal("deactivation did not revoke the existing session")
 	}
 }
-func TestIT05LastActiveAdminCannotBeRemoved(t *testing.T) {
+func TestLastActiveAdminCannotBeRemoved(t *testing.T) {
 	f := newFixture(t, true)
 	wantError(t, f.adminAuth.UpdateAdmin(f.ctx, f.admin, f.admin, "Integration Admin", false, ""), access.ErrInvalid)
 	saved, err := f.adminStore.Admin(f.ctx, f.admin)

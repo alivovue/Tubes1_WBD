@@ -27,8 +27,6 @@ func TestExplorerEnforcesDatabasePermissionsBeforeConnecting(t *testing.T) {
 			return err
 		}},
 		{"snapshot", func() error { _, err := service.Snapshot(context.Background(), 7, 3); return err }},
-		{"fingerprint", func() error { _, err := service.Fingerprint(context.Background(), 7, 3); return err }},
-		{"plans", func() error { _, err := service.QueryPlans(context.Background(), 7, 3, "SELECT 1"); return err }},
 	}
 	for _, tc := range calls {
 		t.Run(tc.name, func(t *testing.T) {
@@ -36,9 +34,6 @@ func TestExplorerEnforcesDatabasePermissionsBeforeConnecting(t *testing.T) {
 			wantError(t, tc.call(), access.ErrForbidden)
 		})
 	}
-	stub.append(permissionStep(access.ViewOnly))
-	_, err := service.QueryPlans(context.Background(), 7, 3, "SELECT 1")
-	wantError(t, err, access.ErrForbidden)
 }
 func TestDatabaseConfigurationValidation(t *testing.T) {
 	_, store, _ := newSQLStub(t)

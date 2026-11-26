@@ -6,14 +6,11 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"sync"
 	"testing"
 	"time"
 
-	"tubes1_wbd/backend"
 	"tubes1_wbd/backend/access"
-	adminbackend "tubes1_wbd_admin/backend"
 )
 
 func rotationClock(t *testing.T, f *fixture) *time.Time {
@@ -33,22 +30,6 @@ func currentHash(t *testing.T, f *fixture, session string) []byte {
 	var hash []byte
 	must(t, f.dbs.Website.QueryRowContext(f.ctx, `SELECT token_hash FROM session_tokens WHERE session_id=$1 AND replaced_at IS NULL`, session).Scan(&hash))
 	return hash
-}
-func userHandler(t *testing.T, f *fixture) http.Handler {
-	t.Helper()
-	root, err := filepath.Abs(filepath.Join(sourceRoot(t), "apps", "user"))
-	must(t, err)
-	handler, err := backend.NewHandlerWithServices(root, backend.Services{Access: f.userAccess, Databases: f.databases, Migrations: f.migrations})
-	must(t, err)
-	return handler
-}
-func adminHandler(t *testing.T, f *fixture) http.Handler {
-	t.Helper()
-	root, err := filepath.Abs(filepath.Join(sourceRoot(t), "apps", "admin"))
-	must(t, err)
-	handler, err := adminbackend.NewHandlerWithServices(root, adminbackend.Services{Authentication: f.adminAuth, Access: f.adminAuth, Connections: f.connections})
-	must(t, err)
-	return handler
 }
 func TestMembershipIncreaseRotatesAllActiveSessionsAndDeliversCookie(t *testing.T) {
 	f := newFixture(t, true)

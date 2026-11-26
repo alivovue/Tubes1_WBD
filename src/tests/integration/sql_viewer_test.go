@@ -5,12 +5,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"path/filepath"
 	"strings"
 	"testing"
 
 	fixtures "schakker_tests/fixtures/setup"
-	"tubes1_wbd/backend"
 	"tubes1_wbd/backend/access"
 	"tubes1_wbd/backend/dbmanagement"
 )
@@ -76,9 +74,7 @@ func TestSQLViewerHTTPReaderPageAndCSRFProtection(t *testing.T) {
 	identity, cookie := f.login(t, reader.Username)
 	csrf, err := f.access.CSRFToken(identity)
 	must(t, err)
-	root := filepath.Join(sourceRoot(t), "apps", "user")
-	handler, err := backend.NewHandlerWithServices(root, backend.Services{Access: f.userAccess, Databases: f.databases, Migrations: f.migrations})
-	must(t, err)
+	handler := userHandler(t, f)
 	request := func(method, route string, form url.Values) *httptest.ResponseRecorder {
 		return apiRequest(t, handler, method, route, cookie, form)
 	}

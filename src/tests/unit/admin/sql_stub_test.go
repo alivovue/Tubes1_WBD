@@ -175,18 +175,8 @@ func wantArg(t *testing.T, args []driver.NamedValue, index int, want any) {
 		t.Errorf("argument %d = %v; want %v", index, args[index].Value, want)
 	}
 }
-func userStep(admin, active bool) sqlStep {
+func adminIdentityStep(active bool) sqlStep {
 	return queryStep("FROM admin_users WHERE id=", []string{"id", "username", "display_name", "is_active", "version", "rotation"}, []driver.Value{int64(7), "employee", "Employee", active, int64(0), int64(0)})
-}
-func permissionStep(permission dao.Permission) sqlStep {
-	level := int64(0)
-	if permission == dao.ViewOnly {
-		level = 1
-	}
-	if permission == dao.ViewEdit {
-		level = 2
-	}
-	return scalarStep("group_database_permissions", level)
 }
 func hashArgument(t *testing.T, value driver.Value) []byte {
 	t.Helper()

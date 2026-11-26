@@ -55,12 +55,12 @@ func TestFailedSecurityVersionUpdateRollsBackMembership(t *testing.T) {
 	wantError(t, newAccess(t, store, nil).SetMembership(context.Background(), 7, 8, 2, false), failure)
 }
 func TestLastAdministratorRemainsActive(t *testing.T) {
-	steps := append(transactionSteps(true), userStep(true, true), scalarStep("count(*) FROM admin_users", int64(1)), sqlStep{kind: "rollback"})
+	steps := append(transactionSteps(true), adminIdentityStep(true), scalarStep("count(*) FROM admin_users", int64(1)), sqlStep{kind: "rollback"})
 	_, store, _ := newSQLStub(t, steps...)
 	wantError(t, newAccess(t, store, nil).UpdateAdmin(context.Background(), 7, 7, "Admin", false, ""), access.ErrInvalid)
 }
 func TestAdministratorPasswordResetRevokesOnlyAdminSessions(t *testing.T) {
-	steps := append(transactionSteps(true), userStep(true, true), execStep("UPDATE admin_users SET"), execStep("UPDATE admin_sessions SET revoked_at="), sqlStep{kind: "commit"})
+	steps := append(transactionSteps(true), adminIdentityStep(true), execStep("UPDATE admin_users SET"), execStep("UPDATE admin_sessions SET revoked_at="), sqlStep{kind: "commit"})
 	_, store, _ := newSQLStub(t, steps...)
 	wantError(t, newAccess(t, store, nil).UpdateAdmin(context.Background(), 7, 7, "Admin", true, testPassword), nil)
 }

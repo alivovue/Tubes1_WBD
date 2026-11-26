@@ -20,8 +20,8 @@ import (
 	admindao "tubes1_wbd_admin/database/dao"
 )
 
-// This is a policy-contract test adapter, not an execution worker. The production
-// queue belongs to P3; only review reservations/history projection are tested here.
+// policyDispatcher records transactional job reservations for workflow policy tests.
+// Worker integration tests exercise target SQL execution with the real queue.
 type policyDispatcher struct {
 	mu    sync.Mutex
 	calls int
@@ -120,7 +120,7 @@ func (f *workflowFixture) commit(t *testing.T, r dao.MigrationReview, number int
 	wantError(t, err, migration.ErrWorkflowConflict)
 	return execution
 }
-func TestM2AllGroupsApproveIncludingViewOnlyAndNoBypass(t *testing.T) {
+func TestAllGroupsApproveIncludingViewOnlyAndNoBypass(t *testing.T) {
 	f := newWorkflowFixture(t)
 	r := f.definition(t, "approval_a")
 	review := f.submit(t, r)
@@ -181,7 +181,7 @@ func TestM2AllGroupsApproveIncludingViewOnlyAndNoBypass(t *testing.T) {
 	_, err = f.workflow.EditDefinition(f.ctx, f.editor, r.DefinitionID, r.ID, reversible("changed"))
 	wantError(t, err, migration.ErrWorkflowConflict)
 }
-func TestM2AuthorityChangesInvalidateApprovalsAndMissingLeadersBlock(t *testing.T) {
+func TestAuthorityChangesInvalidateApprovalsAndMissingLeadersBlock(t *testing.T) {
 	f := newWorkflowFixture(t)
 	r := f.definition(t, "authority_a")
 	review := f.approve(t, f.submit(t, r))
@@ -212,7 +212,7 @@ func TestM2AuthorityChangesInvalidateApprovalsAndMissingLeadersBlock(t *testing.
 	_, err = f.workflow.Enqueue(f.ctx, f.editor, pending.ID, "missing-leader")
 	wantError(t, err, migration.ErrWorkflowConflict)
 }
-func TestM2LeaderMembershipAndActivationInvariants(t *testing.T) {
+func TestLeaderMembershipAndActivationInvariants(t *testing.T) {
 	f := newWorkflowFixture(t)
 	outsider := f.user(t, "leader.outsider")
 	if err := f.adminAuth.SetGroupLeader(f.ctx, f.admin, f.editors.ID, outsider.ID); err == nil {
@@ -230,7 +230,7 @@ func TestM2LeaderMembershipAndActivationInvariants(t *testing.T) {
 	must(t, f.adminAuth.UpdateUser(f.ctx, f.admin, f.editor, "Editor", false, ""))
 	must(t, f.adminAuth.DeleteGroup(f.ctx, f.admin, f.editors.ID))
 }
-func TestM2RevisionsAreImmutableAndRejectionCanBeResubmitted(t *testing.T) {
+func TestRevisionsAreImmutableAndRejectionCanBeResubmitted(t *testing.T) {
 	f := newWorkflowFixture(t)
 	r := f.definition(t, "immutable_a")
 	review := f.submit(t, r)
@@ -259,7 +259,7 @@ func TestM2RevisionsAreImmutableAndRejectionCanBeResubmitted(t *testing.T) {
 		t.Fatal("committed history rewritten")
 	}
 }
-func TestM2RollbackForwardLinearStateAndExactHistoryPair(t *testing.T) {
+func TestRollbackForwardLinearStateAndExactHistoryPair(t *testing.T) {
 	f := newWorkflowFixture(t)
 	a := f.commit(t, f.approve(t, f.submit(t, f.definition(t, "chain_a"))), 1)
 	b := f.commit(t, f.approve(t, f.submit(t, f.definition(t, "chain_b"))), 2)
@@ -313,7 +313,7 @@ func TestM2RollbackForwardLinearStateAndExactHistoryPair(t *testing.T) {
 	_, err = f.workflow.ForwardReview(f.ctx, f.editor, c.ExecutionID, f.state(t).Generation)
 	wantError(t, err, migration.ErrWorkflowConflict)
 }
-func TestM2IrreversibleAndFailedAttemptsDoNotMoveHead(t *testing.T) {
+func TestIrreversibleAndFailedAttemptsDoNotMoveHead(t *testing.T) {
 	f := newWorkflowFixture(t)
 	invalid := reversible("unsafe_a")
 	invalid.DownSQL = ""
@@ -342,7 +342,7 @@ func TestM2IrreversibleAndFailedAttemptsDoNotMoveHead(t *testing.T) {
 		t.Fatal("failed attempt entered committed history")
 	}
 }
-func TestM2BatchCancelRequiresFreshAllLeaderApprovalAndSafeSource(t *testing.T) {
+func TestBatchCancelRequiresFreshAllLeaderApprovalAndSafeSource(t *testing.T) {
 	f := newWorkflowFixture(t)
 	revision := f.definition(t, "cancel_a")
 	original := f.approve(t, f.submit(t, revision))
@@ -388,7 +388,7 @@ func workflowRequest(t *testing.T, handler http.Handler, method, route, cookie, 
 	handler.ServeHTTP(res, req)
 	return res
 }
-func TestM2WorkflowHTTPEnforcesSessionCSRFAndTypedJSON(t *testing.T) {
+func TestWorkflowHTTPEnforcesSessionCSRFAndTypedJSON(t *testing.T) {
 	f := newWorkflowFixture(t)
 	identity, cookie := f.login(t, "it.editor")
 	csrf, err := f.access.CSRFToken(identity)
@@ -458,7 +458,7 @@ func TestM2WorkflowHTTPEnforcesSessionCSRFAndTypedJSON(t *testing.T) {
 	}
 }
 
-func TestM2AuthorityOutageAndChangesAtRunFailClosed(t *testing.T) {
+func TestAuthorityOutageAndChangesAtRunFailClosed(t *testing.T) {
 	f := newWorkflowFixture(t)
 	r := f.definition(t, "run_authority")
 	review := f.approve(t, f.submit(t, r))
@@ -481,7 +481,7 @@ func TestM2AuthorityOutageAndChangesAtRunFailClosed(t *testing.T) {
 		t.Fatal("authority outage reused approvals")
 	}
 }
-func TestM2OneLeaderMustDecideForEachGroupAndCommitAfterAuthorityChange(t *testing.T) {
+func TestOneLeaderMustDecideForEachGroupAndCommitAfterAuthorityChange(t *testing.T) {
 	f := newWorkflowFixture(t)
 	must(t, f.adminAuth.SetMembership(f.ctx, f.admin, f.editor, f.readers.ID, true))
 	must(t, f.adminAuth.SetGroupLeader(f.ctx, f.admin, f.readers.ID, f.editor))
@@ -512,7 +512,7 @@ func TestM2OneLeaderMustDecideForEachGroupAndCommitAfterAuthorityChange(t *testi
 	}
 }
 
-func TestM2EditInvalidatesUnqueuedApprovedReview(t *testing.T) {
+func TestEditInvalidatesUnqueuedApprovedReview(t *testing.T) {
 	f := newWorkflowFixture(t)
 	revision := f.definition(t, "edit_review")
 	review := f.approve(t, f.submit(t, revision))
@@ -530,7 +530,7 @@ func TestM2EditInvalidatesUnqueuedApprovedReview(t *testing.T) {
 	wantError(t, err, migration.ErrWorkflowConflict)
 	f.approve(t, f.submit(t, replacement))
 }
-func TestM2ActivitiesKeepFailuresOutsideCommittedHistory(t *testing.T) {
+func TestActivitiesKeepFailuresOutsideCommittedHistory(t *testing.T) {
 	f := newWorkflowFixture(t)
 	review := f.approve(t, f.submit(t, f.definition(t, "activity_a")))
 	job, err := f.workflow.Enqueue(f.ctx, f.editor, review.ID, "failed-job")
@@ -565,7 +565,7 @@ func (o *policyObserver) Start(ctx context.Context, event string, actor, databas
 	o.events = append(o.events, event)
 	return ctx, func(string) {}
 }
-func TestM2PolicyAuditIsJSONAndSupportsTracingWithoutSecrets(t *testing.T) {
+func TestPolicyAuditIsJSONAndSupportsTracingWithoutSecrets(t *testing.T) {
 	f := newWorkflowFixture(t)
 	var logs bytes.Buffer
 	observer := &policyObserver{}
@@ -587,7 +587,7 @@ func TestM2PolicyAuditIsJSONAndSupportsTracingWithoutSecrets(t *testing.T) {
 	}
 }
 
-func TestM2WorkerHandoffCanReuseTheLockedMetadataConnection(t *testing.T) {
+func TestWorkerHandoffCanReuseTheLockedMetadataConnection(t *testing.T) {
 	f := newWorkflowFixture(t)
 	review := f.approve(t, f.submit(t, f.definition(t, "locked_handoff")))
 	job, err := f.workflow.Enqueue(f.ctx, f.editor, review.ID, "locked-handoff")
@@ -603,7 +603,7 @@ func TestM2WorkerHandoffCanReuseTheLockedMetadataConnection(t *testing.T) {
 	}))
 }
 
-func TestM2PartialJobBlocksOtherMigrationActions(t *testing.T) {
+func TestPartialJobBlocksOtherMigrationActions(t *testing.T) {
 	f := newWorkflowFixture(t)
 	review := f.approve(t, f.submit(t, f.definition(t, "partial_original")))
 	job, err := f.workflow.Enqueue(f.ctx, f.editor, review.ID, "partial-original")
@@ -613,7 +613,7 @@ func TestM2PartialJobBlocksOtherMigrationActions(t *testing.T) {
 	next := f.definition(t, "blocked_next")
 	_, err = f.workflow.SubmitReview(f.ctx, f.editor, migration.ReviewInput{RevisionID: next.ID, Action: "up"})
 	wantError(t, err, migration.ErrWorkflowConflict)
-	// A known job can be revalidated for safe checkpoint-based recovery by P3;
+	// A known job can be revalidated for safe checkpoint-based recovery by the worker;
 	// it does not get permission to ignore an explicit unresolved DB blocker.
 	_, err = f.workflow.ValidateApprovedExecution(f.ctx, review.ID, job)
 	must(t, err)

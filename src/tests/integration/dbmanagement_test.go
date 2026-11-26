@@ -15,7 +15,7 @@ import (
 	"tubes1_wbd_admin/backend/connectionconfig"
 )
 
-func TestIT09ValidateAndRegisterPostgreSQLConnection(t *testing.T) {
+func TestValidateAndRegisterPostgreSQLConnection(t *testing.T) {
 	f := newFixture(t, true)
 	input := f.dbs.Connection()
 	// Registration has no managed database connectivity or query operation.
@@ -40,7 +40,7 @@ func TestIT09ValidateAndRegisterPostgreSQLConnection(t *testing.T) {
 		t.Fatal("managed fixture connection unexpectedly uses a superuser")
 	}
 }
-func TestIT10ExploreRealSchemasTablesColumnsIndexesAndRows(t *testing.T) {
+func TestExploreRealSchemasTablesColumnsIndexesAndRows(t *testing.T) {
 	f := newFixture(t, true)
 	user := f.user(t, "it.reader")
 	target := f.register(t)
@@ -101,7 +101,7 @@ func TestIT10ExploreRealSchemasTablesColumnsIndexesAndRows(t *testing.T) {
 		t.Fatal("real table pagination is incorrect")
 	}
 }
-func TestIT11DisableConnectionRemovesAccessAndRevokesSessions(t *testing.T) {
+func TestDisableConnectionRemovesAccessAndRevokesSessions(t *testing.T) {
 	f := newFixture(t, true)
 	user := f.user(t, "it.reader")
 	target := f.register(t)
@@ -130,11 +130,11 @@ func TestIT11DisableConnectionRemovesAccessAndRevokesSessions(t *testing.T) {
 }
 
 func TestDuplicateDatabaseRegistrationPreservesExistingHistory(t *testing.T) {
-	f, _, runner := p3Fixture(t)
+	f, _, runner := newWorkerFixture(t)
 	input := f.dbs.Connection()
 	target, err := f.store.DatabaseMetadata(f.ctx, f.database)
 	must(t, err)
-	id := enqueueP3(t, f, "registration_history")
+	id := enqueueMigration(t, f, "registration_history")
 	_, err = runner.RunOnce(f.ctx)
 	must(t, err)
 	assertJob(t, f, id, "succeeded")
@@ -159,7 +159,7 @@ func TestDuplicateDatabaseRegistrationPreservesExistingHistory(t *testing.T) {
 	if len(history) != 1 || history[0].JobID != id || history[0].LogicalVersion != 1 {
 		t.Fatal("rejecting duplicates or reactivating the connection changed migration history")
 	}
-	connections, err := f.connections.Connections(f.ctx, f.admin)
+	connections, err := f.adminStore.Databases(f.ctx)
 	must(t, err)
 	if len(connections) != 1 {
 		t.Fatal("duplicate database registrations were persisted")
@@ -210,7 +210,7 @@ func TestConcurrentDuplicateDatabaseRegistrationsSaveOnlyOne(t *testing.T) {
 			t.Fatalf("unexpected registration error: %v", err)
 		}
 	}
-	connections, err := f.connections.Connections(f.ctx, f.admin)
+	connections, err := f.adminStore.Databases(f.ctx)
 	must(t, err)
 	if saved != 1 || rejected != 1 || len(connections) != 1 {
 		t.Fatalf("concurrent registrations saved %d, rejected %d, persisted %d", saved, rejected, len(connections))

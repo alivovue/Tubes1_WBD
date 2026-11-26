@@ -13,7 +13,7 @@ import (
 	"tubes1_wbd/database/dao"
 )
 
-func TestP3BatchTemplateBindsConfigurationAndBothDirections(t *testing.T) {
+func TestBatchTemplateBindsConfigurationAndBothDirections(t *testing.T) {
 	spec := engines.BatchSpec{Schema: "public", Table: "counters", Key: "id", Column: "value", Delta: 7, Size: 50, ExpectedRows: 100}
 	up, down, err := engines.BatchSQL(spec)
 	if err != nil {
@@ -38,7 +38,7 @@ func TestP3BatchTemplateBindsConfigurationAndBothDirections(t *testing.T) {
 		t.Fatal("unbounded batch accepted")
 	}
 }
-func TestP3RetryClassificationAndPartialOutcomes(t *testing.T) {
+func TestRetryClassificationAndPartialOutcomes(t *testing.T) {
 	j := dao.MigrationJob{Attempt: 1, MaxAttempts: 5}
 	for _, err := range []error{context.Canceled, &pgconn.PgError{Code: "40001"}, &pgconn.PgError{Code: "40P01"}} {
 		if !worker.Retryable(err) {

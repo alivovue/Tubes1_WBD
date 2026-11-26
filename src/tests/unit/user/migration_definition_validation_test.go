@@ -6,7 +6,7 @@ import (
 	"tubes1_wbd/backend/migration"
 )
 
-func TestM2DefinitionValidationRequiresAnExplicitSafeDirection(t *testing.T) {
+func TestDefinitionValidationRequiresAnExplicitSafeDirection(t *testing.T) {
 	valid := migration.DefinitionInput{Title: "Add notes", UpSQL: "ALTER TABLE employees ADD note text;", DownSQL: "ALTER TABLE employees DROP note;"}
 	if err := migration.ValidateDefinition(valid); err != nil {
 		t.Fatal(err)
@@ -41,7 +41,7 @@ func TestM2DefinitionValidationRequiresAnExplicitSafeDirection(t *testing.T) {
 		t.Fatal(err)
 	}
 }
-func TestM2RevisionHashBindsBothSQLDirectionsAndReason(t *testing.T) {
+func TestRevisionHashBindsBothSQLDirectionsAndReason(t *testing.T) {
 	base := migration.ContentHash("SELECT 1", "SELECT 2", false, "")
 	for _, different := range []string{
 		migration.ContentHash("SELECT 1 ", "SELECT 2", false, ""),

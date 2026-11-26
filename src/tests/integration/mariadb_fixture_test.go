@@ -50,7 +50,7 @@ func TestMariaDBMockRetainsDataAndRegistersWithPermissions(t *testing.T) {
 	}
 	input := mocks.MariaDB.Connection()
 	must(t, attachManaged(f.ctx, f.store, bytes.Repeat([]byte{21}, 32), mocks.MariaDB.Connection()))
-	connections, err := f.connections.Connections(f.ctx, f.admin)
+	connections, err := f.adminStore.Databases(f.ctx)
 	must(t, err)
 	var target dao.Database
 	for _, connection := range connections {
@@ -111,7 +111,7 @@ func TestMariaDBMockRetainsDataAndRegistersWithPermissions(t *testing.T) {
 		t.Fatal("reopening changed retained MariaDB connection settings or credentials")
 	}
 	must(t, attachManaged(f.ctx, f.store, bytes.Repeat([]byte{21}, 32), mocks.MariaDB.Connection()))
-	reopened, err := f.connections.Connections(f.ctx, f.admin)
+	reopened, err := f.adminStore.Databases(f.ctx)
 	must(t, err)
 	if len(reopened) != len(connections) {
 		t.Fatal("reopening duplicated the managed MariaDB connection")

@@ -51,9 +51,6 @@ func scalarStep(query string, value driver.Value) sqlStep {
 	return queryStep(query, []string{"value"}, []driver.Value{value})
 }
 func execStep(query string) sqlStep { return sqlStep{kind: "exec", query: query, affected: 1} }
-func transactionSteps(allowed bool) []sqlStep {
-	return []sqlStep{{kind: "begin"}, execStep("pg_advisory_xact_lock"), scalarStep("admin_users", allowed)}
-}
 func newSQLStub(t *testing.T, steps ...sqlStep) (*sql.DB, *dao.Store, *sqlStub) {
 	t.Helper()
 	state := &sqlStub{t: t, steps: steps}

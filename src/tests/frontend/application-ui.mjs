@@ -1,6 +1,7 @@
 // UI contract checks against isolated, synthetic API fixtures. No database access.
 // Requires Node 22 and a local Chromium browser; no test framework/dependency.
 import assert from "node:assert/strict";
+import { runFeatureChecks } from "./integration/workspace-admin-ui.mjs";
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
 import { existsSync } from "node:fs";
@@ -10,7 +11,7 @@ import { basename, dirname, extname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
-const evidence = process.env.SCHAKKER_QA_OUTPUT || join(root, "docs/qa/person1");
+const evidence = process.env.SCHAKKER_QA_OUTPUT || join(root, "src/tests/output/frontend");
 const userDist = join(root, "src/apps/user/frontend/dist");
 const adminDist = join(root, "src/apps/admin/frontend/dist");
 const browserPath =
@@ -193,6 +194,8 @@ const state = {
   delay: 0,
   formResponse: null,
   loggedOut: false,
+  pageData: null,
+  respond: null,
 };
 const requests = [];
 const jobReads = [];
@@ -256,6 +259,7 @@ function page(admin = false) {
         Focus: false,
       },
     ],
+    ...state.pageData,
   };
 }
 const json = (res, status, body) => {
@@ -277,6 +281,7 @@ const serve = async (req, res) => {
         origin: req.headers.host,
         method: req.method,
         path,
+        query: Object.fromEntries(url.searchParams),
         body,
         csrf: req.headers["x-csrf-token"],
         key: req.headers["idempotency-key"],
@@ -348,6 +353,10 @@ const serve = async (req, res) => {
         req.headers["x-csrf-token"] !== "synthetic-csrf"
       )
         return json(res, 403, { error: "Missing CSRF" });
+      if (state.respond) {
+        const reply = await state.respond(req, url, body);
+        if (reply) return json(res, reply.status || 200, reply.body);
+      }
       if (path === "/api/migration-definitions" && req.method === "GET")
         return json(res, 200, { definitions: state.definitions });
       if (
@@ -548,6 +557,8 @@ const browser = spawn(
   [
     "--headless=new",
     "--disable-gpu",
+    "--disable-extensions",
+    "--disable-background-networking",
     "--no-first-run",
     "--no-default-browser-check",
     "--remote-debugging-port=0",
@@ -561,6 +572,7 @@ browser.stderr.on("data", (chunk) => { browserStartup = (browserStartup + chunk)
 let socket;
 const results = [];
 const browserErrors = [];
+const networkFailures = [];
 const delay = (ms) => new Promise((done) => setTimeout(done, ms));
 try {
   const portFile = join(profile, "DevToolsActivePort");
@@ -588,10 +600,12 @@ try {
     if (message.id) {
       const operation = pending.get(message.id);
       pending.delete(message.id);
+      if (!operation) return;
       if (message.error)
         operation.reject(new Error(JSON.stringify(message.error)));
       else operation.resolve(message.result);
     }
+    if (message.method === "Network.loadingFailed") networkFailures.push(message.params);
     if (message.method === "Runtime.exceptionThrown")
       browserErrors.push(message.params.exceptionDetails.text);
     if (
@@ -604,10 +618,21 @@ try {
           .join(" "),
       );
   });
+  socket.addEventListener("close", () => {
+    for (const operation of pending.values()) operation.reject(new Error("Browser connection closed"));
+    pending.clear();
+  });
   const cdp = (method, params = {}) =>
     new Promise((resolve, reject) => {
       const id = ++sequence;
-      pending.set(id, { resolve, reject });
+      const timer = setTimeout(() => {
+        pending.delete(id);
+        reject(new Error(`Browser command timed out: ${method}`));
+      }, 20000);
+      pending.set(id, {
+        resolve: (result) => { clearTimeout(timer); resolve(result); },
+        reject: (error) => { clearTimeout(timer); reject(error); },
+      });
       socket.send(JSON.stringify({ id, method, params }));
     });
   const evaluate = async (expression) => {
@@ -630,8 +655,10 @@ try {
     }
     await writeFile(join(evidence, "timeout.json"), JSON.stringify({
       expected: message,
-      page: await evaluate("({url: location.href, text: document.body?.innerText})"),
+      page: await evaluate("({url: location.href, text: document.body?.innerText, readyState: document.readyState, html: document.documentElement.outerHTML, resources: performance.getEntriesByType('resource').map(r => ({name: r.name, transferSize: r.transferSize, responseStatus: r.responseStatus, duration: r.duration}))})"),
+      requests: requests.slice(-20),
       errors: browserErrors,
+      networkFailures,
     }, null, 2));
     throw new Error(`Timed out: ${message}`);
   };
@@ -687,7 +714,9 @@ try {
       Buffer.from(result.data, "base64"),
     );
   };
+  let featureSuite = false;
   async function test(name, action) {
+    if (process.env.SCHAKKER_QA_SUITE === "features" && !featureSuite && !name.startsWith("No browser runtime")) return;
     await action();
     results.push({ name, passed: true });
     console.log(`PASS ${name}`);
@@ -695,6 +724,7 @@ try {
   await cdp("Page.enable");
   await cdp("Page.setLifecycleEventsEnabled", { enabled: true });
   await cdp("Runtime.enable");
+  await cdp("Network.enable");
   await viewport(1440, 1000);
 
   await test("Application routes render in both SPAs", async () => {
@@ -712,7 +742,7 @@ try {
     ])
       await navigate(path, expected);
   });
-  await test("Default Changelog and dashboard links use M2 history", async () => {
+  await test("Default Changelog and dashboard links use execution history", async () => {
     const start = requests.length;
     await navigate("/migrations?db=7", "Migration execution history");
     await wait("document.querySelector('tbody')?.children.length === 3");
@@ -738,9 +768,9 @@ try {
         can_rollback: false,
         can_retry: true,
         error: "database_rejected",
-        job_id: "qna-failed-job",
+        job_id: "failed-rollback-job",
       }];
-      state.jobs = [{ ...makeJob(), job_id: "qna-failed-job", status: "failed", retryable: true }];
+      state.jobs = [{ ...makeJob(), job_id: "failed-rollback-job", status: "failed", retryable: true }];
       await navigate("/migrations?db=7&hide_rollback=true", "Migration execution history");
       await wait("document.querySelector('tbody')?.children.length === 2");
       await click("#failed-down · Add demo flag");
@@ -748,8 +778,8 @@ try {
       assert.equal(await evaluate("[...document.querySelectorAll('button')].some(el => el.textContent.trim() === 'Request rollback review')"), false);
       await check("Retry approved job for execution");
       await click("Retry approved job");
-      await wait("new URLSearchParams(location.search).get('job') === 'qna-failed-job'");
-      assert(requests.some(request => request.path === "/api/migration-jobs/qna-failed-job/retry" && request.method === "POST"));
+      await wait("new URLSearchParams(location.search).get('job') === 'failed-rollback-job'");
+      assert(requests.some(request => request.path === "/api/migration-jobs/failed-rollback-job/retry" && request.method === "POST"));
       await navigate("/dashboard", "Welcome,");
     } finally {
       state.history = savedHistory;
@@ -1154,7 +1184,7 @@ try {
     }
     state.loggedOut = false;
   });
-  await test("SQL analysis saves migration work only through M2 definitions", async () => {
+  await test("SQL analysis saves migration work only through migration definitions", async () => {
     await navigate("/migrations/new?db=7", "Create migration");
     assert.equal(await evaluate(text("Saved drafts")), false);
     assert.equal(await evaluate(text("Save draft")), false);
@@ -1261,6 +1291,8 @@ try {
       sessionFixtures.clear();
     }
   });
+  featureSuite = true;
+  await runFeatureChecks({ test, state, requests, page, navigate, evaluate, wait, text, click, field, check, viewport, delay });
   await test("No browser runtime errors or direct migration execution from new screens", async () => {
     assert.deepEqual(browserErrors, []);
     assert.equal(

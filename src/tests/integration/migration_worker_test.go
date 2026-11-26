@@ -23,7 +23,7 @@ import (
 	"tubes1_wbd/database/dao"
 )
 
-func p3Fixture(t *testing.T) (*workflowFixture, *queue.Service, *worker.Runner) {
+func newWorkerFixture(t *testing.T) (*workflowFixture, *queue.Service, *worker.Runner) {
 	t.Helper()
 	f := newWorkflowFixture(t)
 	jobs := backend.ConfigureExecution(f.runtimeStore, f.userAccess, f.databases, f.migrations)
@@ -31,7 +31,7 @@ func p3Fixture(t *testing.T) (*workflowFixture, *queue.Service, *worker.Runner) 
 	runner := worker.New(f.runtimeStore, f.workflow, f.databases, "worker-one")
 	return f, jobs, runner
 }
-func enqueueP3(t *testing.T, f *workflowFixture, title string) string {
+func enqueueMigration(t *testing.T, f *workflowFixture, title string) string {
 	t.Helper()
 	review := f.approve(t, f.submit(t, f.definition(t, title)))
 	id, err := f.workflow.Enqueue(f.ctx, f.editor, review.ID, title)
@@ -56,9 +56,9 @@ func assertJob(t *testing.T, f *workflowFixture, id, status string) dao.Migratio
 	}
 	return j
 }
-func TestP3WorkerExecutesApprovedJobAndRollbackForward(t *testing.T) {
-	f, jobs, r := p3Fixture(t)
-	id := enqueueP3(t, f, "worker_a")
+func TestWorkerExecutesApprovedJobAndRollbackForward(t *testing.T) {
+	f, jobs, r := newWorkerFixture(t)
+	id := enqueueMigration(t, f, "worker_a")
 	assertJob(t, f, id, "pending")
 	var exists bool
 	must(t, f.dbs.Managed.QueryRowContext(f.ctx, `SELECT to_regclass('public.worker_a') IS NOT NULL`).Scan(&exists))
@@ -74,7 +74,7 @@ func TestP3WorkerExecutesApprovedJobAndRollbackForward(t *testing.T) {
 	var legacyReceipts bool
 	must(t, f.dbs.Managed.QueryRowContext(f.ctx, `SELECT to_regclass('_schakker.migration_receipts') IS NOT NULL`).Scan(&legacyReceipts))
 	if legacyReceipts {
-		t.Fatal("M2 worker created the retired synchronous receipt table")
+		t.Fatal("worker created the retired synchronous receipt table")
 	}
 	if f.state(t).ActiveVersion != 1 {
 		t.Fatal("committed head missing")
@@ -107,9 +107,9 @@ func TestP3WorkerExecutesApprovedJobAndRollbackForward(t *testing.T) {
 		t.Fatal("exact reversal filtering incorrect")
 	}
 }
-func TestP3LostCommitAcknowledgmentAndDuplicateDeliveryDoNotReplaySQL(t *testing.T) {
-	f, jobs, r := p3Fixture(t)
-	id := enqueueP3(t, f, "receipt_a")
+func TestLostCommitAcknowledgmentAndDuplicateDeliveryDoNotReplaySQL(t *testing.T) {
+	f, jobs, r := newWorkerFixture(t)
+	id := enqueueMigration(t, f, "receipt_a")
 	r.Execute = func(ctx context.Context, target *dbmanagement.Target, request engines.JobRequest, hooks engines.JobHooks) (engines.JobReceipt, error) {
 		receipt, err := pgengine.RunJob(ctx, target.DB, target.Adapter, request, hooks)
 		if err != nil {
@@ -140,8 +140,8 @@ func TestP3LostCommitAcknowledgmentAndDuplicateDeliveryDoNotReplaySQL(t *testing
 		t.Fatal("duplicate delivery appended/replayed migration")
 	}
 }
-func TestP3StatementFailureRollsBackAndDoesNotAdvanceHistory(t *testing.T) {
-	f, _, r := p3Fixture(t)
+func TestStatementFailureRollsBackAndDoesNotAdvanceHistory(t *testing.T) {
+	f, _, r := newWorkerFixture(t)
 	revision, err := f.workflow.CreateDefinition(f.ctx, f.editor, f.database, migration.DefinitionInput{Title: "failure", UpSQL: "CREATE TABLE worker_failed(id integer); INSERT INTO no_such_table VALUES(1);", DownSQL: "DROP TABLE worker_failed;"})
 	must(t, err)
 	review := f.approve(t, f.submit(t, revision))
@@ -159,9 +159,9 @@ func TestP3StatementFailureRollsBackAndDoesNotAdvanceHistory(t *testing.T) {
 	}
 }
 
-func TestP3HiddenReceiptTamperingRollsBack(t *testing.T) {
-	f, _, r := p3Fixture(t)
-	first := enqueueP3(t, f, "protected_first")
+func TestHiddenReceiptTamperingRollsBack(t *testing.T) {
+	f, _, r := newWorkerFixture(t)
+	first := enqueueMigration(t, f, "protected_first")
 	_, err := r.RunOnce(f.ctx)
 	must(t, err)
 	assertJob(t, f, first, "succeeded")
@@ -184,9 +184,9 @@ func TestP3HiddenReceiptTamperingRollsBack(t *testing.T) {
 	}
 }
 
-func TestP3AuthorizedEditorCanReconcileAfterOwnerLosesAccess(t *testing.T) {
-	f, jobs, r := p3Fixture(t)
-	id := enqueueP3(t, f, "new_reconciler")
+func TestAuthorizedEditorCanReconcileAfterOwnerLosesAccess(t *testing.T) {
+	f, jobs, r := newWorkerFixture(t)
+	id := enqueueMigration(t, f, "new_reconciler")
 	_, err := r.RunOnce(f.ctx)
 	must(t, err)
 	replacement := f.user(t, "recovery.editor")
@@ -207,9 +207,9 @@ func TestP3AuthorizedEditorCanReconcileAfterOwnerLosesAccess(t *testing.T) {
 	}
 }
 
-func TestP3ExpiredLeaseWithoutTargetAuthorityStaysBlockedUntilReconciled(t *testing.T) {
-	f, jobs, r := p3Fixture(t)
-	id := enqueueP3(t, f, "expired_authority")
+func TestExpiredLeaseWithoutTargetAuthorityStaysBlockedUntilReconciled(t *testing.T) {
+	f, jobs, r := newWorkerFixture(t)
+	id := enqueueMigration(t, f, "expired_authority")
 	_, err := f.runtimeStore.ClaimJob(f.ctx, "dead-worker", 3*time.Second)
 	must(t, err)
 	replacement := f.user(t, "lease.recovery.editor")
@@ -235,8 +235,8 @@ func TestP3ExpiredLeaseWithoutTargetAuthorityStaysBlockedUntilReconciled(t *test
 	}
 }
 
-func TestP3NewEditorCanCancelAfterOriginalOwnerLosesAccess(t *testing.T) {
-	f, _, r := p3Fixture(t)
+func TestNewEditorCanCancelAfterOriginalOwnerLosesAccess(t *testing.T) {
+	f, _, r := newWorkerFixture(t)
 	revision := batchDefinition(t, f, 20, 10)
 	review := f.approve(t, f.submit(t, revision))
 	id, err := f.workflow.Enqueue(f.ctx, f.editor, review.ID, "reassign-owner")
@@ -288,8 +288,8 @@ func stopAfterBatch(r *worker.Runner, batches int64) {
 		return pgengine.RunJob(ctx, target.DB, target.Adapter, request, h)
 	}
 }
-func TestP3BatchResumeUsesTargetCheckpointAndFixedIDs(t *testing.T) {
-	f, jobs, r := p3Fixture(t)
+func TestBatchResumeUsesTargetCheckpointAndFixedIDs(t *testing.T) {
+	f, jobs, r := newWorkerFixture(t)
 	revision := batchDefinition(t, f, 25, 10)
 	review := f.approve(t, f.submit(t, revision))
 	id, err := f.workflow.Enqueue(f.ctx, f.editor, review.ID, "batch-resume")
@@ -328,8 +328,8 @@ func TestP3BatchResumeUsesTargetCheckpointAndFixedIDs(t *testing.T) {
 	}
 }
 
-func TestP3AutomaticRetryResumesOnlyUncommittedBatches(t *testing.T) {
-	f, _, r := p3Fixture(t)
+func TestAutomaticRetryResumesOnlyUncommittedBatches(t *testing.T) {
+	f, _, r := newWorkerFixture(t)
 	revision := batchDefinition(t, f, 25, 10)
 	review := f.approve(t, f.submit(t, revision))
 	id, err := f.workflow.Enqueue(f.ctx, f.editor, review.ID, "automatic-resume")
@@ -352,8 +352,8 @@ func TestP3AutomaticRetryResumesOnlyUncommittedBatches(t *testing.T) {
 		t.Fatal("automatic retry replayed a committed batch")
 	}
 }
-func TestP3RetryLimitRebuildsLostProjectionAndKeepsPartialBlocked(t *testing.T) {
-	f, _, r := p3Fixture(t)
+func TestRetryLimitRebuildsLostProjectionAndKeepsPartialBlocked(t *testing.T) {
+	f, _, r := newWorkerFixture(t)
 	revision := batchDefinition(t, f, 25, 10)
 	review := f.approve(t, f.submit(t, revision))
 	id, err := f.workflow.Enqueue(f.ctx, f.editor, review.ID, "exhausted-partial")
@@ -379,8 +379,8 @@ func TestP3RetryLimitRebuildsLostProjectionAndKeepsPartialBlocked(t *testing.T) 
 	_, err = f.workflow.SubmitReview(f.ctx, f.editor, migration.ReviewInput{RevisionID: next.ID, Action: "up"})
 	wantError(t, err, migration.ErrWorkflowConflict)
 }
-func TestP3FreshCancellationCanReplaceAnInvalidatedReview(t *testing.T) {
-	f, _, r := p3Fixture(t)
+func TestFreshCancellationCanReplaceAnInvalidatedReview(t *testing.T) {
+	f, _, r := newWorkerFixture(t)
 	revision := batchDefinition(t, f, 20, 10)
 	review := f.approve(t, f.submit(t, revision))
 	id, err := f.workflow.Enqueue(f.ctx, f.editor, review.ID, "stale-cancel-source")
@@ -414,8 +414,8 @@ func TestP3FreshCancellationCanReplaceAnInvalidatedReview(t *testing.T) {
 	must(t, err)
 	assertJob(t, f, freshJob, "reverted")
 }
-func TestP3ApprovedCancellationReversesOnlyCommittedBatches(t *testing.T) {
-	f, jobs, r := p3Fixture(t)
+func TestApprovedCancellationReversesOnlyCommittedBatches(t *testing.T) {
+	f, jobs, r := newWorkerFixture(t)
 	revision := batchDefinition(t, f, 25, 10)
 	review := f.approve(t, f.submit(t, revision))
 	id, err := f.workflow.Enqueue(f.ctx, f.editor, review.ID, "batch-cancel")
@@ -474,8 +474,8 @@ func TestP3ApprovedCancellationReversesOnlyCommittedBatches(t *testing.T) {
 		t.Fatal("cancel advanced active migration position")
 	}
 }
-func TestP3UnsafeCancellationDoesNotOverwriteExternalChanges(t *testing.T) {
-	f, _, r := p3Fixture(t)
+func TestUnsafeCancellationDoesNotOverwriteExternalChanges(t *testing.T) {
+	f, _, r := newWorkerFixture(t)
 	revision := batchDefinition(t, f, 20, 10)
 	review := f.approve(t, f.submit(t, revision))
 	id, err := f.workflow.Enqueue(f.ctx, f.editor, review.ID, "unsafe-cancel")
@@ -488,8 +488,8 @@ func TestP3UnsafeCancellationDoesNotOverwriteExternalChanges(t *testing.T) {
 	wantError(t, err, migration.ErrWorkflowConflict)
 }
 
-func TestP3PartialCompensationCanResumeInReverseOrder(t *testing.T) {
-	f, jobs, r := p3Fixture(t)
+func TestPartialCompensationCanResumeInReverseOrder(t *testing.T) {
+	f, jobs, r := newWorkerFixture(t)
 	revision := batchDefinition(t, f, 25, 10)
 	review := f.approve(t, f.submit(t, revision))
 	id, err := f.workflow.Enqueue(f.ctx, f.editor, review.ID, "reverse-resume")
@@ -532,8 +532,8 @@ func TestP3PartialCompensationCanResumeInReverseOrder(t *testing.T) {
 	must(t, err)
 	assertJob(t, f, undo, "reverted")
 }
-func TestP3CompletedBatchRollbackAndForwardUseOriginalSQL(t *testing.T) {
-	f, _, r := p3Fixture(t)
+func TestCompletedBatchRollbackAndForwardUseOriginalSQL(t *testing.T) {
+	f, _, r := newWorkerFixture(t)
 	revision := batchDefinition(t, f, 20, 7)
 	review := f.approve(t, f.submit(t, revision))
 	id, err := f.workflow.Enqueue(f.ctx, f.editor, review.ID, "complete-batch")
@@ -568,8 +568,8 @@ func TestP3CompletedBatchRollbackAndForwardUseOriginalSQL(t *testing.T) {
 	}
 }
 
-func TestP3DifferentDatabasesCanExecuteInParallel(t *testing.T) {
-	f, _, first := p3Fixture(t)
+func TestDifferentDatabasesCanExecuteInParallel(t *testing.T) {
+	f, _, first := newWorkerFixture(t)
 	otherName := f.dbs.ManagedName + "_other"
 	_, err := factory.Cluster.EnsureDatabase(f.ctx, otherName, "schakker_managed", "")
 	must(t, err)
@@ -588,13 +588,13 @@ func TestP3DifferentDatabasesCanExecuteInParallel(t *testing.T) {
 		}
 	})
 	in := f.dbs.Connection()
-	in.Name = "Other P3 database"
+	in.Name = "Other target database"
 	in.DatabaseName = otherName
 	other, err := f.saveConnection(f.ctx, f.admin, 0, in)
 	must(t, err)
 	must(t, f.adminAuth.SetGrant(f.ctx, f.admin, f.editors.ID, other.ID, admindao.ViewEdit))
 	must(t, f.adminAuth.SetGrant(f.ctx, f.admin, f.readers.ID, other.ID, admindao.ViewOnly))
-	one := enqueueP3(t, f, "parallel_a")
+	one := enqueueMigration(t, f, "parallel_a")
 	revision, err := f.workflow.CreateDefinition(f.ctx, f.editor, other.ID, reversible("parallel_b"))
 	must(t, err)
 	review, err := f.workflow.SubmitReview(f.ctx, f.editor, migration.ReviewInput{RevisionID: revision.ID, Action: "up"})
@@ -635,9 +635,9 @@ func TestP3DifferentDatabasesCanExecuteInParallel(t *testing.T) {
 	assertJob(t, f, one, "succeeded")
 	assertJob(t, f, two, "succeeded")
 }
-func TestP3LeaseFencingAndConcurrentClaims(t *testing.T) {
-	f, _, _ := p3Fixture(t)
-	id := enqueueP3(t, f, "lease_a")
+func TestLeaseFencingAndConcurrentClaims(t *testing.T) {
+	f, _, _ := newWorkerFixture(t)
+	id := enqueueMigration(t, f, "lease_a")
 	first, err := f.runtimeStore.ClaimJob(f.ctx, "worker-one", 3*time.Second)
 	must(t, err)
 	_, err = f.runtimeStore.ClaimJob(f.ctx, "worker-two", 3*time.Second)
@@ -653,9 +653,9 @@ func TestP3LeaseFencingAndConcurrentClaims(t *testing.T) {
 	wantError(t, f.runtimeStore.FinishJob(f.ctx, first, "succeeded", "", 0), dao.ErrJobLeaseLost)
 	must(t, f.runtimeStore.FinishJob(f.ctx, second, "failed", "test", 0))
 }
-func TestP3TwoWorkersExecuteOneDatabaseOnlyOnce(t *testing.T) {
-	f, _, first := p3Fixture(t)
-	id := enqueueP3(t, f, "concurrent_a")
+func TestTwoWorkersExecuteOneDatabaseOnlyOnce(t *testing.T) {
+	f, _, first := newWorkerFixture(t)
+	id := enqueueMigration(t, f, "concurrent_a")
 	second := worker.New(f.runtimeStore, f.workflow, f.databases, "worker-two")
 	var executions atomic.Int32
 	execute := func(ctx context.Context, target *dbmanagement.Target, request engines.JobRequest, h engines.JobHooks) (engines.JobReceipt, error) {
@@ -686,9 +686,9 @@ func TestP3TwoWorkersExecuteOneDatabaseOnlyOnce(t *testing.T) {
 		t.Fatal("duplicate SQL execution")
 	}
 }
-func TestP3JobAPIRequiresSessionCSRFAndDatabasePermission(t *testing.T) {
-	f, jobs, _ := p3Fixture(t)
-	id := enqueueP3(t, f, "job_api_a")
+func TestJobAPIRequiresSessionCSRFAndDatabasePermission(t *testing.T) {
+	f, jobs, _ := newWorkerFixture(t)
+	id := enqueueMigration(t, f, "job_api_a")
 	handler := api.NewHandler(f.userAccess, f.databases, f.migrations, false, jobs)
 	identity, cookie := f.login(t, "it.editor")
 	csrf, err := f.access.CSRFToken(identity)

@@ -6,7 +6,7 @@ import (
 	"tubes1_wbd/backend/access"
 )
 
-func TestIT06PermissionsComeFromGroupsAndHighestGrantWins(t *testing.T) {
+func TestPermissionsComeFromGroupsAndHighestGrantWins(t *testing.T) {
 	f := newFixture(t, true)
 	user := f.user(t, "it.employee")
 	target := f.register(t)
@@ -34,7 +34,7 @@ func TestIT06PermissionsComeFromGroupsAndHighestGrantWins(t *testing.T) {
 		t.Fatal("remaining reader group was not respected")
 	}
 }
-func TestIT07ViewOnlyUserCannotAnalyzeOrExecuteMigration(t *testing.T) {
+func TestViewOnlyUserCannotAnalyzeOrSaveMigration(t *testing.T) {
 	f := newFixture(t, true)
 	user := f.user(t, "it.reader")
 	target := f.register(t)
@@ -43,7 +43,7 @@ func TestIT07ViewOnlyUserCannotAnalyzeOrExecuteMigration(t *testing.T) {
 	sql := "CREATE TABLE public.forbidden_change(id INTEGER)"
 	_, err := f.migrations.Analyze(f.ctx, f.editor, target.ID, sql)
 	must(t, err)
-	before, err := f.databases.Fingerprint(f.ctx, user.ID, target.ID)
+	before, err := f.databases.Snapshot(f.ctx, user.ID, target.ID)
 	must(t, err)
 	_, err = f.migrations.Analyze(f.ctx, user.ID, target.ID, sql)
 	wantError(t, err, access.ErrForbidden)
@@ -52,9 +52,9 @@ func TestIT07ViewOnlyUserCannotAnalyzeOrExecuteMigration(t *testing.T) {
 	if f.tableExists(t, "forbidden_change") {
 		t.Fatal("denied migration changed the schema")
 	}
-	after, err := f.databases.Fingerprint(f.ctx, user.ID, target.ID)
+	after, err := f.databases.Snapshot(f.ctx, user.ID, target.ID)
 	must(t, err)
-	if before != after {
+	if before.Fingerprint != after.Fingerprint {
 		t.Fatal("denied operation changed the schema fingerprint")
 	}
 	history, err := f.migrations.Workflow().History(f.ctx, user.ID, target.ID, false, 50, 0)
@@ -63,7 +63,7 @@ func TestIT07ViewOnlyUserCannotAnalyzeOrExecuteMigration(t *testing.T) {
 		t.Fatal("denied operation created migration history")
 	}
 }
-func TestIT08RevokingGroupGrantInvalidatesAccessAndSessions(t *testing.T) {
+func TestRevokingGroupGrantInvalidatesAccessAndSessions(t *testing.T) {
 	f := newFixture(t, true)
 	user := f.user(t, "it.employee")
 	target := f.register(t)

@@ -30,23 +30,6 @@ type localSettings struct {
 	TCPRole string
 }
 
-func OpenLocal(ctx context.Context, directory string) (*sql.DB, func(), error) {
-	cluster, err := StartLocalCluster(ctx, directory, LocalOptions{})
-	if err != nil {
-		return nil, nil, err
-	}
-	if _, err := cluster.EnsureDatabase(ctx, "schakker_platform", "", ""); err != nil {
-		cluster.Close()
-		return nil, nil, err
-	}
-	db, err := cluster.Open(ctx, "schakker_platform")
-	if err != nil {
-		cluster.Close()
-		return nil, nil, err
-	}
-	return db, cluster.Close, nil
-}
-
 func (c *LocalCluster) DSN(database string) string {
 	return localDSN(c, database)
 }
