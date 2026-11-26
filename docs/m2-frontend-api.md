@@ -6,6 +6,8 @@ All paths include `/api`, use same-origin session cookies, and return JSON. Muta
 
 The frontend route `/migrations` defaults to M2 execution history, also available with `view=history`. It loads database selection from `/api/databases` and executions from `/api/migrations/history`. The retired M1 `/api/migrations` endpoint returns 404.
 
+`/migrations/new` provides SQL analysis and visual changes through the `analyze`, `analyze_visual` and `analyze_desired` actions. Analysis previews the submitted input without saving a draft. The PostgreSQL editor carries SQL and its title into M2 definitions via navigation state; the editor requires down SQL or an irreversible reason before `POST /migration-definitions`. M2 definitions/revisions are the sole saved migration model. The retired `save_draft` and `delete_draft` actions return 400. MariaDB SQL analysis remains available without an execution workflow.
+
 `GET /dashboard` returns `Recent`, containing up to eight committed executions across accessible databases, newest commit first. Each entry has `id` (execution UUID), `database_id`, `database_name`, `title`, `actor`, `operation`, `committed_at` and `version`, using the same identity and display values as committed history. Dashboard links use `/migrations?db=<database_id>&execution=<id>`. Completed failed, partial and uncertain attempts also appear in Changelog. Jobs/activity provides live status and progress.
 
 ## Definitions

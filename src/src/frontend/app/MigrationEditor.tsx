@@ -13,7 +13,6 @@ import {
   Notice,
   Panel,
   pretty,
-  stamp,
   url,
   usePage,
 } from "./ui";
@@ -27,20 +26,23 @@ export function MigrationEditor() {
     setDescription(data.Description);
   }, [data]);
   const stale = !!data.Review && data.Review.SQL !== sql;
+  const postgres = data.Database.DBMS === "postgresql";
   return (
     <>
       <Heading
         title="Create migration"
         icon="code"
-        text="Compose and analyze SQL, then request group approval through the up/down workflow."
+        text="Compose and analyze SQL. Save PostgreSQL migrations in the up/down approval workflow."
       >
-        <Link
-          className="button button--primary"
-          to={url("/migrations", { db: data.Database.ID, view: "definitions" })}
-          state={{ migrationDraft: { title: description, up_sql: sql } }}
-        >
-          Up/down approval workflow
-        </Link>
+        {postgres && (
+          <Link
+            className="button button--primary"
+            to={url("/migrations", { db: data.Database.ID, view: "definitions" })}
+            state={{ migrationDraft: { title: description, up_sql: sql } }}
+          >
+            Up/down approval workflow
+          </Link>
+        )}
         {!!data.Database.ID && (
           <a className="button button--secondary" href="#query-plan">
             Query Plan
@@ -62,7 +64,7 @@ export function MigrationEditor() {
             description={description}
             setDescription={setDescription}
           />
-          <div className="migration-layout workflow-editor">
+          <div className="workflow-editor">
             <Panel
               title={data.Review ? "Review SQL" : "SQL editor"}
               text={`${data.Database.Name} · ${data.Database.DBMS}`}
@@ -70,13 +72,11 @@ export function MigrationEditor() {
               <div id="migration-sql-editor" className="workflow-scroll-target">
                 <Form className="form-stack">
                   <Hidden name="db" value={data.Database.ID} />
-                  <Hidden name="draft" value={data.DraftID || ""} />
-                  <Hidden name="draft_updated" value={data.DraftUpdated} />
                   {data.Review && (
                     <Hidden name="review" value={pretty(data.Review)} />
                   )}
                   <div className="editor-fields">
-                    <Field label="Description / draft title">
+                    <Field label="Migration title">
                       <input
                         name="description"
                         value={description}
@@ -106,13 +106,8 @@ export function MigrationEditor() {
                   <p className="integration-form muted">
                     The backend manages transactions. Enter migration statements
                     without BEGIN or COMMIT.
-                    {!!data.DraftID &&
-                      " Save edited draft SQL before analysis."}
                   </p>
                   <div className="editor-actions">
-                    <Button action="save_draft" secondary>
-                      Save draft
-                    </Button>
                     <Button action="analyze">
                       {data.Review ? "Re-analyze SQL" : "Analyze migration"}
                     </Button>
@@ -125,52 +120,32 @@ export function MigrationEditor() {
                           previous diff and plans no longer apply.
                         </Notice>
                       )}
-                      <Notice>
-                        Execution requires an up/down draft and approval from
-                        every access group's leader.
-                      </Notice>
-                      <Link
-                        className="button button--primary"
-                        to={url("/migrations", { db: data.Database.ID, view: "definitions" })}
-                        state={{ migrationDraft: { title: description, up_sql: sql } }}
-                      >
-                        Use SQL in approval draft
-                      </Link>
+                      {postgres ? (
+                        <>
+                          <Notice>
+                            Save this SQL in the approval workflow with SQL down
+                            or an irreversible reason. Execution requires
+                            approval from every access group's leader.
+                          </Notice>
+                          <Link
+                            className="button button--primary"
+                            to={url("/migrations", { db: data.Database.ID, view: "definitions" })}
+                            state={{ migrationDraft: { title: description, up_sql: sql } }}
+                          >
+                            Use SQL in approval draft
+                          </Link>
+                        </>
+                      ) : (
+                        <Notice>
+                          MariaDB SQL is available for analysis. Saved migrations
+                          and execution require PostgreSQL.
+                        </Notice>
+                      )}
                     </div>
                   )}
                 </Form>
               </div>
             </Panel>
-            <aside className="panel guidance-panel saved-drafts">
-              <header className="panel__header">
-                <h2>Saved drafts</h2>
-              </header>
-              <div className="integration-form">
-                {data.Drafts?.map((draft) => (
-                  <article className="draft-entry" key={draft.ID}>
-                    <Link
-                      to={url("/migrations/new", {
-                        db: data.Database.ID,
-                        draft: draft.ID,
-                      })}
-                    >
-                      {draft.Title}
-                    </Link>
-                    <small>{stamp(draft.UpdatedAt)}</small>
-                    <Form confirm="Delete this draft?">
-                      <Hidden name="db" value={data.Database.ID} />
-                      <Hidden name="draft" value={draft.ID} />
-                      <Button action="delete_draft" secondary>
-                        Delete
-                      </Button>
-                    </Form>
-                  </article>
-                ))}
-                {!data.Drafts?.length && (
-                  <p>No saved drafts for this database.</p>
-                )}
-              </div>
-            </aside>
           </div>
           {data.Review && !stale && <Analysis />}
           <QueryPlan

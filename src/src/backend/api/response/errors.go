@@ -13,8 +13,6 @@ import (
 	"tubes1_wbd/backend/migration/diff"
 )
 
-var ErrUnsavedDraft = errors.New("save the edited draft before analysis")
-
 func Fail(w http.ResponseWriter, r *http.Request, err error) {
 	message, status := ErrorStatus(err)
 	httpapi.Error(w, r, message, status)
@@ -35,8 +33,6 @@ func ErrorStatus(err error) (string, int) {
 		return "The SQL, database or connection changed. Analyze the migration again.", 409
 	case errors.Is(err, access.ErrConflict):
 		return "This item changed or already exists. Reload and try again.", 409
-	case errors.Is(err, ErrUnsavedDraft):
-		return "This draft has unsaved SQL. Save the draft, then analyze the saved SQL before execution.", 409
 	case errors.Is(err, migration.ErrUnsafeSQL):
 		return "Migration SQL cannot run procedural blocks, define executable routines, change session settings, use dynamic SQL helpers, or access internal migration metadata. Use explicit schema or data statements.", 400
 	case errors.Is(err, diff.ErrDependency):

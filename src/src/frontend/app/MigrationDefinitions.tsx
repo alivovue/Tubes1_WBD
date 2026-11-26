@@ -158,6 +158,12 @@ function DefinitionEditor({
   return (
     <form className="form-stack integration-form" onSubmit={save}>
       {action.error && <Notice error>{action.error}</Notice>}
+      {carried && !original && (
+        <Notice>
+          SQL from the analysis editor is ready to save here. Add SQL down or an
+          irreversible reason before saving the migration draft.
+        </Notice>
+      )}
       {source && (
         <Notice>
           Creating a new draft from definition #{source.id}, revision{" "}

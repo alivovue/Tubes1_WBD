@@ -47,9 +47,7 @@ func TestPostgreSQLRejectsReceiptAttacksBeforeApproval(t *testing.T) {
 		`CREATE OR REPLACE FUNCTION public.erase_receipts() RETURNS void LANGUAGE sql AS $$DELETE FROM _schakker.job_receipts$$`,
 	}
 	for _, query := range attacks {
-		_, err := f.migrations.SaveDraft(f.ctx, f.editor, f.database, migration.DraftInput{Title: "Rejected receipt attack", SQL: query})
-		wantError(t, err, migration.ErrUnsafeSQL)
-		_, err = f.migrations.Analyze(f.ctx, f.editor, f.database, query)
+		_, err := f.migrations.Analyze(f.ctx, f.editor, f.database, query)
 		wantError(t, err, migration.ErrUnsafeSQL)
 		_, err = f.workflow.CreateDefinition(f.ctx, f.editor, f.database, migration.DefinitionInput{Title: "Rejected receipt attack", UpSQL: query, DownSQL: "SELECT 1"})
 		wantError(t, err, migration.ErrDefinitionInvalid)

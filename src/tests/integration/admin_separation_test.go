@@ -88,7 +88,6 @@ func TestSeparatedApplicationsEnforceAuthenticationDomainsAndManagedEndpointBoun
 		{"snapshot", func() error { _, err := f.databases.Snapshot(f.ctx, f.admin, target.ID); return err }},
 		{"read SQL", func() error { _, err := f.databases.ReadQuery(f.ctx, f.admin, target.ID, "SELECT 1"); return err }},
 		{"query plans", func() error { _, err := f.databases.QueryPlans(f.ctx, f.admin, target.ID, "SELECT 1"); return err }},
-		{"drafts", func() error { _, err := f.migrations.Drafts(f.ctx, f.admin, target.ID, 10, 0); return err }},
 		{"history", func() error {
 			_, err := f.migrations.Workflow().History(f.ctx, f.admin, target.ID, false, 10, 0)
 			return err

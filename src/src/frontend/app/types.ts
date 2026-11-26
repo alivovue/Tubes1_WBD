@@ -58,12 +58,6 @@ export type RecentExecution = Pick<
   MigrationExecution,
   "id" | "database_id" | "title" | "actor" | "operation" | "committed_at" | "version"
 > & { database_name: string; committed_at: string };
-export type Draft = {
-  ID: number;
-  Title: string;
-  SQL: string;
-  UpdatedAt: string;
-};
 export type Operation = {
   Kind: string;
   Schema: string;
@@ -151,9 +145,6 @@ export type PageData = {
   Previous: number;
   Next: number;
   HasMore: boolean;
-  Drafts: Draft[] | null;
-  DraftID: number;
-  DraftUpdated: string;
   Description: string;
   SQL: string;
   OperationsJSON: string;

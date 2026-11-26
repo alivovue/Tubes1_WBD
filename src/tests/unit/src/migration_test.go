@@ -2,7 +2,6 @@ package unit_test
 
 import (
 	"context"
-	"database/sql/driver"
 	"errors"
 	"strings"
 	"testing"
@@ -16,26 +15,13 @@ import (
 	pgengine "tubes1_wbd/backend/migration/engines/postgres"
 )
 
-func metadataStep() sqlStep {
-	return queryStep("FROM managed_databases WHERE id=", []string{"id", "name", "dbms", "host", "port", "database", "active", "tls", "username", "password"}, []driver.Value{int64(3), "Target", "postgresql", "db.internal", int64(5432), "target", true, "verify-full", "dbuser", []byte("encrypted")})
-}
-func draftStep(query string) sqlStep {
-	return queryStep(query, []string{"id", "database", "creator", "title", "mode", "sql", "created", "updated"}, []driver.Value{int64(4), int64(3), int64(7), "A draft", "sql", "SELECT 1", testTime, testTime})
-}
-func TestMigrationWritesRequireEditPermission(t *testing.T) {
+func TestMigrationAnalysisRequiresEditPermission(t *testing.T) {
 	_, store, stub := newSQLStub(t)
 	_, _, service := newServices(t, store)
 	calls := []struct {
 		name string
 		call func() error
 	}{
-		{"save draft", func() error {
-			_, err := service.SaveDraft(context.Background(), 7, 3, migration.DraftInput{Title: "Draft", SQL: "SELECT 1"})
-			return err
-		}},
-		{"read draft", func() error { _, err := service.Draft(context.Background(), 7, 3, 4); return err }},
-		{"list drafts", func() error { _, err := service.Drafts(context.Background(), 7, 3, 50, 0); return err }},
-		{"delete draft", func() error { return service.DeleteDraft(context.Background(), 7, 3, 4) }},
 		{"analyze", func() error { _, err := service.Analyze(context.Background(), 7, 3, "SELECT 1"); return err }},
 		{"analyze schema", func() error {
 			_, err := service.AnalyzeDesired(context.Background(), 7, 3, emptySnapshot("postgresql"))
@@ -64,37 +50,6 @@ func TestCommittedHistoryAllowsReaders(t *testing.T) {
 	stub.append(permissionStep(access.ViewOnly))
 	_, err = service.Workflow().History(context.Background(), 7, 3, false, 201, 0)
 	wantError(t, err, access.ErrInvalid)
-}
-func TestDraftSaveAndOptimisticUpdate(t *testing.T) {
-	_, store, stub := newSQLStub(t)
-	_, _, service := newServices(t, store)
-	stub.append(permissionStep(access.ViewEdit), permissionStep(access.ViewEdit), metadataStep(), execStep("INSERT INTO managed_databases"), draftStep("INSERT INTO migration_drafts"))
-	saved, err := service.SaveDraft(context.Background(), 7, 3, migration.DraftInput{Title: "A draft", SQL: "SELECT 1"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if saved.ID != 4 || saved.SQL != "SELECT 1" {
-		t.Fatal("created draft content not returned")
-	}
-	stub.append(permissionStep(access.ViewEdit), permissionStep(access.ViewEdit), metadataStep(), execStep("INSERT INTO managed_databases"), draftStep("UPDATE migration_drafts SET"))
-	_, err = service.SaveDraft(context.Background(), 7, 3, migration.DraftInput{ID: 4, Title: "A draft", SQL: "SELECT 1", ExpectedUpdatedAt: testTime})
-	if err != nil {
-		t.Fatal(err)
-	}
-	stub.append(permissionStep(access.ViewEdit), permissionStep(access.ViewEdit), metadataStep(), execStep("INSERT INTO managed_databases"))
-	_, err = service.SaveDraft(context.Background(), 7, 3, migration.DraftInput{ID: 4, Title: "A draft", SQL: "SELECT 1"})
-	wantError(t, err, access.ErrInvalid)
-}
-func TestDraftOptimisticConflictAndDeletion(t *testing.T) {
-	_, store, stub := newSQLStub(t)
-	_, _, service := newServices(t, store)
-	stub.append(permissionStep(access.ViewEdit), permissionStep(access.ViewEdit), metadataStep(), execStep("INSERT INTO managed_databases"), queryStep("UPDATE migration_drafts SET", []string{"id"}), draftStep("FROM migration_drafts WHERE"))
-	_, err := service.SaveDraft(context.Background(), 7, 3, migration.DraftInput{ID: 4, Title: "A draft", SQL: "SELECT 1", ExpectedUpdatedAt: testTime})
-	wantError(t, err, access.ErrConflict)
-	stub.append(permissionStep(access.ViewEdit), execStep("DELETE FROM migration_drafts"))
-	if err := service.DeleteDraft(context.Background(), 7, 3, 4); err != nil {
-		t.Fatal(err)
-	}
 }
 func TestMigrationEngineModesAndRegistry(t *testing.T) {
 	pg := pgengine.New()

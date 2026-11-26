@@ -136,21 +136,17 @@ func (h *router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Method == http.MethodPost {
-		var handled bool
 		var err error
 		switch r.URL.Path {
 		case "/sql-viewer":
 			err = h.viewer.Action(r, &data)
 		case "/migrations/new":
-			handled, err = h.migrations.Action(w, r, &data)
+			err = h.migrations.Action(r, &data)
 		default:
 			err = access.ErrInvalid
 		}
 		if err != nil {
 			response.Fail(w, r, err)
-			return
-		}
-		if handled {
 			return
 		}
 	}

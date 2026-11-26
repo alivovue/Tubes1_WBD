@@ -6,7 +6,6 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"errors"
-	"strings"
 	"time"
 
 	"tubes1_wbd/backend/access"
@@ -32,12 +31,6 @@ type Service struct {
 	databases *dbmanagement.Service
 	engines   *engines.Registry
 	workflow  *Workflow
-}
-type DraftInput struct {
-	ID                int64
-	Title             string
-	SQL               string
-	ExpectedUpdatedAt time.Time
 }
 type Plan = adapters.Plan
 type Statement = adapters.Statement
@@ -96,62 +89,6 @@ func ValidateSQL(query string, dbms ...string) ([]Statement, error) {
 	}
 	return engine.Parse(query)
 }
-func (s *Service) SaveDraft(ctx context.Context, actor, database int64, input DraftInput) (dao.MigrationDraft, error) {
-	if err := s.access.RequirePermission(ctx, actor, database, access.ViewEdit); err != nil {
-		return dao.MigrationDraft{}, err
-	}
-	if input.ID < 0 || strings.TrimSpace(input.Title) == "" || len(input.Title) > 255 {
-		return dao.MigrationDraft{}, ErrInvalid
-	}
-	engine, err := s.engine(ctx, actor, database)
-	if err != nil {
-		return dao.MigrationDraft{}, err
-	}
-	if _, err := engine.Parse(input.SQL); err != nil {
-		return dao.MigrationDraft{}, err
-	}
-	if input.ID == 0 {
-		return s.store.CreateDraft(ctx, database, actor, strings.TrimSpace(input.Title), input.SQL)
-	}
-	if input.ExpectedUpdatedAt.IsZero() {
-		return dao.MigrationDraft{}, ErrInvalid
-	}
-	return s.store.UpdateDraft(ctx, database, input.ID, strings.TrimSpace(input.Title), input.SQL, input.ExpectedUpdatedAt)
-}
-
-func (s *Service) Draft(ctx context.Context, actor, database, id int64) (dao.MigrationDraft, error) {
-	if err := s.access.RequirePermission(ctx, actor, database, access.ViewEdit); err != nil {
-		return dao.MigrationDraft{}, err
-	}
-	if id < 1 {
-		return dao.MigrationDraft{}, ErrInvalid
-	}
-	return s.store.Draft(ctx, database, id)
-}
-
-func (s *Service) Drafts(ctx context.Context, actor, database int64, limit, offset int) ([]dao.MigrationDraft, error) {
-	if err := s.access.RequirePermission(ctx, actor, database, access.ViewEdit); err != nil {
-		return nil, err
-	}
-	if limit == 0 {
-		limit = 50
-	}
-	if limit < 1 || limit > 200 || offset < 0 {
-		return nil, ErrInvalid
-	}
-	return s.store.Drafts(ctx, database, limit, offset)
-}
-
-func (s *Service) DeleteDraft(ctx context.Context, actor, database, id int64) error {
-	if err := s.access.RequirePermission(ctx, actor, database, access.ViewEdit); err != nil {
-		return err
-	}
-	if id < 1 {
-		return ErrInvalid
-	}
-	return s.store.DeleteDraft(ctx, database, id)
-}
-
 func (s *Service) Analyze(ctx context.Context, actor, database int64, query string) (Analysis, error) {
 	if err := s.access.RequirePermission(ctx, actor, database, access.ViewEdit); err != nil {
 		return Analysis{}, err

@@ -145,7 +145,7 @@ func TestSPAAuthenticationLoginLogoutAndExpiration(t *testing.T) {
 	}
 }
 
-func TestMigrationAPIAnalysisDraftAndRetiredActions(t *testing.T) {
+func TestMigrationAPIAnalysisSavesThroughM2DefinitionsAndRejectsRetiredActions(t *testing.T) {
 	f := newFixture(t, true)
 	reader := f.user(t, "spa.reader")
 	target := f.register(t)
@@ -155,19 +155,7 @@ func TestMigrationAPIAnalysisDraftAndRetiredActions(t *testing.T) {
 	csrf, err := f.access.CSRFToken(identity)
 	must(t, err)
 	handler := userHandler(t, f)
-	form := url.Values{"csrf": {csrf}, "db": {fmt.Sprint(target.ID)}, "description": {"Add SPA note"}, "sql": {"ALTER TABLE public.employees ADD COLUMN spa_note TEXT;"}, "action": {"save_draft"}}
-	location := apiLocation(t, apiRequest(t, handler, http.MethodPost, "/migrations/new", cookie, form))
-	loaded := apiRequest(t, handler, http.MethodGet, location.String(), cookie, nil)
-	draft := decodeAPI[struct {
-		DraftID           int64
-		DraftUpdated, SQL string
-	}](t, loaded)
-	if draft.DraftID == 0 || draft.SQL != form.Get("sql") || draft.DraftUpdated == "" {
-		t.Fatal("draft did not round-trip through JSON")
-	}
-	form.Set("draft", fmt.Sprint(draft.DraftID))
-	form.Set("draft_updated", draft.DraftUpdated)
-	form.Set("action", "analyze")
+	form := url.Values{"csrf": {csrf}, "db": {fmt.Sprint(target.ID)}, "description": {"Add SPA note"}, "sql": {"ALTER TABLE public.employees ADD COLUMN spa_note TEXT;"}, "action": {"analyze"}}
 	analyzed := apiRequest(t, handler, http.MethodPost, "/migrations/new", cookie, form)
 	if analyzed.Code != 200 {
 		t.Fatalf("analysis returned %d: %s", analyzed.Code, analyzed.Body.String())
@@ -176,8 +164,31 @@ func TestMigrationAPIAnalysisDraftAndRetiredActions(t *testing.T) {
 		Review     migration.Analysis
 		SchemaDiff json.RawMessage
 	}](t, analyzed)
-	if review.Review.SQLHash != migration.SQLHash(draft.SQL) || review.Review.SchemaDiffAvailable || review.Review.SchemaDiffMessage == "" {
+	if review.Review.SQLHash != migration.SQLHash(form.Get("sql")) || review.Review.SchemaDiffAvailable || review.Review.SchemaDiffMessage == "" {
 		t.Fatal("arbitrary SQL did not return its analysis and diff-unavailable state")
+	}
+	definitions, err := f.migrations.Workflow().Definitions(f.ctx, f.editor, target.ID, 50, 0)
+	must(t, err)
+	if len(definitions) != 0 {
+		t.Fatal("analysis saved a migration before the editor supplied rollback semantics")
+	}
+	payload := map[string]any{"database_id": target.ID, "title": form.Get("description"), "up_sql": review.Review.SQL}
+	incomplete := workflowRequest(t, handler, http.MethodPost, "/migration-definitions", cookie, csrf, payload)
+	if incomplete.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("analysis SQL saved without down SQL or an irreversible reason: %d", incomplete.Code)
+	}
+	payload["down_sql"] = "ALTER TABLE public.employees DROP COLUMN spa_note;"
+	created := workflowRequest(t, handler, http.MethodPost, "/migration-definitions", cookie, csrf, payload)
+	if created.Code != http.StatusCreated {
+		t.Fatalf("analysis SQL did not save through M2 definitions: %d %s", created.Code, created.Body.String())
+	}
+	definition := decodeAPI[struct {
+		Definition definitionResource `json:"definition"`
+	}](t, created).Definition
+	saved, err := f.migrations.Workflow().Definition(f.ctx, f.editor, definition.ID)
+	must(t, err)
+	if saved.UpSQL != review.Review.SQL || saved.DownSQL != payload["down_sql"] || saved.Title != form.Get("description") || saved.FrozenAt != nil {
+		t.Fatal("analysis handoff lost migration content or prematurely froze the draft")
 	}
 	visual := url.Values{"csrf": {csrf}, "db": {fmt.Sprint(target.ID)}, "action": {"analyze_visual"}, "description": {"Add SPA note"}, "operations": {`[{"Kind":"add_column","Schema":"public","Table":"employees","Column":{"Name":"spa_note","DataType":"text","Nullable":true}}]`}}
 	visualResponse := apiRequest(t, handler, http.MethodPost, "/migrations/new", cookie, visual)
@@ -202,7 +213,7 @@ func TestMigrationAPIAnalysisDraftAndRetiredActions(t *testing.T) {
 	if denied.Code != 403 {
 		t.Fatalf("View Only migration analysis returned %d", denied.Code)
 	}
-	for _, action := range []string{"execute", "resolve", "reconcile"} {
+	for _, action := range []string{"save_draft", "delete_draft", "execute", "resolve", "reconcile"} {
 		form.Set("action", action)
 		form.Set("confirm", "on")
 		form.Set("id", "1")

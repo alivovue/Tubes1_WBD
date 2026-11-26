@@ -228,9 +228,6 @@ function page(admin = false) {
     Table: "",
     Detail: null,
     Data: null,
-    Drafts: [],
-    DraftID: 0,
-    DraftUpdated: "",
     Description: "",
     SQL: "",
     OperationsJSON: "",
@@ -536,8 +533,14 @@ try {
   });
   let sequence = 0;
   const pending = new Map();
+  const loadedDocuments = new Set();
   socket.addEventListener("message", ({ data }) => {
     const message = JSON.parse(data);
+    if (
+      message.method === "Page.lifecycleEvent" &&
+      message.params.name === "load"
+    )
+      loadedDocuments.add(message.params.loaderId);
     if (message.id) {
       const operation = pending.get(message.id);
       pending.delete(message.id);
@@ -591,8 +594,19 @@ try {
   const text = (value) =>
     `!!document.body?.innerText.includes(${JSON.stringify(value)})`;
   const navigate = async (path, expected) => {
-    await cdp("Page.navigate", { url: origin + path });
+    const navigation = await cdp("Page.navigate", { url: origin + path });
+    assert.equal(navigation.errorText, undefined);
+    // Shared navigation labels can already exist in the previous document.
+    // Wait for this document to load before checking its rendered content.
+    for (let i = 0; !loadedDocuments.has(navigation.loaderId) && i < 80; i++)
+      await delay(100);
+    assert(
+      loadedDocuments.has(navigation.loaderId),
+      `Document did not load: ${path}`,
+    );
     await wait(text(expected));
+    if (!expected.startsWith("Loading "))
+      await wait("!document.querySelector('.empty-state[role=status]')");
   };
   const click = async (value) =>
     evaluate(
@@ -635,6 +649,7 @@ try {
     console.log(`PASS ${name}`);
   }
   await cdp("Page.enable");
+  await cdp("Page.setLifecycleEventsEnabled", { enabled: true });
   await cdp("Runtime.enable");
   await viewport(1440, 1000);
 
@@ -823,13 +838,7 @@ try {
       3,
     );
     await check("Hide rollback");
-    await wait("document.querySelector('tbody')?.children.length === 1");
-    assert.equal(
-      await evaluate(
-        "document.querySelector('tbody').innerText.includes('#3')",
-      ),
-      true,
-    );
+    await wait("document.querySelector('tbody')?.children.length === 1 && document.querySelector('tbody')?.innerText.includes('#3')");
   });
   await test("Rollback and forward each create a new review for the exact execution", async () => {
     await navigate(
@@ -1101,9 +1110,11 @@ try {
     }
     state.loggedOut = false;
   });
-  await test("SQL analysis carries SQL and title into a reviewed draft", async () => {
+  await test("SQL analysis saves migration work only through M2 definitions", async () => {
     await navigate("/migrations/new?db=7", "Create migration");
-    await field("Description / draft title", "From analysis");
+    assert.equal(await evaluate(text("Saved drafts")), false);
+    assert.equal(await evaluate(text("Save draft")), false);
+    await field("Migration title", "From analysis");
     await evaluate(`(() => {
       const input = document.querySelector('textarea[aria-label="SQL migration"]');
       Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(input, 'ALTER TABLE demo ADD reviewed boolean;');
@@ -1114,6 +1125,19 @@ try {
     await wait(text("New migration draft"));
     await wait(`document.querySelector('textarea')?.value === 'ALTER TABLE demo ADD reviewed boolean;'`);
     assert.equal(await evaluate(`document.querySelector('input:not([type=hidden])').value`), "From analysis");
+    const before = state.definitions.length;
+    assert.equal(await evaluate(`document.querySelector('form').checkValidity()`), false);
+    await field("SQL down", "ALTER TABLE demo DROP COLUMN reviewed;");
+    await click("Save draft");
+    await wait(`location.search.includes('definition=${before + 1}')`);
+    assert.equal(state.definitions.length, before + 1);
+    assert.equal(state.definitions.at(-1).title, "From analysis");
+    assert.equal(state.definitions.at(-1).up_sql, "ALTER TABLE demo ADD reviewed boolean;");
+    assert.equal(state.definitions.at(-1).down_sql, "ALTER TABLE demo DROP COLUMN reviewed;");
+    const savedID = state.definitions.at(-1).id;
+    await navigate(`/migrations?view=definitions&db=7&definition=${savedID}`, "From analysis");
+    await wait(`document.querySelector('textarea')?.value === 'ALTER TABLE demo ADD reviewed boolean;'`);
+    assert.equal(requests.some((request) => ["save_draft", "delete_draft"].includes(request.body.action)), false);
   });
   await test("No browser runtime errors or direct migration execution from new screens", async () => {
     assert.deepEqual(browserErrors, []);

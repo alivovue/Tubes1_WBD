@@ -1939,9 +1939,6 @@ svg {
   padding: 18px 20px 20px;
 }
 
-.guidance-panel {
-  align-self: start;
-}
 .check-list {
   padding: 6px 20px;
   margin: 0;
@@ -2441,9 +2438,6 @@ svg {
   .migration-layout {
     grid-template-columns: 1fr;
   }
-  .guidance-panel {
-    display: none;
-  }
   .explorer-shell {
     grid-template-columns: 210px minmax(600px, 1fr);
     overflow-x: auto;
@@ -2651,14 +2645,6 @@ svg {
 .detail-grid dd {
   margin: 6px 0 0;
   overflow-wrap: anywhere;
-}
-.draft-entry {
-  padding: 16px 0;
-  border-bottom: 1px solid var(--border, #283146);
-}
-.draft-entry small {
-  display: block;
-  margin: 8px 0;
 }
 .change-list,
 .operation-list {
@@ -3149,9 +3135,6 @@ pre {
   .tree__items {
     max-height: 210px;
     overflow-y: auto;
-  }
-  .guidance-panel.saved-drafts {
-    display: block;
   }
 }
 

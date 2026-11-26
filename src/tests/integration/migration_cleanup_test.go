@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"reflect"
 	"strings"
 	"testing"
 
@@ -15,33 +14,7 @@ import (
 	"tubes1_wbd/backend/migration"
 	"tubes1_wbd/backend/migration/diff"
 	pgengine "tubes1_wbd/backend/migration/engines/postgres"
-	"tubes1_wbd/database/dao"
 )
-
-func TestDeletingAnalysisDraftPreservesCommittedHistory(t *testing.T) {
-	f, _, runner := p3Fixture(t)
-	draft, err := f.migrations.SaveDraft(f.ctx, f.editor, f.database, migration.DraftInput{Title: "Analysis draft", SQL: "SELECT 1;"})
-	must(t, err)
-	kept, err := f.migrations.SaveDraft(f.ctx, f.editor, f.database, migration.DraftInput{Title: "Keep draft", SQL: "SELECT 2;"})
-	must(t, err)
-	id := enqueueP3(t, f, "draft_cleanup")
-	_, err = runner.RunOnce(f.ctx)
-	must(t, err)
-	assertJob(t, f, id, "succeeded")
-	before, err := f.workflow.History(f.ctx, f.reader.ID, f.database, false, 50, 0)
-	must(t, err)
-	wantError(t, f.migrations.DeleteDraft(f.ctx, f.reader.ID, f.database, draft.ID), access.ErrForbidden)
-	must(t, f.migrations.DeleteDraft(f.ctx, f.editor, f.database, draft.ID))
-	_, err = f.migrations.Draft(f.ctx, f.editor, f.database, draft.ID)
-	wantError(t, err, dao.ErrNotFound)
-	_, err = f.migrations.Draft(f.ctx, f.editor, f.database, kept.ID)
-	must(t, err)
-	after, err := f.workflow.History(f.ctx, f.reader.ID, f.database, false, 50, 0)
-	must(t, err)
-	if len(after) != 1 || !reflect.DeepEqual(before, after) {
-		t.Fatal("deleting an analysis draft changed committed M2 history")
-	}
-}
 
 func TestVisualDropColumnsAppliesLocalDependencyCleanup(t *testing.T) {
 	f, _, runner := p3Fixture(t)
