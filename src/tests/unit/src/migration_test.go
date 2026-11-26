@@ -50,22 +50,19 @@ func TestMigrationWritesRequireEditPermission(t *testing.T) {
 		})
 	}
 }
-func TestMigrationHistoryAllowsReaders(t *testing.T) {
+func TestCommittedHistoryAllowsReaders(t *testing.T) {
 	_, store, stub := newSQLStub(t)
 	_, _, service := newServices(t, store)
-	stub.append(permissionStep(access.ViewOnly), queryStep("FROM migration_executions e", []string{"id"}))
-	history, err := service.History(context.Background(), 7, 3, 50, 0)
+	stub.append(permissionStep(access.ViewOnly), queryStep("FROM migration_execution_history h", []string{"history"}))
+	history, err := service.Workflow().History(context.Background(), 7, 3, false, 50, 0)
 	if err != nil || len(history) != 0 {
 		t.Fatalf("reader history request failed: %v", err)
 	}
 	stub.append(permissionStep(access.NoAccess))
-	_, err = service.History(context.Background(), 7, 3, 50, 0)
+	_, err = service.Workflow().History(context.Background(), 7, 3, false, 50, 0)
 	wantError(t, err, access.ErrForbidden)
 	stub.append(permissionStep(access.ViewOnly))
-	_, err = service.Detail(context.Background(), 7, 3, 0)
-	wantError(t, err, access.ErrInvalid)
-	stub.append(permissionStep(access.ViewOnly))
-	_, err = service.History(context.Background(), 7, 3, 201, 0)
+	_, err = service.Workflow().History(context.Background(), 7, 3, false, 201, 0)
 	wantError(t, err, access.ErrInvalid)
 }
 func TestDraftSaveAndOptimisticUpdate(t *testing.T) {
@@ -94,7 +91,7 @@ func TestDraftOptimisticConflictAndDeletion(t *testing.T) {
 	stub.append(permissionStep(access.ViewEdit), permissionStep(access.ViewEdit), metadataStep(), execStep("INSERT INTO managed_databases"), queryStep("UPDATE migration_drafts SET", []string{"id"}), draftStep("FROM migration_drafts WHERE"))
 	_, err := service.SaveDraft(context.Background(), 7, 3, migration.DraftInput{ID: 4, Title: "A draft", SQL: "SELECT 1", ExpectedUpdatedAt: testTime})
 	wantError(t, err, access.ErrConflict)
-	stub.append(permissionStep(access.ViewEdit), sqlStep{kind: "begin"}, scalarStep("FROM migration_drafts WHERE database_id=$1 AND id=$2 FOR UPDATE", int64(4)), execStep("UPDATE migration_executions SET draft_id=NULL"), execStep("DELETE FROM migration_drafts"), sqlStep{kind: "commit"})
+	stub.append(permissionStep(access.ViewEdit), execStep("DELETE FROM migration_drafts"))
 	if err := service.DeleteDraft(context.Background(), 7, 3, 4); err != nil {
 		t.Fatal(err)
 	}

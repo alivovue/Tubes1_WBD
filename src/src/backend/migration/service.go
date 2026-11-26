@@ -152,29 +152,6 @@ func (s *Service) DeleteDraft(ctx context.Context, actor, database, id int64) er
 	return s.store.DeleteDraft(ctx, database, id)
 }
 
-func (s *Service) History(ctx context.Context, actor, database int64, limit, offset int) ([]dao.MigrationExecution, error) {
-	if err := s.access.RequirePermission(ctx, actor, database, access.ViewOnly); err != nil {
-		return nil, err
-	}
-	if limit == 0 {
-		limit = 50
-	}
-	if limit < 1 || limit > 200 || offset < 0 {
-		return nil, ErrInvalid
-	}
-	return s.store.MigrationHistory(ctx, database, limit, offset)
-}
-
-func (s *Service) Detail(ctx context.Context, actor, database, id int64) (dao.MigrationExecution, error) {
-	if err := s.access.RequirePermission(ctx, actor, database, access.ViewOnly); err != nil {
-		return dao.MigrationExecution{}, err
-	}
-	if id < 1 {
-		return dao.MigrationExecution{}, ErrInvalid
-	}
-	return s.store.Execution(ctx, database, id)
-}
-
 func (s *Service) Analyze(ctx context.Context, actor, database int64, query string) (Analysis, error) {
 	if err := s.access.RequirePermission(ctx, actor, database, access.ViewEdit); err != nil {
 		return Analysis{}, err

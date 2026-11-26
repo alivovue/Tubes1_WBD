@@ -13,14 +13,18 @@ export const migrationViews = [
   "history",
 ] as const;
 
+export function migrationView(raw: string | null) {
+  return migrationViews.find((view) => view === raw) || "history";
+}
+
 export function MigrationWorkspace() {
   const { data } = usePage();
   const [params] = useSearchParams();
-  const view = params.get("view") || "definitions";
+  const view = migrationView(params.get("view"));
   return (
     <>
       <Heading
-        title="Migration workflow"
+        title={view === "history" ? "Changelog" : "Migration workflow"}
         icon="layers"
         text="Draft → Group review → Approved → Queued → Running → Completed"
       >
@@ -32,9 +36,9 @@ export function MigrationWorkspace() {
         </Link>
         <Link
           className="button button--secondary"
-          to={url("/migrations", { db: data.Database.ID })}
+          to={migrationURL("jobs", data.Database.ID)}
         >
-          Execution attempts
+          Jobs & activity
         </Link>
       </Heading>
       <DatabasePicker
@@ -71,8 +75,8 @@ export function MigrationWorkspace() {
         <>
           {data.Database.DBMS !== "postgresql" && (
             <Notice>
-              Approval and batch workflows support PostgreSQL. Use the SQL
-              editor and changelog for MariaDB.
+              Migration execution supports PostgreSQL. SQL analysis remains
+              available for MariaDB.
             </Notice>
           )}
           {view === "definitions" && <MigrationDefinitions />}

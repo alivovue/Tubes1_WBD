@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"strconv"
+	"time"
 
 	"tubes1_wbd/backend/access"
 	"tubes1_wbd/backend/migration/engines"
@@ -161,7 +162,30 @@ func (v *Resources) Review(r dao.MigrationReview) (map[string]any, error) {
 		"expected_generation":    v.state.Generation,
 	}, nil
 }
+
+type ExecutionSummary struct {
+	ID          string    `json:"id"`
+	DatabaseID  int64     `json:"database_id"`
+	Title       string    `json:"title"`
+	Actor       string    `json:"actor"`
+	Operation   string    `json:"operation"`
+	CommittedAt time.Time `json:"committed_at"`
+	Version     int64     `json:"version"`
+}
+
+func (v *Resources) ExecutionSummary(e dao.CommittedExecution) (ExecutionSummary, error) {
+	r, err := v.revision(e.RevisionID)
+	if err != nil {
+		return ExecutionSummary{}, err
+	}
+	return ExecutionSummary{ID: e.ExecutionID, DatabaseID: e.DatabaseID, Title: r.Title, Actor: v.name(e.ActorID), Operation: resourceAction(e.Operation, r), CommittedAt: e.CommittedAt, Version: e.LogicalVersion}, nil
+}
+
 func (v *Resources) Execution(e dao.CommittedExecution) (map[string]any, error) {
+	summary, err := v.ExecutionSummary(e)
+	if err != nil {
+		return nil, err
+	}
 	r, err := v.revision(e.RevisionID)
 	if err != nil {
 		return nil, err
@@ -185,17 +209,17 @@ func (v *Resources) Execution(e dao.CommittedExecution) (map[string]any, error) 
 		return nil, err
 	}
 	return map[string]any{
-		"id":                     e.ExecutionID,
-		"database_id":            e.DatabaseID,
+		"id":                     summary.ID,
+		"database_id":            summary.DatabaseID,
 		"definition_id":          e.DefinitionID,
 		"revision_id":            e.RevisionID,
 		"revision":               r.RevisionNo,
-		"version":                e.LogicalVersion,
-		"title":                  r.Title,
-		"operation":              resourceAction(e.Operation, r),
+		"version":                summary.Version,
+		"title":                  summary.Title,
+		"operation":              summary.Operation,
 		"sql":                    e.SQL,
-		"actor":                  v.name(e.ActorID),
-		"committed_at":           e.CommittedAt,
+		"actor":                  summary.Actor,
+		"committed_at":           summary.CommittedAt,
 		"duration_ms":            duration,
 		"job_id":                 e.JobID,
 		"review_id":              e.ReviewID,

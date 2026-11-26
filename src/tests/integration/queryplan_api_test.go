@@ -83,7 +83,7 @@ SELECT not_yet_created FROM public.employees;`
 			t.Fatal("plan analysis executed ALTER TABLE")
 		}
 	}
-	history, err := f.migrations.History(f.ctx, f.editor, target.ID, 50, 0)
+	history, err := f.migrations.Workflow().History(f.ctx, f.editor, target.ID, false, 50, 0)
 	must(t, err)
 	if len(history) != 0 {
 		t.Fatal("plan analysis created an execution attempt")

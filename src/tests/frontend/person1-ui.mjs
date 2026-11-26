@@ -204,15 +204,22 @@ function page(admin = false) {
     Database: state.noDatabases ? { ID: 0 } : db,
     CanEdit: state.permission === "view_edit",
     EditableCount: 1,
-    Recent: [],
+    Recent: state.noDatabases ? [] : state.history.slice(-1).map((event) => ({
+      id: event.id,
+      database_id: event.database_id,
+      database_name: db.Name,
+      title: event.title,
+      actor: event.actor,
+      operation: event.operation,
+      committed_at: event.committed_at,
+      version: event.version,
+    })),
     Schemas: [{ Name: "public" }],
     Tables: [],
     Schema: "public",
     Table: "",
     Detail: null,
     Data: null,
-    History: [],
-    Execution: null,
     Drafts: [],
     DraftID: 0,
     DraftUpdated: "",
@@ -623,7 +630,7 @@ try {
   await cdp("Runtime.enable");
   await viewport(1440, 1000);
 
-  await test("M1 routes render in both SPAs", async () => {
+  await test("Application routes render in both SPAs", async () => {
     for (const [path, expected] of [
       ["/dashboard", "Welcome,"],
       ["/databases", "My Databases"],
@@ -637,6 +644,19 @@ try {
       ["/admin/groups", "Designate leader"],
     ])
       await navigate(path, expected);
+  });
+  await test("Default Changelog and dashboard links use M2 committed history", async () => {
+    const start = requests.length;
+    await navigate("/migrations?db=7", "Committed execution history");
+    await wait("document.querySelector('tbody')?.children.length === 3");
+    assert(requests.slice(start).some((request) => request.path === "/api/migrations/history"));
+    assert.equal(requests.slice(start).some((request) => request.path === "/api/migrations"), false);
+    await navigate("/dashboard", "Latest committed executions across your databases.");
+    await wait(text("Add demo flag"));
+    await click("Add demo flag");
+    await wait(text("Execution #3"));
+    assert.equal(await evaluate("new URLSearchParams(location.search).get('execution')"), "3");
+    assert.equal(await evaluate("document.querySelector('h1').textContent"), "Changelog");
   });
   await test("Draft requires SQL down or irreversibility reason; batch settings persist", async () => {
     await navigate("/migrations?view=definitions&db=7", "New migration draft");

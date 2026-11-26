@@ -100,7 +100,7 @@ func (h *router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p, exists := pages[r.URL.Path]
-	if !exists && r.URL.Path != "/logout" && r.URL.Path != "/session" {
+	if (!exists || r.URL.Path == "/migrations") && r.URL.Path != "/logout" && r.URL.Path != "/session" {
 		httpapi.Error(w, r, "The requested endpoint was not found.", 404)
 		return
 	}
@@ -141,7 +141,7 @@ func (h *router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/sql-viewer":
 			err = h.viewer.Action(r, &data)
-		case "/migrations", "/migrations/new":
+		case "/migrations/new":
 			handled, err = h.migrations.Action(w, r, &data)
 		default:
 			err = access.ErrInvalid
@@ -173,7 +173,7 @@ func (h *router) load(r *http.Request, data *response.Data) error {
 		return h.explorer.Load(r, data)
 	case "/sql-viewer":
 		return h.viewer.Load(r, data)
-	case "/migrations", "/migrations/new":
+	case "/migrations/new":
 		return h.migrations.Load(r, data)
 	}
 	if err := selection.List(r, data, h.explorer.Databases); err != nil {

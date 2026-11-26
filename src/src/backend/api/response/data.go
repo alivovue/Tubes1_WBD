@@ -9,8 +9,8 @@ import (
 )
 
 type RecentExecution struct {
-	dao.MigrationExecution
-	DatabaseName string
+	migration.ExecutionSummary
+	DatabaseName string `json:"database_name"`
 }
 
 type Data struct {
@@ -31,8 +31,6 @@ type Data struct {
 	Data                                           *dbmanagement.DataPage
 	Offset, Previous, Next                         int
 	HasMore                                        bool
-	History                                        []dao.MigrationExecution
-	Execution                                      *dao.MigrationExecution
 	Drafts                                         []dao.MigrationDraft
 	DraftID                                        int64
 	DraftUpdated, Description, SQL, OperationsJSON string

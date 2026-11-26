@@ -57,7 +57,7 @@ func TestIT07ViewOnlyUserCannotAnalyzeOrExecuteMigration(t *testing.T) {
 	if before != after {
 		t.Fatal("denied operation changed the schema fingerprint")
 	}
-	history, err := f.migrations.History(f.ctx, user.ID, target.ID, 50, 0)
+	history, err := f.migrations.Workflow().History(f.ctx, user.ID, target.ID, false, 50, 0)
 	must(t, err)
 	if len(history) != 0 {
 		t.Fatal("denied operation created migration history")

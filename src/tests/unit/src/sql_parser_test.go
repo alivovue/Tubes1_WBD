@@ -70,7 +70,7 @@ func TestMigrationSQLPolicy(t *testing.T) {
 			}
 		})
 	}
-	for _, query := range []string{"CREATE INDEX CONCURRENTLY idx ON people(id)", "SELECT set_config('role','admin',false)", `SELECT * FROM "_schakker".migration_receipts`} {
+	for _, query := range []string{"CREATE INDEX CONCURRENTLY idx ON people(id)", "SELECT set_config('role','admin',false)", `SELECT * FROM "_schakker".job_receipts`} {
 		if _, err := migration.ValidateSQL(query, "postgresql"); err == nil {
 			t.Errorf("PostgreSQL policy accepted %s", query)
 		}
@@ -110,23 +110,23 @@ func TestMariaDBReferencesStayWithinSelectedDatabase(t *testing.T) {
 
 func TestPostgreSQLMigrationRejectsExecutableLiteralsAndIdentifierBypasses(t *testing.T) {
 	for _, query := range []string{
-		`DO $$ BEGIN DELETE FROM _schakker.migration_receipts; END $$`,
-		`DO $body$ BEGIN EXECUTE 'DELETE FROM ' || quote_ident('_sch' || 'akker') || '.migration_receipts'; END $body$`,
-		`DO 'BEGIN DELETE FROM _schakker.migration_receipts; END'`,
+		`DO $$ BEGIN DELETE FROM _schakker.job_receipts; END $$`,
+		`DO $body$ BEGIN EXECUTE 'DELETE FROM ' || quote_ident('_sch' || 'akker') || '.job_receipts'; END $body$`,
+		`DO 'BEGIN DELETE FROM _schakker.job_receipts; END'`,
 		`CALL public.erase_receipts()`,
-		`CREATE FUNCTION public.erase_receipts() RETURNS void LANGUAGE sql AS $$DELETE FROM _schakker.migration_receipts$$`,
-		`CREATE OR REPLACE FUNCTION public.erase_receipts() RETURNS void LANGUAGE plpgsql AS $$BEGIN EXECUTE 'DELETE FROM _schakker.migration_receipts'; END$$`,
-		`CREATE PROCEDURE public.erase_receipts() LANGUAGE plpgsql AS $$BEGIN DELETE FROM _schakker.migration_receipts; END$$`,
+		`CREATE FUNCTION public.erase_receipts() RETURNS void LANGUAGE sql AS $$DELETE FROM _schakker.job_receipts$$`,
+		`CREATE OR REPLACE FUNCTION public.erase_receipts() RETURNS void LANGUAGE plpgsql AS $$BEGIN EXECUTE 'DELETE FROM _schakker.job_receipts'; END$$`,
+		`CREATE PROCEDURE public.erase_receipts() LANGUAGE plpgsql AS $$BEGIN DELETE FROM _schakker.job_receipts; END$$`,
 		`CREATE TRIGGER erase_receipts AFTER INSERT ON people EXECUTE FUNCTION public.erase_receipts()`,
-		`CREATE RULE erase_receipts AS ON INSERT TO people DO ALSO DELETE FROM _schakker.migration_receipts`,
+		`CREATE RULE erase_receipts AS ON INSERT TO people DO ALSO DELETE FROM _schakker.job_receipts`,
 		`SELECT "set_config"('search_path','_schakker',false)`,
 		`SELECT "pg_catalog"."set_config"('standard_conforming_strings','off',true)`,
 		`SELECT pg_catalog."set_config"('role','other_user',false)`,
 		`SELECT U&"set\005fconfig"('search_path','_schakker',true)`,
-		`DELETE FROM U&"\005fschakker".migration_receipts`,
-		`DELETE FROM U&"!005fschakker" UESCAPE '!'.migration_receipts`,
-		`SELECT query_to_xml('WITH erased AS (DELETE FROM _schakker.migration_receipts RETURNING *) SELECT * FROM erased',true,false,'')`,
-		`SELECT "dblink_exec"('dbname=target','DELETE FROM _schakker.migration_receipts')`,
+		`DELETE FROM U&"\005fschakker".job_receipts`,
+		`DELETE FROM U&"!005fschakker" UESCAPE '!'.job_receipts`,
+		`SELECT query_to_xml('WITH erased AS (DELETE FROM _schakker.job_receipts RETURNING *) SELECT * FROM erased',true,false,'')`,
+		`SELECT "dblink_exec"('dbname=target','DELETE FROM _schakker.job_receipts')`,
 	} {
 		t.Run(query, func(t *testing.T) {
 			_, err := migration.ValidateSQL(query, "postgresql")
@@ -146,7 +146,7 @@ func TestPostgreSQLMigrationKeepsExplicitSQLAndLiteralData(t *testing.T) {
 		`CREATE TYPE status AS ENUM ('pending','done')`,
 		`CREATE TABLE preferences("set_config" text)`,
 		`SELECT "set_config" FROM preferences`,
-		`INSERT INTO people(note) VALUES ($text$DO $$ BEGIN DELETE FROM _schakker.migration_receipts; END $$;$text$)`,
+		`INSERT INTO people(note) VALUES ($text$DO $$ BEGIN DELETE FROM _schakker.job_receipts; END $$;$text$)`,
 		`INSERT INTO people(note) VALUES (U&'ordinary\0020text')`,
 		`SELECT 'set_config', '_schakker', 'CREATE FUNCTION'`,
 		`UPDATE people SET note=upper(note) WHERE id=1`,

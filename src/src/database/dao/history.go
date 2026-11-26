@@ -48,18 +48,17 @@ func (d *Store) AppendCommittedExecution(ctx context.Context, e CommittedExecuti
 func (d *Store) SetDefinitionVersion(ctx context.Context, id, version int64) error {
 	return affected(d.q.ExecContext(ctx, `UPDATE migration_definitions SET logical_version=$2 WHERE id=$1 AND (logical_version IS NULL OR logical_version=$2)`, id, version))
 }
-func (d *Store) BlockingSynchronousHistory(ctx context.Context, database int64) (bool, error) {
-	var unsafe bool
-	err := d.q.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM migration_executions e WHERE e.database_id=$1 AND
- (e.status='running' OR (e.status='failed' AND e.execution_mode='non_atomic' AND e.completed_statements>0)
- OR e.status='succeeded'))`, database).Scan(&unsafe)
-	return unsafe, classify(err)
-}
-
 func (d *Store) BlockingWorkflowJob(ctx context.Context, database int64, own *string) (bool, error) {
 	var blocked bool
 	err := d.q.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM migration_jobs WHERE database_id=$1
  AND status IN('running','partial','uncertain','reverting','partially_reverted')
  AND ($2::uuid IS NULL OR id<>$2::uuid))`, database, own).Scan(&blocked)
 	return blocked, classify(err)
+}
+
+// MigrationVersion reports the current M2 active position, including rollback.
+func (d *Store) MigrationVersion(ctx context.Context, database int64) (int64, error) {
+	var version int64
+	err := d.q.QueryRowContext(ctx, `SELECT COALESCE((SELECT active_version FROM migration_database_state WHERE database_id=$1),0)`, database).Scan(&version)
+	return version, classify(err)
 }

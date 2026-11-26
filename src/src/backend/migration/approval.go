@@ -72,13 +72,6 @@ func (w *Workflow) SubmitReview(ctx context.Context, actor int64, in ReviewInput
 		if err = w.checkAction(ctx, tx, r, revision, state); err != nil {
 			return err
 		}
-		pending, err := tx.UnfinishedExecutions(ctx, revision.DatabaseID)
-		if err != nil {
-			return err
-		}
-		if len(pending) > 0 {
-			return ErrWorkflowConflict
-		}
 		if err := tx.FreezeRevision(ctx, revision.ID); err != nil {
 			return err
 		}

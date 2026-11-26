@@ -25,7 +25,7 @@ func TestIT15StaleDraftUpdateDoesNotOverwriteNewerSQL(t *testing.T) {
 	if saved.SQL != "SELECT 2" || saved.Title != "New draft" || !saved.UpdatedAt.Equal(updated.UpdatedAt) {
 		t.Fatal("stale draft write overwrote newer changes")
 	}
-	history, err := f.migrations.History(f.ctx, f.editor, target.ID, 50, 0)
+	history, err := f.migrations.Workflow().History(f.ctx, f.editor, target.ID, false, 50, 0)
 	must(t, err)
 	if len(history) != 0 {
 		t.Fatal("draft changes created executed history")

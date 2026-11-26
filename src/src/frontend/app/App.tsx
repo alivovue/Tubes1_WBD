@@ -21,10 +21,10 @@ import {
 import { api, APIError, formFields } from "./api";
 import type { APIResult, Fields, PageData } from "./types";
 import { Button, Field, Icon, initials, Notice, PageContext } from "./ui";
-import { Dashboard, Databases, Explorer, History } from "./workspace";
+import { Dashboard, Databases, Explorer } from "./workspace";
 import { SQLViewer } from "./SQLViewer";
 import { MigrationEditor } from "./MigrationEditor";
-import { MigrationWorkspace, migrationViews } from "./MigrationWorkspace";
+import { MigrationWorkspace, migrationView } from "./MigrationWorkspace";
 
 const SessionContext = createContext<{
   session: APIResult;
@@ -270,9 +270,7 @@ function Layout() {
   }
   const workflowOpen =
     location.pathname === "/migrations" &&
-    migrationViews.some(
-      (view) => view === new URLSearchParams(location.search).get("view"),
-    );
+    migrationView(new URLSearchParams(location.search).get("view")) !== "history";
   const nav = (to: string, label: string, icon: string) => {
     const active = to.includes("?view=")
       ? workflowOpen
@@ -395,9 +393,11 @@ function Page() {
   });
   const currentPath = location.pathname + location.search;
   const apiParams = new URLSearchParams(location.search);
-  const workflow =
-    location.pathname === "/migrations" &&
-    migrationViews.some((view) => view === apiParams.get("view"));
+  const workflow = location.pathname === "/migrations";
+  const workflowTitle =
+    migrationView(apiParams.get("view")) === "history"
+      ? "Changelog"
+      : "Migration workflow";
   const selectedDatabase = workflow ? apiParams.get("db") || "" : "";
   apiParams.delete("tab");
   const requestPath = workflow
@@ -434,12 +434,12 @@ function Page() {
             throw new Error("You do not have access to the selected database.");
           setData({
             ...result,
-            Title: "Migration workflow",
+            Title: workflowTitle,
             Database: database || { ID: 0 },
             CanEdit: database?.Permission === "view_edit",
           } as PageData);
         } else setData(result as PageData);
-        update(workflow ? { ...result, Title: "Migration workflow" } : result);
+        update(workflow ? { ...result, Title: workflowTitle } : result);
       })
       .catch((problem) => {
         if (controller.signal.aborted) return;
@@ -457,6 +457,7 @@ function Page() {
     update,
     expire,
     workflow,
+    workflowTitle,
     selectedDatabase,
   ]);
   useEffect(() => {
@@ -532,11 +533,7 @@ function Page() {
       content = <MigrationEditor />;
       break;
     case "/migrations":
-      content = workflow ? (
-        <MigrationWorkspace key={data.Database.ID} />
-      ) : (
-        <History />
-      );
+      content = <MigrationWorkspace key={data.Database.ID} />;
       break;
   }
   return (

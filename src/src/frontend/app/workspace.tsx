@@ -4,9 +4,7 @@ import {
   Button,
   DatabasePicker,
   Field,
-  Form,
   Heading,
-  Hidden,
   Icon,
   Pagination,
   Panel,
@@ -84,18 +82,23 @@ export function Dashboard() {
       </Panel>
       <Panel
         title="Recent migrations"
-        text="Latest attempts across your databases."
+        text="Latest committed executions across your databases."
       >
         <Table
-          headers={["Database", "Migration", "Executor", "Time", "Status"]}
+          headers={["Database", "Migration", "Actor", "Committed", "Action"]}
           rows={(data.Recent || []).map((item) => [
-            item.DatabaseName,
-            <Link to={url("/migrations", { db: item.DatabaseID, id: item.ID })}>
-              {item.Description || `Attempt #${item.ID}`}
+            item.database_name,
+            <Link
+              to={url("/migrations", {
+                db: item.database_id,
+                execution: item.id,
+              })}
+            >
+              {item.title}
             </Link>,
-            item.Username,
-            stamp(item.StartedAt),
-            item.Status,
+            item.actor,
+            stamp(item.committed_at),
+            item.operation.replaceAll("_", " "),
           ])}
           empty="No migration history yet."
         />
@@ -455,125 +458,6 @@ export function Explorer() {
         <p className="empty-state">
           No databases assigned. Contact your platform admin.
         </p>
-      )}
-    </>
-  );
-}
-
-export function History() {
-  const { data } = usePage();
-  const execution = data.Execution;
-  return (
-    <>
-      <Heading
-        title="Changelog"
-        icon="history"
-        text="Linear history of execution attempts for each database."
-      >
-        <Link
-          className="button button--secondary"
-          to={url("/migrations", { db: data.Database.ID, view: "history" })}
-        >
-          Committed history
-        </Link>
-        {data.CanEdit && (
-          <Link
-            className="button button--primary"
-            to={url("/migrations/new", { db: data.Database.ID })}
-          >
-            Create migration
-          </Link>
-        )}
-      </Heading>
-      <DatabasePicker databases={data.Databases} selected={data.Database.ID} />
-      {data.Database.ID ? (
-        <>
-          {execution && (
-            <Panel
-              title={`Attempt #${execution.ID} · ${execution.Status}`}
-              text={execution.Description}
-            >
-              <div className="integration-form">
-                <dl className="detail-grid">
-                  {[
-                    [
-                      "Applied version",
-                      execution.AppliedVersion
-                        ? `v${execution.AppliedVersion}`
-                        : "—",
-                    ],
-                    ["Attempted version", execution.AttemptedVersion],
-                    ["Executor", execution.Username],
-                    ["Started", stamp(execution.StartedAt)],
-                    ["Mode", execution.Mode],
-                    [
-                      "Committed statements",
-                      `${execution.CompletedStatements} / ${execution.TotalStatements}`,
-                    ],
-                  ].map(([label, value]) => (
-                    <div key={label}>
-                      <dt>{label}</dt>
-                      <dd>{value}</dd>
-                    </div>
-                  ))}
-                </dl>
-                {execution.ErrorMessage && (
-                  <p className="notice notice--warning" role="alert">
-                    {execution.ErrorMessage}
-                  </p>
-                )}
-                <Field label="Executed SQL">
-                  <textarea
-                    className="review-editor"
-                    readOnly
-                    value={execution.SQL}
-                  />
-                </Field>
-              </div>
-            </Panel>
-          )}
-          <Panel>
-            <Table
-              headers={[
-                "Version / Attempt",
-                "Description",
-                "Executor",
-                "Time",
-                "Status",
-                "Progress",
-              ]}
-              rows={(data.History || []).map((item) => [
-                <Link
-                  to={url("/migrations", {
-                    db: data.Database.ID,
-                    id: item.ID,
-                    offset: data.Offset,
-                  })}
-                >
-                  {item.AppliedVersion
-                    ? `v${item.AppliedVersion}`
-                    : `Attempt #${item.ID}`}
-                </Link>,
-                item.Description,
-                item.Username,
-                stamp(item.StartedAt),
-                <span
-                  className={`badge badge--${item.Status === "succeeded" ? "success" : item.Status === "failed" ? "danger" : "warning"}`}
-                >
-                  {item.Status}
-                </span>,
-                <>
-                  {item.CompletedStatements} / {item.TotalStatements}
-                  <small>{item.Mode}</small>
-                </>,
-              ])}
-              empty="No migration history yet."
-            />
-            <Pagination />
-          </Panel>
-        </>
-      ) : (
-        <p className="empty-state">No databases assigned.</p>
       )}
     </>
   );

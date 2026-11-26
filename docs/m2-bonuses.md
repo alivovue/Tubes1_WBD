@@ -39,4 +39,4 @@ All Go processes, central telemetry services and local PostgreSQL share an AMD R
 
 Both frontend production builds, shared TypeScript checking, all eight backend unit-test packages, Go vet, OTLP correlation/redaction tests and the schema-diff allocation regression passed. The full PostgreSQL integration suite passed after the changes in **428.159 seconds**; [verification records](evidence/bonuses/verification.json) retain the commands and actual results. The standalone admin binary test gives its cold Go build a separate deadline and uses an ephemeral metrics listener so optional instrumentation cannot conflict with another local process.
 
-These bonuses preserve the existing approval and worker execution path. They do not resolve the separate M1 legacy-schema/history transition and literal-SQL logging limitations recorded in [M2 integration](m2-integration.md).
+These bonuses preserve the existing approval and worker execution path. The literal-SQL logging limitation remains documented in [M2 integration](m2-integration.md).

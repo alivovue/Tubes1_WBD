@@ -26,7 +26,7 @@ func ValidateSchema(ctx context.Context, db *sql.DB) error {
 		return err
 	}
 	var mixed bool
-	if err := db.QueryRowContext(ctx, `SELECT to_regclass('public.migration_drafts') IS NOT NULL OR to_regclass('public.migration_executions') IS NOT NULL OR to_regclass('public.sessions') IS NOT NULL`).Scan(&mixed); err != nil || mixed {
+	if err := db.QueryRowContext(ctx, `SELECT to_regclass('public.migration_drafts') IS NOT NULL OR to_regclass('public.migration_definitions') IS NOT NULL OR to_regclass('public.migration_execution_history') IS NOT NULL OR to_regclass('public.sessions') IS NOT NULL`).Scan(&mixed); err != nil || mixed {
 		return errors.New("admin control plane requires a separate database without ordinary runtime tables")
 	}
 	return nil

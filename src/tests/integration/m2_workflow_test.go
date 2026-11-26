@@ -620,18 +620,3 @@ func TestM2PartialJobBlocksOtherMigrationActions(t *testing.T) {
 		t.Fatal("temporary blocker rewrote the immutable approval decision")
 	}
 }
-
-func TestM2ReviewedWorkflowPreservesExistingLegacyHistory(t *testing.T) {
-	f := newWorkflowFixture(t)
-	// An existing committed M1 record still blocks an unreviewed history reset.
-	_, err := f.dbs.Website.ExecContext(f.ctx, `INSERT INTO migration_executions(database_id,executed_by,sql_text,attempted_version,applied_version,status,total_statements,completed_statements,finished_at)
-VALUES($1,$2,'CREATE TABLE synchronous_first(id integer)',1,1,'succeeded',1,1,clock_timestamp())`, f.database, f.editor)
-	must(t, err)
-	_, err = f.workflow.CreateDefinition(f.ctx, f.editor, f.database, reversible("reviewed_next"))
-	wantError(t, err, migration.ErrWorkflowConflict)
-	version, err := f.runtimeStore.MigrationVersion(f.ctx, f.database)
-	must(t, err)
-	if version != 1 {
-		t.Fatal("attempting to start a reviewed workflow reset migration history")
-	}
-}

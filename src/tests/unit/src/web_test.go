@@ -54,7 +54,7 @@ func TestWebServesSameSPAShellForDirectNavigation(t *testing.T) {
 
 func TestWebRequiresSessionForProtectedAPIs(t *testing.T) {
 	handler := newWebHandler(t, false)
-	for _, route := range frontendRoutes[2:] {
+	for _, route := range []string{"/dashboard", "/databases", "/explorer", "/sql-viewer", "/migrations/new", "/migrations/history?database_id=3"} {
 		for _, method := range []string{http.MethodGet, http.MethodPost} {
 			response := httptest.NewRecorder()
 			handler.ServeHTTP(response, httptest.NewRequest(method, "/api"+route, strings.NewReader(`{}`)))

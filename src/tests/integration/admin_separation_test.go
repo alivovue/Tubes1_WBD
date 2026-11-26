@@ -36,7 +36,7 @@ func TestSeparatedApplicationsEnforceAuthenticationDomainsAndManagedEndpointBoun
 	editorCSRF, err := f.access.CSRFToken(editorIdentity)
 	must(t, err)
 	userServer, adminServer := userHandler(t, f), adminHandler(t, f)
-	for _, route := range []string{"/dashboard", "/databases", "/explorer", "/sql-viewer", "/migrations", "/migrations/new"} {
+	for _, route := range []string{"/dashboard", "/databases", "/explorer", "/sql-viewer", "/migrations/history", "/migrations/new"} {
 		for _, method := range []string{http.MethodGet, http.MethodPost} {
 			response := apiRequest(t, userServer, method, route+"?db="+fmt.Sprint(target.ID), adminCookie, url.Values{"csrf": {adminCSRF}, "db": {fmt.Sprint(target.ID)}, "action": {"analyze"}, "sql": {"SELECT 1"}})
 			if response.Code != http.StatusUnauthorized {
@@ -89,7 +89,10 @@ func TestSeparatedApplicationsEnforceAuthenticationDomainsAndManagedEndpointBoun
 		{"read SQL", func() error { _, err := f.databases.ReadQuery(f.ctx, f.admin, target.ID, "SELECT 1"); return err }},
 		{"query plans", func() error { _, err := f.databases.QueryPlans(f.ctx, f.admin, target.ID, "SELECT 1"); return err }},
 		{"drafts", func() error { _, err := f.migrations.Drafts(f.ctx, f.admin, target.ID, 10, 0); return err }},
-		{"history", func() error { _, err := f.migrations.History(f.ctx, f.admin, target.ID, 10, 0); return err }},
+		{"history", func() error {
+			_, err := f.migrations.Workflow().History(f.ctx, f.admin, target.ID, false, 10, 0)
+			return err
+		}},
 		{"analysis", func() error { _, err := f.migrations.Analyze(f.ctx, f.admin, target.ID, "SELECT 1"); return err }},
 		{"migration definition", func() error {
 			_, err := f.migrations.Workflow().CreateDefinition(f.ctx, f.admin, target.ID, reversible("admin_denied"))

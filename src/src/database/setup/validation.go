@@ -16,7 +16,7 @@ func ValidateSchema(ctx context.Context, db *sql.DB) error {
 	if err := db.QueryRowContext(ctx, `SELECT to_regclass('public.users') IS NOT NULL`).Scan(&exists); err != nil || !exists {
 		return errors.New("platform schema is missing; provision the database outside the application")
 	}
-	rows, err := db.QueryContext(ctx, `SELECT u.username,s.authority_version,s.rotation_version,d.connection_options,e.execution_mode,e.completed_statements,e.total_statements FROM users u CROSS JOIN sessions s CROSS JOIN managed_databases d CROSS JOIN migration_executions e LIMIT 0`)
+	rows, err := db.QueryContext(ctx, `SELECT u.username,s.authority_version,s.rotation_version,d.connection_options FROM users u CROSS JOIN sessions s CROSS JOIN managed_databases d LIMIT 0`)
 	if err != nil {
 		return errors.New("platform runtime schema is incompatible; provision it outside the application")
 	}

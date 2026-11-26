@@ -1,6 +1,12 @@
 # Integrated M2 API contract
 
-All paths include `/api`, use same-origin session cookies, and return JSON. Mutations require `Content-Type: application/json` and `X-CSRF-Token`. M1/admin page data keeps PascalCase; M2 resources use snake_case. Resource responses are objects, including empty lists, rather than bare DAO records/arrays.
+All paths include `/api`, use same-origin session cookies, and return JSON. Mutations require `Content-Type: application/json` and `X-CSRF-Token`. Existing page envelopes and admin page data keep PascalCase; M2 resources use snake_case. Resource responses are objects, including empty lists, rather than bare DAO records/arrays.
+
+## Changelog and dashboard
+
+The frontend route `/migrations` defaults to M2 committed history, also available with `view=history`. It loads database selection from `/api/databases` and executions from `/api/migrations/history`. The retired M1 `/api/migrations` endpoint returns 404.
+
+`GET /dashboard` returns `Recent`, containing up to eight committed executions across accessible databases, newest commit first. Each entry has `id` (execution UUID), `database_id`, `database_name`, `title`, `actor`, `operation`, `committed_at` and `version`, using the same identity and display values as committed history. Dashboard links use `/migrations?db=<database_id>&execution=<id>`. Failed and running attempts are available in Jobs/activity, rather than committed history.
 
 ## Definitions
 

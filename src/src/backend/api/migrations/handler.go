@@ -20,64 +20,36 @@ type Handler struct {
 }
 
 func (h Handler) Load(r *http.Request, data *response.Data) error {
-	editor := r.URL.Path == "/migrations/new"
-	if err := selection.Database(r, data, h.Databases, editor); err != nil {
+	if err := selection.Database(r, data, h.Databases, true); err != nil {
 		return err
 	}
 	if data.Database.ID == 0 {
 		return nil
 	}
 	var err error
-	if editor {
-		data.Schemas, err = h.Databases.Schemas(r.Context(), data.User.ID, data.Database.ID)
+	data.Schemas, err = h.Databases.Schemas(r.Context(), data.User.ID, data.Database.ID)
+	if err != nil {
+		return err
+	}
+	if r.Method != http.MethodPost {
+		data.DraftID, err = httpapi.ID(r.URL.Query().Get("draft"))
 		if err != nil {
 			return err
 		}
-		if r.Method != http.MethodPost {
-			data.DraftID, err = httpapi.ID(r.URL.Query().Get("draft"))
+		if data.DraftID > 0 {
+			draft, err := h.Migrations.Draft(r.Context(), data.User.ID, data.Database.ID, data.DraftID)
 			if err != nil {
 				return err
 			}
-			if data.DraftID > 0 {
-				draft, err := h.Migrations.Draft(r.Context(), data.User.ID, data.Database.ID, data.DraftID)
-				if err != nil {
-					return err
-				}
-				data.Description = draft.Title
-				data.SQL = draft.SQL
-				data.DraftUpdated = draft.UpdatedAt.Format(time.RFC3339Nano)
-			}
+			data.Description = draft.Title
+			data.SQL = draft.SQL
+			data.DraftUpdated = draft.UpdatedAt.Format(time.RFC3339Nano)
 		}
-		data.Drafts, err = h.Migrations.Drafts(r.Context(), data.User.ID, data.Database.ID, 100, 0)
-		return err
 	}
-	data.Offset, err = httpapi.Offset(r.URL.Query().Get("offset"))
-	if err != nil {
-		return err
-	}
-	data.History, err = h.Migrations.History(r.Context(), data.User.ID, data.Database.ID, 51, data.Offset)
-	if err != nil {
-		return err
-	}
-	data.HasMore = len(data.History) > 50
-	if data.HasMore {
-		data.History = data.History[:50]
-	}
-	data.Previous = max(0, data.Offset-50)
-	data.Next = data.Offset + 50
-	id, err := httpapi.ID(r.URL.Query().Get("id"))
-	if err != nil {
-		return err
-	}
-	if id > 0 {
-		execution, err := h.Migrations.Detail(r.Context(), data.User.ID, data.Database.ID, id)
-		if err != nil {
-			return err
-		}
-		data.Execution = &execution
-	}
-	return nil
+	data.Drafts, err = h.Migrations.Drafts(r.Context(), data.User.ID, data.Database.ID, 100, 0)
+	return err
 }
+
 func (h Handler) Action(w http.ResponseWriter, r *http.Request, data *response.Data) (bool, error) {
 	if err := selection.Database(r, data, h.Databases, true); err != nil {
 		return false, err

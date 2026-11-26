@@ -106,40 +106,6 @@ func TestHiddenReceiptDeletionRollsBackTheWholeMigration(t *testing.T) {
 	}
 }
 
-func TestWorkerPreservesExistingLegacyReceiptEvidence(t *testing.T) {
-	f, runner, original := receiptFixture(t)
-	_, err := f.dbs.Managed.ExecContext(f.ctx, `CREATE TABLE _schakker.migration_receipts(namespace text,attempt_id bigint,version bigint,sql_hash text,applied_at timestamptz);
-INSERT INTO _schakker.migration_receipts VALUES('legacy',1,1,'legacy-query-hash',clock_timestamp());
-CREATE FUNCTION public.erase_legacy_receipts() RETURNS integer LANGUAGE plpgsql AS $$BEGIN DELETE FROM _schakker.migration_receipts; RETURN 1; END$$`)
-	must(t, err)
-	id := enqueueDefinition(t, f, migration.DefinitionInput{Title: "Legacy receipt protection", UpSQL: "SELECT public.erase_legacy_receipts()", DownSQL: "SELECT 1"})
-	_, err = runner.RunOnce(f.ctx)
-	if !errors.Is(err, engines.ErrProtectedMetadata) {
-		t.Fatalf("existing receipt evidence was not protected: %v", err)
-	}
-	assertJob(t, f, id, "failed")
-	var rows int
-	must(t, f.dbs.Managed.QueryRowContext(f.ctx, `SELECT count(*) FROM _schakker.migration_receipts WHERE namespace='legacy' AND attempt_id=1 AND version=1 AND sql_hash='legacy-query-hash'`).Scan(&rows))
-	if rows != 1 || f.state(t).ActiveVersion != 1 {
-		t.Fatal("failed migration changed existing receipt evidence or the active version")
-	}
-	assertOriginalReceipt(t, f, original, 1)
-
-	// Receipt evidence must remain fully inspectable before the worker runs SQL.
-	_, err = f.dbs.Managed.ExecContext(f.ctx, `ALTER TABLE _schakker.migration_receipts ENABLE ROW LEVEL SECURITY`)
-	must(t, err)
-	id = enqueueDefinition(t, f, migration.DefinitionInput{Title: "Uninspectable legacy receipts", UpSQL: "INSERT INTO public.receipt_guard_demo VALUES(1,'must not run')", DownSQL: "DELETE FROM public.receipt_guard_demo WHERE id=1"})
-	_, err = runner.RunOnce(f.ctx)
-	if !errors.Is(err, engines.ErrProtectedMetadata) {
-		t.Fatalf("worker trusted inaccessible receipt evidence: %v", err)
-	}
-	assertJob(t, f, id, "failed")
-	must(t, f.dbs.Managed.QueryRowContext(f.ctx, `SELECT count(*) FROM public.receipt_guard_demo`).Scan(&rows))
-	if rows != 0 {
-		t.Fatal("worker executed SQL before validating receipt evidence")
-	}
-}
-
 func TestHiddenReceiptDDLAndSessionChangesAreRolledBack(t *testing.T) {
 	for _, tc := range []struct{ name, body string }{
 		{"receipt column", `ALTER TABLE _schakker.job_receipts ADD COLUMN unexpected boolean;`},

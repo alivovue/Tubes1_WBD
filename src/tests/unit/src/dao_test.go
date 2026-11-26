@@ -55,7 +55,7 @@ func TestDAODatabaseLockAlwaysReleases(t *testing.T) {
 		acquire.check = func(args []driver.NamedValue) { wantArg(t, args, 0, int64(-3)) }
 		release := execStep("SELECT pg_advisory_unlock(")
 		release.check = acquire.check
-		_, store, _ := newSQLStub(t, acquire, scalarStep("MAX(applied_version)", int64(5)), release)
+		_, store, _ := newSQLStub(t, acquire, scalarStep("active_version", int64(5)), release)
 		err := store.WithDatabaseLock(context.Background(), 3, func(locked *dao.Store) error {
 			version, err := locked.MigrationVersion(context.Background(), 3)
 			if err != nil {
@@ -73,39 +73,6 @@ func TestDAODatabaseLockAlwaysReleases(t *testing.T) {
 	wantError(t, store.WithDatabaseLock(context.Background(), 3, func(*dao.Store) error { return nil }), dao.ErrInvalid)
 	wantError(t, store.WithDatabaseLock(context.Background(), 0, func(*dao.Store) error { return nil }), dao.ErrInvalid)
 }
-func TestDAOHistoryPreservesPartialProgressAndAppliedVersions(t *testing.T) {
-	columns := []string{"id", "database", "draft", "executor", "username", "description", "sql", "attempted", "applied", "status", "error", "started", "finished", "mode", "completed", "total"}
-	rows := [][]driver.Value{
-		{int64(2), int64(3), nil, int64(7), "employee", "Partial DDL", "ALTER TABLE people ADD age INTEGER", int64(2), nil, "failed", "One statement committed", testTime, testTime, "non_atomic", int64(1), int64(2)},
-		{int64(1), int64(3), int64(4), int64(7), "employee", "Initial migration", "CREATE TABLE people(id INTEGER)", int64(1), int64(1), "succeeded", "", testTime, testTime, "transactional", int64(1), int64(1)},
-	}
-	_, store, _ := newSQLStub(t, queryStep("FROM migration_executions e", columns, rows...))
-	history, err := store.MigrationHistory(context.Background(), 3, 50, 0)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(history) != 2 || history[0].AppliedVersion != nil || history[0].CompletedStatements != 1 || history[0].TotalStatements != 2 || history[0].Mode != "non_atomic" {
-		t.Fatalf("partial execution history lost: %#v", history)
-	}
-	if history[1].AppliedVersion == nil || *history[1].AppliedVersion != 1 || history[1].DraftID == nil || *history[1].DraftID != 4 {
-		t.Fatal("successful execution history lost version or draft association")
-	}
-}
-func TestDraftDeletionRollsBackHistoryDetachmentOnFailure(t *testing.T) {
-	_, store, _ := newSQLStub(t,
-		sqlStep{kind: "begin"},
-		scalarStep("FROM migration_drafts WHERE database_id=$1 AND id=$2 FOR UPDATE", int64(4)),
-		execStep("UPDATE migration_executions SET draft_id=NULL WHERE database_id=$1 AND draft_id=$2"),
-		sqlStep{kind: "exec", query: "DELETE FROM migration_drafts", err: &pgconn.PgError{Code: "23503"}},
-		sqlStep{kind: "rollback"})
-	wantError(t, store.DeleteDraft(context.Background(), 3, 4), dao.ErrConflict)
-	_, missing, _ := newSQLStub(t,
-		sqlStep{kind: "begin"},
-		queryStep("FROM migration_drafts WHERE database_id=$1 AND id=$2 FOR UPDATE", []string{"id"}),
-		sqlStep{kind: "rollback"})
-	wantError(t, missing.DeleteDraft(context.Background(), 3, 4), dao.ErrNotFound)
-}
-
 func TestRuntimeIdentitySnapshotRejectsReuseOfAHistoricalID(t *testing.T) {
 	_, store, _ := newSQLStub(t, sqlStep{kind: "exec", query: "WHERE users.username=EXCLUDED.username", affected: 0})
 	wantError(t, store.RememberUser(context.Background(), dao.User{ID: 7, Username: "different.identity", DisplayName: "New account", Active: true}), dao.ErrConflict)

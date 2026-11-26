@@ -14,7 +14,7 @@ Scope follows section 6.1 / FE-01–FE-05 of the supplied Milestone 2 implementa
 | FE-04 | Polling job detail, job activity separate from committed history, execution details, exact execution-ID rollback pairing and Hide rollback. |
 | FE-05 | Rollback/forward review requests, PostgreSQL batch configuration, committed/reverted rows and batches, cursor, checkpoint retry, cancellation review, partial/uncertain/compensation states. |
 
-The navigation entry **Migration workflow** opens `/migrations?view=definitions`. The four views are `definitions`, `reviews`, `jobs` and `history`; all support `db=<database-id>`. Existing `/migrations/new` (SQL analysis and M1 execution) and `/migrations` (M1 history) remain available, with links into the new workflow. Query parameters reuse Go's existing HTML routes, so deep links do not need new page handlers.
+The navigation entry **Migration workflow** opens `/migrations?view=definitions`. The four views are `definitions`, `reviews`, `jobs` and `history`; all support `db=<database-id>`. **Changelog** opens `/migrations`, which defaults to M2 committed history; `view=history` also selects that view. Dashboard recent migrations link to these same committed executions. `/migrations/new` retains SQL analysis and analysis drafts, with a handoff into workflow definitions. Query parameters reuse Go's existing HTML routes, so deep links do not need new page handlers.
 
 Selection parameters: `definition`, `copy`, `review`, `job`, `execution`; committed history also uses `hide_rollback=true` and a server-provided `cursor`. Changing databases preserves the workflow view and drops the old selection.
 

@@ -65,13 +65,6 @@ func (w *Workflow) CreateDefinition(ctx context.Context, actor, database int64, 
 		if err := tx.LockDatabase(ctx, database); err != nil {
 			return err
 		}
-		blocked, err := tx.BlockingSynchronousHistory(ctx, database)
-		if err != nil {
-			return err
-		}
-		if blocked {
-			return ErrWorkflowConflict
-		}
 		id, err := tx.CreateDefinition(ctx, database, actor, strings.TrimSpace(in.Title))
 		if err != nil {
 			return err

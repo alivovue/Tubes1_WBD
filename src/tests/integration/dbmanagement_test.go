@@ -308,7 +308,7 @@ func TestExplorerReadsCommittedManualDataAndSchemaChanges(t *testing.T) {
 	if !strings.Contains(get().Body.String(), "manual_department") {
 		t.Fatal("explorer did not load the external schema change")
 	}
-	history, err := f.migrations.History(f.ctx, reader.ID, target.ID, 50, 0)
+	history, err := f.migrations.Workflow().History(f.ctx, reader.ID, target.ID, false, 50, 0)
 	must(t, err)
 	if len(history) != 0 {
 		t.Fatal("external changes were incorrectly recorded as platform migrations")

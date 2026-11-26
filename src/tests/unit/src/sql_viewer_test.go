@@ -38,7 +38,7 @@ func TestSQLViewerValidatesReadQueries(t *testing.T) {
 			"SELECT nextval('employees_id_seq')", "SELECT set_config('transaction_read_only','off',true)",
 			"SELECT pg_read_file('/etc/passwd')", "SELECT dblink_exec('remote', 'DELETE FROM employees')",
 			"SELECT custom_function()", "SELECT public.count(*) FROM employees", `SELECT "custom"()`,
-			"SELECT * FROM _schakker.migration_receipts", "SELECT @x := 1", "COMMIT", "EXPLAIN ANALYZE DELETE FROM employees",
+			"SELECT * FROM _schakker.job_receipts", "SELECT @x := 1", "COMMIT", "EXPLAIN ANALYZE DELETE FROM employees",
 		} {
 			t.Run(dbms+"/reject/"+query, func(t *testing.T) {
 				_, err := adapters.ValidateReadQuery(query, dbms)

@@ -208,11 +208,13 @@ func TestMigrationAPIAnalysisDraftAndRetiredActions(t *testing.T) {
 		form.Set("id", "1")
 		form.Set("outcome", "applied")
 		path := "/migrations/new"
+		want := http.StatusBadRequest
 		if action == "reconcile" {
 			path = "/migrations"
+			want = http.StatusNotFound
 		}
 		blocked := apiRequest(t, handler, http.MethodPost, path, cookie, form)
-		if blocked.Code != http.StatusBadRequest {
+		if blocked.Code != want {
 			t.Fatalf("retired action %q was accepted: %d %s", action, blocked.Code, blocked.Body.String())
 		}
 	}
@@ -223,7 +225,7 @@ func TestMigrationAPIAnalysisDraftAndRetiredActions(t *testing.T) {
 			t.Fatal("retired browser action executed SQL")
 		}
 	}
-	entries, err := f.migrations.History(f.ctx, f.editor, target.ID, 50, 0)
+	entries, err := f.migrations.Workflow().History(f.ctx, f.editor, target.ID, false, 50, 0)
 	must(t, err)
 	if len(entries) != 0 {
 		t.Fatal("blocked browser execution created migration history")

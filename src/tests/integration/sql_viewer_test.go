@@ -56,7 +56,7 @@ func TestSQLViewerReadsWithoutWritingOrRecordingHistory(t *testing.T) {
 	if len(result.Rows) != dbmanagement.ViewerRowLimit || !result.HasMore {
 		t.Fatalf("viewer did not cap a large result: %d rows, more=%v", len(result.Rows), result.HasMore)
 	}
-	history, err := f.migrations.History(f.ctx, reader.ID, target.ID, 50, 0)
+	history, err := f.migrations.Workflow().History(f.ctx, reader.ID, target.ID, false, 50, 0)
 	must(t, err)
 	if len(history) != 0 || f.tableExists(t, "viewer_copy") {
 		t.Fatal("viewer changed schema or wrote migration history")
@@ -150,7 +150,7 @@ func TestSQLViewerMariaDBReadOnlyAndVisualQuery(t *testing.T) {
 	wantError(t, err, dbmanagement.ErrInvalid)
 	_, err = f.databases.ReadQuery(f.ctx, reader.ID, target.ID, "DELETE FROM employees")
 	wantError(t, err, dbmanagement.ErrReadOnly)
-	history, err := f.migrations.History(f.ctx, reader.ID, target.ID, 50, 0)
+	history, err := f.migrations.Workflow().History(f.ctx, reader.ID, target.ID, false, 50, 0)
 	must(t, err)
 	if len(history) != 0 {
 		t.Fatal("MariaDB read query created migration history")

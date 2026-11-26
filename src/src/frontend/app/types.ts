@@ -54,22 +54,10 @@ export type Rows = {
   HasMore: boolean;
   Duration: number;
 };
-export type Execution = {
-  ID: number;
-  DatabaseID: number;
-  DatabaseName?: string;
-  Description: string;
-  SQL: string;
-  Username: string;
-  StartedAt: string;
-  Status: string;
-  Mode: string;
-  CompletedStatements: number;
-  TotalStatements: number;
-  AppliedVersion?: number;
-  AttemptedVersion: number;
-  ErrorMessage: string;
-};
+export type RecentExecution = Pick<
+  MigrationExecution,
+  "id" | "database_id" | "title" | "actor" | "operation" | "committed_at" | "version"
+> & { database_name: string };
 export type Draft = {
   ID: number;
   Title: string;
@@ -150,7 +138,7 @@ export type PageData = {
   Database: Database;
   CanEdit: boolean;
   EditableCount: number;
-  Recent: Execution[] | null;
+  Recent: RecentExecution[] | null;
   Schemas: { Name: string }[] | null;
   Tables: { Name: string }[] | null;
   Schema: string;
@@ -163,8 +151,6 @@ export type PageData = {
   Previous: number;
   Next: number;
   HasMore: boolean;
-  History: Execution[] | null;
-  Execution: Execution | null;
   Drafts: Draft[] | null;
   DraftID: number;
   DraftUpdated: string;

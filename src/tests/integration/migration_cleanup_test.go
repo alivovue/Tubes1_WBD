@@ -15,46 +15,31 @@ import (
 	"tubes1_wbd/backend/migration"
 	"tubes1_wbd/backend/migration/diff"
 	pgengine "tubes1_wbd/backend/migration/engines/postgres"
+	"tubes1_wbd/database/dao"
 )
 
-func TestDeletingLegacyDraftPreservesExistingHistory(t *testing.T) {
-	f := newFixture(t, true)
-	target := f.register(t)
-	f.grant(t, f.editor, target.ID, access.ViewEdit)
-	draft, err := f.migrations.SaveDraft(f.ctx, f.editor, target.ID, migration.DraftInput{Title: "Reusable draft", SQL: "SELECT 1"})
+func TestDeletingAnalysisDraftPreservesCommittedHistory(t *testing.T) {
+	f, _, runner := p3Fixture(t)
+	draft, err := f.migrations.SaveDraft(f.ctx, f.editor, f.database, migration.DraftInput{Title: "Analysis draft", SQL: "SELECT 1;"})
 	must(t, err)
-	// Seed historical M1 records without invoking the retired execution service.
-	_, err = f.dbs.Website.ExecContext(f.ctx, `INSERT INTO migration_executions(database_id,draft_id,executed_by,sql_text,attempted_version,applied_version,status,completed_statements,total_statements,finished_at)
-VALUES($1,$2,$3,'SELECT 1',1,1,'succeeded',1,1,clock_timestamp()),
-($1,$2,$3,'SELECT 1/0',2,NULL,'failed',0,1,clock_timestamp())`, target.ID, draft.ID, f.editor)
+	kept, err := f.migrations.SaveDraft(f.ctx, f.editor, f.database, migration.DraftInput{Title: "Keep draft", SQL: "SELECT 2;"})
 	must(t, err)
-	before, err := f.migrations.History(f.ctx, f.editor, target.ID, 50, 0)
+	id := enqueueP3(t, f, "draft_cleanup")
+	_, err = runner.RunOnce(f.ctx)
 	must(t, err)
-	if len(before) != 2 {
-		t.Fatal("legacy execution fixture is incomplete")
-	}
-	other, err := f.migrations.SaveDraft(f.ctx, f.editor, target.ID, migration.DraftInput{Title: "Keep this draft", SQL: "SELECT 2"})
+	assertJob(t, f, id, "succeeded")
+	before, err := f.workflow.History(f.ctx, f.reader.ID, f.database, false, 50, 0)
 	must(t, err)
-	reader := f.user(t, "draft.reader")
-	f.grant(t, reader.ID, target.ID, access.ViewOnly)
-	wantError(t, f.migrations.DeleteDraft(f.ctx, reader.ID, target.ID, draft.ID), access.ErrForbidden)
-	must(t, f.migrations.DeleteDraft(f.ctx, f.editor, target.ID, draft.ID))
-	_, err = f.migrations.Draft(f.ctx, f.editor, target.ID, draft.ID)
-	wantError(t, err, access.ErrNotFound)
-	_, err = f.migrations.Draft(f.ctx, f.editor, target.ID, other.ID)
+	wantError(t, f.migrations.DeleteDraft(f.ctx, f.reader.ID, f.database, draft.ID), access.ErrForbidden)
+	must(t, f.migrations.DeleteDraft(f.ctx, f.editor, f.database, draft.ID))
+	_, err = f.migrations.Draft(f.ctx, f.editor, f.database, draft.ID)
+	wantError(t, err, dao.ErrNotFound)
+	_, err = f.migrations.Draft(f.ctx, f.editor, f.database, kept.ID)
 	must(t, err)
-	for _, expected := range before {
-		entry, err := f.migrations.Detail(f.ctx, reader.ID, target.ID, expected.ID)
-		must(t, err)
-		expected.DraftID = nil
-		if !reflect.DeepEqual(entry, expected) {
-			t.Fatalf("deleting the draft changed execution history: got %#v, want %#v", entry, expected)
-		}
-	}
-	version, err := f.runtimeStore.MigrationVersion(f.ctx, target.ID)
+	after, err := f.workflow.History(f.ctx, f.reader.ID, f.database, false, 50, 0)
 	must(t, err)
-	if version != 1 {
-		t.Fatal("deleting the draft changed the migration version")
+	if len(after) != 1 || !reflect.DeepEqual(before, after) {
+		t.Fatal("deleting an analysis draft changed committed M2 history")
 	}
 }
 
@@ -118,7 +103,7 @@ CREATE TABLE public.cleanup_children(id INTEGER PRIMARY KEY,parent_id INTEGER,CO
 	if response.Code != http.StatusConflict || !strings.Contains(response.Body.String(), "cleanup_children_parent_fk") || !strings.Contains(response.Body.String(), "CASCADE") {
 		t.Fatalf("dependency error was not rendered with its blocker and CASCADE guidance: %d", response.Code)
 	}
-	history, err := f.migrations.History(f.ctx, f.editor, target.ID, 50, 0)
+	history, err := f.migrations.Workflow().History(f.ctx, f.editor, target.ID, false, 50, 0)
 	must(t, err)
 	if len(history) != 0 {
 		t.Fatal("a blocked visual change created execution history")

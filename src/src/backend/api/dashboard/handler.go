@@ -25,15 +25,27 @@ func (h Handler) Load(r *http.Request, data *response.Data) error {
 		if db.Permission == access.ViewEdit {
 			data.EditableCount++
 		}
-		entries, err := h.Migrations.History(r.Context(), data.User.ID, db.ID, 5, 0)
+		workflow := h.Migrations.Workflow()
+		entries, err := workflow.History(r.Context(), data.User.ID, db.ID, false, 8, 0)
+		if err != nil {
+			return err
+		}
+		if len(entries) == 0 {
+			continue
+		}
+		view, err := workflow.Resources(r.Context(), data.User.ID, db.ID)
 		if err != nil {
 			return err
 		}
 		for _, entry := range entries {
-			data.Recent = append(data.Recent, response.RecentExecution{MigrationExecution: entry, DatabaseName: db.Name})
+			summary, err := view.ExecutionSummary(entry)
+			if err != nil {
+				return err
+			}
+			data.Recent = append(data.Recent, response.RecentExecution{ExecutionSummary: summary, DatabaseName: db.Name})
 		}
 	}
-	sort.Slice(data.Recent, func(i, j int) bool { return data.Recent[i].StartedAt.After(data.Recent[j].StartedAt) })
+	sort.SliceStable(data.Recent, func(i, j int) bool { return data.Recent[i].CommittedAt.After(data.Recent[j].CommittedAt) })
 	if len(data.Recent) > 8 {
 		data.Recent = data.Recent[:8]
 	}
