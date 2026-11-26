@@ -7,8 +7,8 @@ bash src/ops/observability/init.sh
 docker compose -f src/ops/observability/compose.yaml up -d
 # Set this in each terminal, or in each application's .env before its launcher:
 export OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4318
-bash run-admin.sh
-# Other terminals: bash run.sh; bash run-worker.sh
+bash src/tools/launchers/run-admin.sh
+# Other terminals: bash src/tools/launchers/run.sh; bash src/tools/launchers/run-worker.sh
 ```
 
 Grafana is at `http://127.0.0.1:3030`, user `admin`; its generated password is in `src/ops/observability/secrets/grafana_password`. The dashboard and Prometheus/Tempo/Loki data sources are provisioned automatically. No anonymous Grafana access is enabled. Service versions are pinned in `compose.yaml`.

@@ -1,6 +1,6 @@
 # Repository and application boundaries
 
-All application, library, schema, test, tooling and operations code lives under `src/`. The repository root is the Go and npm workspace. `go.work` includes the two applications, shared backend, schemas, tests and tools. `package.json` includes the user frontend, admin frontend and shared UI package. Root launch commands forward to implementations under `src/tools/launchers/`.
+All application, library, schema, test, tooling and operations code lives under `src/`. The repository root is the Go and npm workspace. `go.work` includes the two applications, shared backend, schemas, tests and tools. `package.json` includes the user frontend, admin frontend and shared UI package. The root `run.sh`, `run.bat` and `run.ps1` start the complete local development environment through implementations under `src/tools/launchers/`. Individual user, admin and worker launchers are kept in that folder for separately configured services.
 
 | Directory | Responsibility |
 | --- | --- |

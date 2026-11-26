@@ -7,10 +7,10 @@ The merged application connects both React SPAs to the Go authority, workflow, d
 For a working local development environment, run this from the repository root in PowerShell:
 
 ```powershell
-.\run-dev.bat
+.\run.bat
 ```
 
-Git Bash on Windows can use `bash ./run-dev.sh`; it delegates to the same PowerShell launcher. Linux/WSL uses `bash ./run-dev.sh` with Go, Node/npm and PostgreSQL server tools installed in that environment. Windows does not require WSL. Shell scripts use LF line endings, enforced by `.gitattributes`.
+Git Bash on Windows can use `bash ./run.sh`; it delegates to the same PowerShell launcher. Linux/WSL uses `bash ./run.sh` with Go, Node/npm and PostgreSQL server tools installed in that environment. Windows does not require WSL. Shell scripts use LF line endings, enforced by `.gitattributes`.
 
 The development launcher builds both SPAs and the actual admin, user API and worker binaries. It creates a private PostgreSQL cluster on an available loopback port, separate admin/platform/target databases, restricted application roles, persistent random keys and an initial administrator. It registers a demo target with `employees` and `demo_counters` tables and creates two access groups with separate editor and View Only leaders. Then it runs all three application processes. Public development listeners bind to `127.0.0.1`; the application ports are 3000 and 3001, authority 3002, and metrics 9464–9466.
 
@@ -31,30 +31,30 @@ Use the same hostname consistently during a session: `localhost` and `127.0.0.1`
 Press Ctrl+C in the launcher terminal to stop, or use another terminal:
 
 ```powershell
-.\run-dev.bat -Stop
+.\run.bat -Stop
 ```
 
-Git Bash also accepts `bash ./run-dev.sh --stop`. Use `-SkipBuild` on Windows (or `--skip-build` in Bash) to reuse the last compiled binaries. Rebuild after source changes. `-Check` / `--check` starts the real services, authenticates all three accounts, submits a reversible migration, collects both leader approvals, waits for the worker commit, then approves and executes rollback and stops. Check history remains in the local development database.
+Git Bash also accepts `bash ./run.sh --stop`. Use `-SkipBuild` on Windows (or `--skip-build` in Bash) to reuse the last compiled binaries. Rebuild after source changes. `-Check` / `--check` starts the real services, authenticates all three accounts, submits a reversible migration, collects both leader approvals, waits for the worker commit, then approves and executes rollback and stops. Check history remains in the local development database.
 
-This mode uses its own private configuration and leaves the existing application `.env` files and team databases alone. To connect to team databases, use the standard three-process launchers below with the actual team URLs, original keys and shared service token. Copying `.env.example` alone leaves the required values empty. Standard launchers now detect an empty database URL before installing/building and point to the local launcher.
+This mode uses its own private configuration and leaves the existing application `.env` files and team databases alone. The root `run` command always selects this complete development mode. To connect to team databases, use the individual launchers under `src/tools/launchers/` below with the actual team URLs, original keys and shared service token. Copying `.env.example` alone leaves the required values empty. Individual launchers detect an empty database URL before installing/building and point to the root launcher.
 
 Verified on Windows on 22 November 2026: PowerShell and Git Bash launch paths; restart with persistent accounts/data; stop command; all eight backend unit-test packages; five focused real PostgreSQL integration tests for startup/schema/SPA migration/batching; `go vet` for the development command; and real browser admin/editor login with the actual Groups and migration workspace pages. A real two-leader approval → enqueue → worker commit → approved rollback completed on the local cluster. The browser pages loaded without runtime exceptions. Linux/WSL was not executed in this Windows verification.
 
-## Start all three processes
+## Start individual processes with team databases
 
 Provision two separate application databases, restricted runtime roles, an initial administrator, existing master keys and a shared internal service token outside the application. Use `src/apps/user/.env.example` and `src/apps/admin/.env.example`; both `.env` files are ignored by Git. The complete fresh schemas are `src/schemas/platform/schema.sql` and `src/schemas/admin/schema.sql`. These scripts create tables and should only be applied to empty application databases with suitable ownership/grants. They do not bootstrap the initial administrator.
 
-Fresh databases use the canonical schema directly, including attempt snapshots and write-once protection. `src/schemas/platform/jobs_upgrade.sql` only upgrades the P2 queue schema to P3's columns; it is not an M1-to-M2 migration or a substitute for the current complete schema. Startup and launchers validate externally provisioned schemas and do not modify them.
+Fresh databases use the canonical schema directly, including attempt snapshots and write-once protection. `src/schemas/platform/jobs_upgrade.sql` only upgrades the P2 queue schema to P3's columns; it is not an M1-to-M2 migration or a substitute for the current complete schema. Startup through individual service launchers validates externally provisioned schemas without modifying them.
 
 From the repository root, run each command in a separate terminal:
 
 ```bash
-bash ./run-admin.sh
-bash ./run.sh
-bash ./run-worker.sh
+bash src/tools/launchers/run-admin.sh
+bash src/tools/launchers/run.sh
+bash src/tools/launchers/run-worker.sh
 ```
 
-Windows uses `run-admin.bat`, `run.bat`, `run-worker.bat`, or `run.ps1 -Admin`, `run.ps1`, `run.ps1 -Worker`. The worker loads the user application's `.env`, builds `src/apps/user/cmd/worker`, and runs from the user application directory. It does not build the frontend or start a web listener. A direct binary reads exported environment variables only.
+Windows uses `src\tools\launchers\run-admin.bat`, `src\tools\launchers\run.bat`, and `src\tools\launchers\run-worker.bat`, or `src\tools\launchers\run.ps1` with `-Admin`, no switch, or `-Worker`. The worker loads the user application's `.env`, builds `src/apps/user/cmd/worker`, and runs from the user application directory. It does not build the frontend or start a web listener. A direct binary reads exported environment variables only.
 
 The admin private authority defaults to `127.0.0.1:3002`; public apps default to 3000/3001. Production authority uses trusted HTTPS; loopback HTTP is permitted for development. The worker needs the same platform URL, signing key, control-plane URL and internal token as the user API. Optional settings: concurrency 1–32 (default 2), lease 3–300 seconds (default 30), job timeout 10–86400 seconds (default 1800).
 
@@ -81,7 +81,7 @@ From the repository root:
 ```bash
 npm run build
 npm run typecheck:shared
-go -C tests test -count=1 -timeout=12m ./...
+go -C src/tests test -count=1 -timeout=12m ./...
 # Requires a local Chromium browser; synthetic API fixtures, no database writes:
 npm run verify:person1
 ```

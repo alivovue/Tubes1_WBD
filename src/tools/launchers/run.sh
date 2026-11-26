@@ -7,7 +7,7 @@ case "${1:-}" in
     '') ;;
     --admin) application_mode=admin ;;
     --worker) application_mode=worker ;;
-    *) printf '%s\n' 'Usage: bash ./run.sh [--admin|--worker]' >&2; exit 2 ;;
+    *) printf '%s\n' 'Usage: bash src/tools/launchers/run.sh [--admin|--worker]' >&2; exit 2 ;;
 esac
 
 repository_directory="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../.." && pwd)"
@@ -16,7 +16,7 @@ case "$(uname -s)" in
         windows_arguments=()
         if [[ "$application_mode" == admin ]]; then windows_arguments+=(-Admin); fi
         if [[ "$application_mode" == worker ]]; then windows_arguments+=(-Worker); fi
-        MSYS_NO_PATHCONV=1 exec powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "$(cygpath -w "$repository_directory/run.ps1")" "${windows_arguments[@]}"
+        MSYS_NO_PATHCONV=1 exec powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "$(cygpath -w "$repository_directory/src/tools/launchers/run.ps1")" "${windows_arguments[@]}"
         ;;
 esac
 project_directory="$repository_directory"
@@ -30,7 +30,7 @@ if [[ -f .env ]]; then
 fi
 if [[ "$application_mode" == admin && -z "${SCHAKKER_ADMIN_DATABASE_URL:-}" ]] ||
    [[ "$application_mode" != admin && -z "${SCHAKKER_PLATFORM_DATABASE_URL:-}${SCHAKKER_DATABASE_URL:-}${DATABASE_URL:-}" ]]; then
-    printf '%s\n' 'Database configuration is empty. Use bash ./run-dev.sh for local development, or supply the team database configuration in the application .env.' >&2
+    printf '%s\n' 'Database configuration is empty. Use bash ./run.sh from the repository root for local development, or supply the team database configuration in the application .env.' >&2
     exit 1
 fi
 if [[ "$application_mode" != admin && -n "${SCHAKKER_STATE_DIR:-}" && "$SCHAKKER_STATE_DIR" != /* ]]; then

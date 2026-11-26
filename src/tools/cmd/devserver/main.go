@@ -142,7 +142,7 @@ func run() error {
 	fmt.Println("Admin:    http://localhost:3001")
 	fmt.Println("Login accounts and generated password:", filepath.Join(state, "credentials.txt"))
 	fmt.Println("Service logs:", state)
-	fmt.Println("Press Ctrl+C, or run .\\run-dev.bat -Stop, to stop development.")
+	fmt.Println("Press Ctrl+C, or run .\\run.bat -Stop / bash ./run.sh --stop, to stop development.")
 	ticker := time.NewTicker(300 * time.Millisecond)
 	defer ticker.Stop()
 	for {

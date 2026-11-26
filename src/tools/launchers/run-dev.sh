@@ -10,12 +10,12 @@ for argument in "$@"; do
         --check|-Check) check=true; windows_arguments+=(-Check) ;;
         --stop|-Stop) stop=true; windows_arguments+=(-Stop) ;;
         --skip-build|-SkipBuild) skip_build=true; windows_arguments+=(-SkipBuild) ;;
-        *) printf '%s\n' 'Usage: bash ./run-dev.sh [--check|--stop|--skip-build]' >&2; exit 2 ;;
+        *) printf '%s\n' 'Usage: bash ./run.sh [--check|--stop|--skip-build]' >&2; exit 2 ;;
     esac
 done
 case "$(uname -s)" in
     MINGW*|MSYS*|CYGWIN*)
-        MSYS_NO_PATHCONV=1 exec powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "$(cygpath -w "$repository_directory/run-dev.ps1")" "${windows_arguments[@]}"
+        MSYS_NO_PATHCONV=1 exec powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "$(cygpath -w "$repository_directory/src/tools/launchers/run-dev.ps1")" "${windows_arguments[@]}"
         ;;
 esac
 cd "$repository_directory"
