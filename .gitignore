@@ -1,29 +1,22 @@
 node_modules/
-/src/src/frontend/dist/
-/src/src/bin/
 .env
 .env.*
-!/src/src/.env.example
-/src/src/.test-postgres/
-/src/src/.test-postgres.log
-/src/src/.schakker/
-/src/.schakker/
-/src/.test-postgres/
-/src/.test-postgres.log
-/src/bin/
+!/src/apps/user/.env.example
+!/src/apps/admin/.env.example
+.schakker/
+.test-postgres/
+.test-postgres.log
+/src/apps/*/frontend/dist/
+/src/apps/*/bin/
+/src/tools/bin/
 /src/tests/output/*
 !/src/tests/output/.gitkeep
-/src/src/frontend/public/*
-!/src/src/frontend/public/sc logo.png
+/src/apps/user/frontend/public/*
+!/src/apps/user/frontend/public/sc logo.png
 
-/src/src-admin/frontend/dist/
-/src/src-admin/bin/
-
-!/src/src-admin/.env.example
-
-# Disposable bonus fixtures, observability state, and local scan databases.
-/src/observability/secrets/
-/src/observability/data/
+# Disposable fixtures, observability state and scan outputs.
+/src/ops/observability/secrets/
+/src/ops/observability/data/
 /src/tests/k6/fixture.json
 /src/tests/k6/summary.json
 /codeql-results/

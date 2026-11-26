@@ -13,6 +13,7 @@ require (
 	golang.org/x/crypto v0.58.0
 	google.golang.org/protobuf v1.36.12
 	schakker_shared v0.0.0
+	schakker_schemas v0.0.0
 	tubes1_wbd v0.0.0
 	tubes1_wbd_admin v0.0.0
 )
@@ -53,8 +54,10 @@ require (
 	google.golang.org/grpc v1.83.2 // indirect
 )
 
-replace tubes1_wbd => ../src
+replace tubes1_wbd => ../apps/user
 
-replace tubes1_wbd_admin => ../src-admin
+replace tubes1_wbd_admin => ../apps/admin
 
 replace schakker_shared => ../shared/backend
+
+replace schakker_schemas => ../schemas

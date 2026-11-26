@@ -28,7 +28,7 @@ Shared frontend behavior lives in `src/shared/frontend/src/app/`: `SessionProvid
 
 ## Verification and evidence
 
-From `src/`:
+From the repository root:
 
 ```powershell
 npm ci

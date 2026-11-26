@@ -20,13 +20,13 @@ Open:
 - Administrator: http://localhost:3001 — username `dev.admin`.
 - View Only approval leader: http://localhost:3000 — username `dev.reader`.
 
-The generated password for these local accounts is stored privately in `src/.schakker/dev/credentials.txt`. Read it with:
+The generated password for these local accounts is stored privately in `.schakker/dev/credentials.txt`. Read it with:
 
 ```powershell
-notepad .\src\.schakker\dev\credentials.txt
+notepad .\.schakker\dev\credentials.txt
 ```
 
-Use the same hostname consistently during a session: `localhost` and `127.0.0.1` have separate cookies. The local data, keys and history persist under the Git-ignored `src/.schakker/dev/` directory. Keep this directory to retain the same database and encryption keys on restart. Service activity is in `admin.log`, `user.log`, `worker.log` and `setup.log` in that directory. The private cluster is stopped with the applications; the installed Windows PostgreSQL service is separate.
+Use the same hostname consistently during a session: `localhost` and `127.0.0.1` have separate cookies. The local data, keys and history persist under the Git-ignored `.schakker/dev/` directory. Keep this directory to retain the same database and encryption keys on restart. Service activity is in `admin.log`, `user.log`, `worker.log` and `setup.log` in that directory. The private cluster is stopped with the applications; the installed Windows PostgreSQL service is separate.
 
 Press Ctrl+C in the launcher terminal to stop, or use another terminal:
 
@@ -42,9 +42,9 @@ Verified on Windows on 22 November 2026: PowerShell and Git Bash launch paths; r
 
 ## Start all three processes
 
-Provision two separate application databases, restricted runtime roles, an initial administrator, existing master keys and a shared internal service token outside the application. Use `src/src/.env.example` and `src/src-admin/.env.example`; both `.env` files are ignored by Git. The complete fresh schemas are `src/tests/fixtures/website/schema.sql` and `src/tests/fixtures/admin/schema.sql`. These scripts create tables and should only be applied to empty application databases with suitable ownership/grants. They do not bootstrap the initial administrator.
+Provision two separate application databases, restricted runtime roles, an initial administrator, existing master keys and a shared internal service token outside the application. Use `src/apps/user/.env.example` and `src/apps/admin/.env.example`; both `.env` files are ignored by Git. The complete fresh schemas are `src/schemas/platform/schema.sql` and `src/schemas/admin/schema.sql`. These scripts create tables and should only be applied to empty application databases with suitable ownership/grants. They do not bootstrap the initial administrator.
 
-Fresh databases use the complete fixture schema directly, including attempt snapshots and write-once protection. `src/src/database/dao/jobs_upgrade.sql` only upgrades the P2 queue schema to P3's columns; it is not an M1-to-M2 migration or a substitute for the current complete schema. Startup and launchers validate externally provisioned schemas and do not modify them.
+Fresh databases use the canonical schema directly, including attempt snapshots and write-once protection. `src/schemas/platform/jobs_upgrade.sql` only upgrades the P2 queue schema to P3's columns; it is not an M1-to-M2 migration or a substitute for the current complete schema. Startup and launchers validate externally provisioned schemas and do not modify them.
 
 From the repository root, run each command in a separate terminal:
 
@@ -54,7 +54,7 @@ bash ./run.sh
 bash ./run-worker.sh
 ```
 
-Windows uses `run-admin.bat`, `run.bat`, `run-worker.bat`, or `run.ps1 -Admin`, `run.ps1`, `run.ps1 -Worker`. The worker loads the user application's `.env`, builds `src/src/cmd/worker`, and runs from the user application directory. It does not build the frontend or start a web listener. A direct binary reads exported environment variables only.
+Windows uses `run-admin.bat`, `run.bat`, `run-worker.bat`, or `run.ps1 -Admin`, `run.ps1`, `run.ps1 -Worker`. The worker loads the user application's `.env`, builds `src/apps/user/cmd/worker`, and runs from the user application directory. It does not build the frontend or start a web listener. A direct binary reads exported environment variables only.
 
 The admin private authority defaults to `127.0.0.1:3002`; public apps default to 3000/3001. Production authority uses trusted HTTPS; loopback HTTP is permitted for development. The worker needs the same platform URL, signing key, control-plane URL and internal token as the user API. Optional settings: concurrency 1–32 (default 2), lease 3–300 seconds (default 30), job timeout 10–86400 seconds (default 1800).
 
@@ -79,11 +79,11 @@ For a paused partial batch, request cancellation review from its job detail. Eve
 From the repository root:
 
 ```bash
-npm --prefix src run build
-npm --prefix src run typecheck:shared
-go -C src/tests test -count=1 -timeout=12m ./...
+npm run build
+npm run typecheck:shared
+go -C tests test -count=1 -timeout=12m ./...
 # Requires a local Chromium browser; synthetic API fixtures, no database writes:
-npm --prefix src run verify:person1
+npm run verify:person1
 ```
 
 Set `TMPDIR` to a spacious writable directory when the root disk is nearly full. Go integration fixtures are isolated temporary databases and are removed after the suite. `SCHAKKER_POSTGRES_BIN` selects local PostgreSQL server tools; MariaDB tools are optional. Browser evidence defaults to `docs/qa/person1`; `SCHAKKER_QA_OUTPUT` can redirect new evidence to a temporary directory.

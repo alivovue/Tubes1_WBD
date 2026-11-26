@@ -1,56 +1,59 @@
 # Schakker
 
-Untuk langsung menjalankan development lokal dari root repositori pada Windows:
+Schakker menyediakan aplikasi pengguna dan administrasi terpisah untuk pengelolaan database dan migrasi SQL dengan review, durable queue, worker PostgreSQL dan execution history.
+
+## Mulai development lokal
+
+Dari root repositori, gunakan salah satu launcher berikut dengan Go 1.26+, Node.js 22.12+ / npm dan PostgreSQL server tools terpasang:
 
 ```powershell
 .\run-dev.bat
 ```
 
-Perintah ini menyiapkan database lokal terpisah, akun awal dan key, lalu menjalankan admin (`http://localhost:3001`), aplikasi pengguna (`http://localhost:3000`) dan worker. Login admin `dev.admin`, pengguna `dev.editor`, dan leader View Only `dev.reader`; password hasil generate ada di `src/.schakker/dev/credentials.txt`. Git Bash dapat memakai `bash ./run-dev.sh`. Hentikan dengan Ctrl+C atau `.\run-dev.bat -Stop`. Data development tersimpan untuk pemakaian berikutnya. Lihat [panduan development lokal](docs/m2-integration.md#run-locally-without-team-credentials). Koneksi database tim tetap memakai konfigurasi `.env` tim melalui launcher standar di bawah.
+```bash
+bash ./run-dev.sh
+```
 
-Milestone 2 sudah menghubungkan kedua SPA, authority/group leader, immutable revision dan approval, durable queue, worker PostgreSQL, batch/recovery, serta execution history untuk seluruh attempt yang selesai, termasuk gagal. Buka **Migration workflow** untuk alur draft → review → queue → execution; gunakan admin **Groups** untuk menunjuk leader. Lihat [panduan integrasi dan batasan](docs/m2-integration.md) serta [kontrak API aktual](docs/m2-frontend-api.md).
+Launcher membangun kedua frontend dan menjalankan backend pengguna, backend admin serta worker dengan database lokal terpisah. Buka pengguna di `http://localhost:3000` atau admin di `http://localhost:3001`. Akun awal: `dev.editor`, `dev.reader` dan `dev.admin`; password hasil generate ada di `.schakker/dev/credentials.txt`. Data dan key development tetap tersimpan di `.schakker/dev/`, yang diabaikan Git. Hentikan dengan Ctrl+C atau `run-dev.bat -Stop` / `bash run-dev.sh --stop`.
 
-Source workspace Schakker berada di folder `src/` repositori. Di dalamnya terdapat aplikasi pengguna (`src/src/` dari root repositori), aplikasi administrasi (`src/src-admin/`), library bersama (`src/shared/`), serta konfigurasi Go/npm dan test integrasi. Launcher Bash dan Windows berada di root repositori.
+Jalankan `run-dev.bat -Check` atau `bash run-dev.sh --check` untuk memeriksa login, dua approval leader, enqueue, worker commit dan rollback pada layanan serta database asli, kemudian berhenti. [Panduan development dan operasi](docs/m2-integration.md) menjelaskan kebutuhan tools, konfigurasi dan recovery.
 
-| Aplikasi | Port Go | Port Vite | Launcher |
-| --- | --- | --- | --- |
-| Pengguna | `PORT=3000` | `5173` | `bash ./run.sh` / `run.bat` |
-| Admin | `SCHAKKER_ADMIN_PORT=3001` | `5174` | `bash ./run-admin.sh` / `run-admin.bat` |
+## Struktur repositori
 
-Pengguna memiliki explorer, SQL viewer, query plan dan migrasi sesuai permission. Admin mengelola akun, grup, keanggotaan, permission dan registrasi koneksi terenkripsi. Server admin tidak memiliki adapter target, explorer, eksekusi SQL atau mesin migrasi. Registrasi hanya menyimpan konfigurasi; pengujian koneksi admin telah dihapus.
+```text
+src/
+  apps/
+    user/               # Backend pengguna, cmd/server, cmd/worker, frontend
+    admin/              # Backend admin, private authority API, frontend
+  shared/
+    backend/            # Mekanisme Go bersama
+    frontend/           # Paket React @schakker/ui
+  schemas/
+    platform/           # Schema metadata pengguna
+    admin/              # Schema metadata admin
+  tests/
+    unit/{user,admin,shared}/
+    integration/
+    frontend/
+    fixtures/           # Cluster disposable dan sample data target
+    k6/
+  tools/                # Devserver, load fixture, CodeQL dan CI templates nonaktif
+    launchers/          # Implementasi launcher; file root hanya meneruskan argumen
+  ops/
+    observability/      # Collector, Loki, Tempo, Prometheus dan Grafana
+docs/                   # Arsitektur, API, operasi dan bukti verifikasi
+go.work
+package.json
+package-lock.json
+```
 
-Kedua SPA memakai `@schakker/ui` untuk sesi, login/logout, layout navigasi, pemuatan halaman dan submit form. Implementasi bersama ada di `src/shared/frontend/src/app/`; masing-masing `App.tsx` menentukan rute, navigasi, konten login dan pemetaan data halamannya sendiri. Setiap SPA tetap menggunakan client `/api` pada origin servernya sendiri dan memiliki state sesi terpisah.
+Seluruh kode aplikasi, library, schema, test, tooling dan operasional berada di `src/`. Masing-masing aplikasi memiliki `backend/`, `database/`, `frontend/`, `go.mod` dan `.env.example`. Go dan npm workspace berada di root repositori. Launcher root meneruskan argumen ke `src/tools/launchers/`. [Arsitektur dan kepemilikan database](docs/architecture.md) menjelaskan batas aplikasi, kode bersama, schema, tools dan local state.
 
-Backend berbagi mekanisme di `src/shared/backend/`: `database` untuk membuka pool PostgreSQL dan menerjemahkan error SQL, `auth` untuk token/CSRF dan rotasi, `authhttp` untuk HTTP login/sesi/logout, serta `webapp` untuk static asset, shell React dan routing prefix `/api/`. Pool dibuat terpisah dari DSN yang diberikan masing-masing aplikasi; helper tidak membaca environment atau menyimpan koneksi global. Setiap aplikasi memasok nama cookie, tujuan login dan identitasnya sendiri. Verifikasi kredensial, policy otorisasi, DAO/query SQL, transaksi/locking, validasi schema dan startup tetap dimiliki backend masing-masing. Kode bersama tidak memberikan akses database tambahan atau mengubah kontrak API internal admin.
+## Database tim dan konfigurasi aplikasi
 
-## Kepemilikan database
+Untuk memakai database yang sudah disediakan, salin `src/apps/user/.env.example` dan `src/apps/admin/.env.example` menjadi `.env` di aplikasi masing-masing, lalu isi URL, key yang sudah ada dan token layanan yang sesuai. Launcher standar memvalidasi konfigurasi; schema, restricted roles dan akun awal disediakan secara eksplisit di luar startup aplikasi. [Schema canonical](src/schemas/README.md) berada di `src/schemas/platform/schema.sql` dan `src/schemas/admin/schema.sql`.
 
-- `schakker_admin`: akun/password/sesi admin, definisi akun pengguna biasa beserta password, grup, membership, permission, registrasi koneksi dan atribusi administrasi.
-- `schakker_platform`: sesi pengguna biasa, draft/eksekusi/riwayat migrasi, namespace receipt, serta snapshot identitas dan ID database untuk foreign key lokal.
-
-Masing-masing server hanya terhubung ke database aplikasinya sendiri. Pengguna memperoleh autentikasi dan permission terkini melalui API internal admin yang dilindungi token layanan dan TLS. Tidak ada cache otorisasi; gangguan authority menolak operasi terlindungi. Snapshot lokal tidak memiliki password, flag administrator atau grant yang dapat diedit.
-
-Akun admin dan pengguna biasa adalah identitas terpisah, termasuk bila username atau ID numeriknya sama. Cookie pengguna `schakker_session` dan cookie admin `schakker_admin_session` juga terpisah. Admin tidak mendapatkan akses database target melalui registrasi atau membership.
-
-## Penyiapan dan konfigurasi
-
-Untuk koneksi database tim, database, schema, role PostgreSQL terbatas, akun administrator pertama, key yang sudah ada dan token layanan disediakan di luar aplikasi. Startup aplikasi dan launcher standar hanya memvalidasi konfigurasi tersebut. Launcher development `run-dev` menyediakan lingkungan lokal terpisah seperti dijelaskan di atas.
-
-Panduan startup, kontrak schema, worker, recovery dan verifikasi tersedia di [M2 integration](docs/m2-integration.md).
-
-Salin `src/src/.env.example` dan `src/src-admin/.env.example` menjadi `.env` dalam folder aplikasi masing-masing. Launcher hanya membaca `.env` aplikasi yang dipilih. Binary Go langsung membaca environment, tanpa memuat `.env` otomatis.
-
-Aplikasi pengguna memerlukan `SCHAKKER_PLATFORM_DATABASE_URL`, `SCHAKKER_MASTER_KEY`, `SCHAKKER_CONTROL_PLANE_URL` dan `SCHAKKER_INTERNAL_TOKEN`. URL platform masih menerima alias lama `SCHAKKER_DATABASE_URL` / `DATABASE_URL`. Development dapat membaca key pengguna dari berkas `master.key` yang sudah ada dalam `SCHAKKER_STATE_DIR` (default `.schakker`).
-
-Aplikasi admin memerlukan `SCHAKKER_ADMIN_DATABASE_URL`, `SCHAKKER_ADMIN_MASTER_KEY` dan token layanan yang sama. Key admin tidak dibaca dari aplikasi pengguna. Saat cutover, sediakan key enkripsi koneksi lama sebagai key admin agar ciphertext tetap dapat dibaca. Jangan menghasilkan pengganti secara otomatis.
-
-Listener internal default `127.0.0.1:3002`, dapat diatur dengan `SCHAKKER_ADMIN_INTERNAL_ADDR`. Production (`SCHAKKER_ADMIN_ENV=production`) dan listener non-loopback memerlukan `SCHAKKER_ADMIN_INTERNAL_TLS_CERT` / `SCHAKKER_ADMIN_INTERNAL_TLS_KEY`. Pengguna production (`SCHAKKER_ENV=production`) mewajibkan URL authority HTTPS dengan sertifikat tepercaya. HTTP hanya diizinkan untuk IP loopback pada development. Listener internal tidak diproxy ke browser.
-
-## Menjalankan dan mengembangkan
-
-Gunakan Go 1.26+ (toolchain modul `go1.26.10`), Node.js 22.12+ dengan npm, serta Bash 4+ atau Windows PowerShell 5.1+. Kedua database aplikasi harus sudah disediakan.
-
-Dari root repositori, jalankan admin, aplikasi pengguna dan worker pada tiga terminal terpisah:
+Jalankan pada tiga terminal:
 
 ```bash
 bash ./run-admin.sh
@@ -58,97 +61,44 @@ bash ./run.sh
 bash ./run-worker.sh
 ```
 
-Windows menggunakan `run-admin.bat`, `run.bat` dan `run-worker.bat` dari root repositori; PowerShell juga dapat memakai `./run.ps1 -Admin` atau `./run.ps1`; worker memakai `./run.ps1 -Worker`. Launcher dapat dipanggil dari direktori mana pun karena semua path dihitung dari lokasi script. Setiap launcher membangun frontend dan server aplikasinya sendiri, menawarkan pengujian yang terkait, lalu menjalankan binary dalam `bin/`. Fixture integration test tidak diteruskan ke server. Launcher worker membaca `.env` aplikasi pengguna, membangun `cmd/worker` dan menjalankannya tanpa build frontend. Tanpa worker, job tetap pending.
+Windows memakai `run-admin.bat`, `run.bat` dan `run-worker.bat`. Konfigurasi pengguna memakai `SCHAKKER_PLATFORM_DATABASE_URL`, `SCHAKKER_MASTER_KEY`, `SCHAKKER_CONTROL_PLANE_URL` dan `SCHAKKER_INTERNAL_TOKEN`; admin memakai `SCHAKKER_ADMIN_DATABASE_URL`, `SCHAKKER_ADMIN_MASTER_KEY` dan token layanan yang sama. Detail TLS authority dan konfigurasi worker ada di [panduan operasi](docs/m2-integration.md).
 
-Di dalam source workspace `src/`, kedua aplikasi menggunakan utilitas Go di `shared/backend/` dan paket React `@schakker/ui` di `shared/frontend/`. Tidak ada import antaraplikasi atau konfigurasi runtime bersama. Build source independen memerlukan aplikasi yang dipilih dan folder `shared/` pada layout repositori ini. Binary hasil build tidak memerlukan source shared atau aplikasi lain.
+## Build dan test
 
-```bash
-# Dari root repositori, masuk ke source workspace terlebih dahulu
-cd src
-# Pilih schakker-admin-frontend atau schakker-frontend
-npm ci --workspace=schakker-admin-frontend --workspace=@schakker/ui
-npm run build:admin
-cd src-admin                 # atau src untuk aplikasi pengguna
-GOWORK=off go build -o bin/server .
-./bin/server
-```
-
-Gunakan `npm run build:user` untuk frontend pengguna. Satu manifest dan lockfile npm, serta `go.work`, berada di source workspace `src/`. Source checkout minimal juga harus menyertakan manifest/lockfile workspace; `replace schakker_shared => ../shared/backend` pada setiap modul Go membuat build tidak bergantung pada `go.work`.
-
-Jalankan `npm run dev` dari `src/src/frontend/` atau `src/src-admin/frontend/` (dari root repositori) untuk pengembangan Vite. Proxy `/api/` dan `/public/` hanya mengarah ke server publik aplikasi tersebut. Route pengguna dan tampilan explorer/migrasi tetap sama. Route admin: `/admin/users`, `/admin/administrators`, `/admin/groups`, `/admin/connections`; `/admin/access` tetap menjadi alias grup.
-
-## Sesi dan permission
-
-Cookie menggunakan HttpOnly, SameSite=Lax, serta Secure pada HTTPS/production. Idle timeout 30 menit, absolute lifetime delapan jam, rotasi berkala 15 menit dan grace period 30 detik tetap berlaku. Password/aktivasi, pengurangan permission dan perubahan koneksi mengubah versi keamanan pengguna secara atomik di authority. Sesi dengan versi lama ditolak pada permintaan berikutnya. Penambahan hak menyebabkan rotasi token saat autentikasi berikutnya. Perubahan permission pengguna tidak membatalkan sesi admin.
-
-## Pengujian
-
-Go unit test, integration test, mock database dan laporan berada di `src/tests/` dari root repositori. Verifikasi browser Person 1 menggunakan fixture API sintetis tanpa dependensi test frontend tambahan: jalankan `npm run verify:person1` dari `src/` setelah build. [Panduan integrasi](docs/m2-integration.md) membedakan pengujian API/database asli dan fixture sintetis untuk verifikasi browser.
-
-```text
-src/tests/
-  unit/src/           # backend pengguna
-  unit/src-admin/     # backend admin
-  unit/shared/        # library Go bersama
-  integration/        # alur lintas aplikasi dan database
-  fixtures/
-    website/          # schema/data database aplikasi pengguna
-    admin/            # schema/data database administrasi
-    postgre/          # data database PostgreSQL target
-    mariadb/          # data database MariaDB target
-    setup/            # koneksi, local server, role dan fixture lifecycle
-  output/             # laporan launcher user/admin
-```
-
-Dari root repositori:
+Semua perintah berikut dijalankan dari root repositori:
 
 ```bash
-# Semua backend unit + integration tests
-GOWORK=off go -C src/tests test -count=1 -timeout=10m ./...
-# Hanya unit tests
-GOWORK=off go -C src/tests test ./unit/...
+npm ci
+npm run typecheck:shared
+npm run build
+
+# Modul backend dapat dibangun secara independen, termasuk tanpa go.work.
+GOWORK=off go -C src/apps/user build ./...
+GOWORK=off go -C src/apps/admin build ./...
+GOWORK=off go -C tools build ./...
+
+# Unit dan integration tests; fixture memakai database disposable.
+GOWORK=off go -C tests test -count=1 -timeout=12m ./...
+# Hanya unit test backend pengguna, admin atau mekanisme bersama.
+GOWORK=off go -C tests test ./unit/user/... ./unit/admin/... ./unit/shared/...
+
+# Browser fixture sintetis; perlu Chrome/Chromium/Edge terpasang.
+npm run verify:person1
 ```
 
-Go unit suite dapat dipilih melalui `./unit/src/...`, `./unit/src-admin/...`, dan `./unit/shared/...` dari `src/tests/`. `go.work` menyertakan modul test tersebut; production build kedua aplikasi tidak bergantung padanya. npm hanya digunakan untuk instalasi, build dan pengembangan frontend.
+Build frontend terpisah memakai `npm run build:user` / `npm run build:admin`. Untuk development Vite, jalankan `npm run dev --workspace=schakker-frontend` atau `npm run dev --workspace=schakker-admin-frontend` (port 5173 / 5174). Proxy API masing-masing tetap menuju server aplikasinya sendiri.
 
-Setup database, seed data dan bootstrap akun tersedia dalam test support, yang juga dipakai oleh launcher development eksplisit di `src/tests/cmd/devserver/`. Fixture menyimpan schema database aplikasi saat ini dan data contoh PostgreSQL/MariaDB. PostgreSQL server/client tools diperlukan untuk fixture dan development lokal (`SCHAKKER_POSTGRES_BIN`); MariaDB server tools opsional (`SCHAKKER_MARIADB_BIN`). Launcher standar tetap menawarkan unit/integration test sebelum menjalankan aplikasi, dengan laporan di `src/tests/output/user/` atau `src/tests/output/admin/`. Launcher standar tidak menyiapkan database tim.
+Executable server berada di `src/apps/user/cmd/server` dan `src/apps/admin/cmd/server`; worker di `src/apps/user/cmd/worker`. Launcher mengatur direktori kerja ke root aplikasi agar frontend dan path relatif tetap ditemukan. Perintah provisioning development berada di [tools](src/tools/README.md). Laporan launcher rutin ada di `src/tests/output/`, yang diabaikan Git.
 
-## Milestone 2 terintegrasi
+## Dokumentasi
 
-Kontrak resource aktual ada di [M2 API](docs/m2-frontend-api.md). Frontend menggunakan ID definition dan revision yang berbeda, UUID untuk execution/job, generation aktif untuk optimistic concurrency, dan `Idempotency-Key` untuk enqueue. Semua leader grup yang punya akses database, termasuk View Only, harus menyetujui setiap aksi. Enqueue menyimpan job dan segera mengembalikan 202; SQL dijalankan oleh worker terpisah.
+- [Arsitektur dan batas aplikasi](docs/architecture.md).
+- [Setup, workflow, recovery dan keterbatasan](docs/m2-integration.md).
+- [Kontrak API frontend](docs/m2-frontend-api.md).
+- [Review spesifikasi dan Q&A](docs/m2-specification-review.md).
+- [Query Plan dan EXPLAIN](docs/query-plans.md).
+- [Bonus, stress test dan bukti verifikasi](docs/m2-bonuses.md).
+- [Operasional observability](src/ops/observability/README.md).
+- [Review keamanan](docs/m2-security-review.md).
 
-Schema lengkap saat ini ada di `src/tests/fixtures/website/schema.sql` dan `src/tests/fixtures/admin/schema.sql`. Startup hanya memvalidasi schema, sehingga provisioning/upgrade database tetap dilakukan di luar aplikasi. Jangan menjalankan fixture CREATE TABLE pada database yang sudah berisi data. Script `src/src/database/dao/jobs_upgrade.sql` hanya menambah kolom worker pada schema P2 sebelum integrasi, bukan upgrade umum dari M1.
-
-Batch mendukung penambahan/pengurangan nilai tetap pada kolom BIGINT dengan primary key BIGINT. UI menghasilkan pasangan SQL yang sama dengan `engines.BatchSQL`; pengaturan batch menjadi bagian dari SQL immutable yang disetujui. Execution history mencatat attempt berhasil maupun gagal dengan snapshot SQL yang immutable. Hanya commit terverifikasi yang mengubah active/forward stack; Jobs menampilkan status dan progres. Review tanpa leader tetap Pending Review dan belum dapat masuk queue. Lihat [review spesifikasi dan Q&A](docs/m2-specification-review.md). Editor SQL dan visual builder tersedia untuk analisis tanpa penyimpanan draf terpisah. Draf migrasi PostgreSQL disimpan melalui definitions/revisions M2 dengan SQL down atau alasan irreversible; aksi HTTP `execute` ditolak agar tidak melewati approval.
-
-Batasan dan prosedur recovery ada di [M2 integration](docs/m2-integration.md). Implementasi dan bukti bonus tersedia di [M2 bonuses](docs/m2-bonuses.md): Collector → Loki/Tempo, Prometheus/Grafana, stress test k6 dengan job ber-approval, serta CodeQL Go dan JS/TS. Template GitHub Actions disimpan nonaktif di [temp/workflows](temp/README.md), di luar `.github`; bukti scan lokal tetap tersedia. Bonus pengumpulan cepat tetap membutuhkan pengiriman form sebelum 23 November 2026, 13:10 WIB.
-
-### Hasil stress test bonus
-
-Pengujian lokal menggunakan 5 target VU normal, naik ke 12 lalu 24, kemudian turun dan bertahan di 5. Ketiga skenario berjalan bersamaan: pembacaan API, enqueue idempotent pada database yang sama, dan migration pada dua database lain. Semua 55 job yang diterima selesai melalui worker; HTTP 202 tidak dihitung sebagai migration sukses. API error dan job failure 0%, tetapi threshold API p95 <750 ms **gagal**. Nilai berikut adalah hasil pengukuran, bukan klaim kapasitas production.
-
-| Fase | API p50 / p95 (ms) | Request/s | API error | Queue p95 (ms) | Migration p95 (ms) | Job selesai | Job/s |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Normal, 10 s | 54.86 / 367.26 | 31.40 | 0% | 186.00 | 2707.00 | 9 | 0.90 |
-| Load, 15 s | 98.40 / 809.77 | 24.13 | 0% | 210.00 | 3775.00 | 11 | 0.73 |
-| Stress, 20 s | 216.44 / 1758.31 | 19.60 | 0% | 215.10 | 5842.45 | 10 | 0.50 |
-| Recovery + drain, 32.79 s | 67.39 / 1050.87 | 20.77 | 0% | 196.60 | 5463.80 | 25 | 0.76 |
-
-Normal memenuhi objective latency. Saat load dan stress, p95 meningkat dan throughput request/job menurun walaupun tidak ada kegagalan; menaikkan konkurensi belum meningkatkan kapasitas pada lingkungan ini. Pada recovery, median API mendekati normal dan throughput job membaik, tetapi tail latency belum pulih ke baseline. Fase recovery juga menyelesaikan job yang sudah diterima sebelumnya. Angka queue dan durasi migration dikelompokkan saat job selesai sehingga dapat mencakup pekerjaan dari fase sebelumnya. Fixture menyiapkan approval baru secara serial per database sesuai generation aktif; contention fixture dicatat terpisah. Pengujian singkat di workstation bersama ini belum membuktikan steady-state production atau akar bottleneck. Lihat [script dan cara menjalankan](src/tests/k6/README.md), [JSON hasil asli](docs/evidence/bonuses/k6.json), serta [analisis dan batasan lengkap](docs/m2-bonuses.md).
-
-## Query Plan
-
-Di halaman SQL Migration, pilih **Analyze migration** atau **Analyze change set**, lalu
-buka panel **Query Plan** melalui tautan di bagian atas halaman. Setiap statement SQL
-memiliki pohon operasi tersendiri. Klik node induk atau gunakan **Expand all** / **Collapse all**
-untuk menelusuri relasi antaroperasi. Panel menampilkan relasi, index, jenis join, estimasi
-jumlah baris, startup cost, dan total cost jika tersedia. Nilai yang tidak dikembalikan
-database ditandai **Not available**. Cost merupakan satuan estimasi planner, bukan durasi
-eksekusi aktual.
-
-**Original EXPLAIN JSON** tersedia sebagai panel sekunder yang tertutup secara bawaan,
-dengan tombol **Copy JSON**. Statement yang tidak mendukung EXPLAIN, plan yang tidak
-tersedia terhadap skema saat ini, proses loading, dan kegagalan analisis memiliki status
-tersendiri. Mengubah SQL membuat plan sebelumnya tidak berlaku sampai analisis diulang.
-Menelusuri pohon dan menyalin JSON hanya menggunakan data yang sudah diterima browser.
-Backend tetap memakai EXPLAIN tanpa ANALYZE; perubahan ini tidak menambahkan eksekusi SQL.
+Execution history mencatat seluruh attempt yang selesai, termasuk gagal; hanya commit terverifikasi yang mengubah active/forward stack. SQL analysis dan visual builder tetap tersedia; draf PostgreSQL disimpan melalui definitions/revisions M2. Lihat panduan operasi untuk alur approval, batch, rollback dan recovery.

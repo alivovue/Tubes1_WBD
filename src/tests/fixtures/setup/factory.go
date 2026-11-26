@@ -16,8 +16,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	platformschema "schakker_schemas/platform"
 	"schakker_tests/fixtures/postgre"
-	websitefixtures "schakker_tests/fixtures/website"
 	"tubes1_wbd/backend/dbmanagement"
 )
 
@@ -143,7 +143,7 @@ func openPostgres(ctx context.Context, directory string, website, managed bool) 
 		if err != nil {
 			return fail(err)
 		}
-		err = websitefixtures.Initialize(ctx, db)
+		err = platformschema.Initialize(ctx, db)
 		db.Close()
 		if err != nil {
 			return fail(err)

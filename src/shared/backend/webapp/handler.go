@@ -29,7 +29,7 @@ func New(config Config) (http.Handler, error) {
 	}
 	entry, err := os.ReadFile(filepath.Join(config.Root, "frontend", "dist", "index.html"))
 	if err != nil {
-		return nil, fmt.Errorf("run npm ci and npm run build --workspace=%s from the source workspace root (src/): %w", config.BuildWorkspace, err)
+		return nil, fmt.Errorf("run npm ci and npm run build --workspace=%s from the repository root: %w", config.BuildWorkspace, err)
 	}
 	assets := http.StripPrefix("/assets/", http.FileServer(http.Dir(filepath.Join(config.Root, "frontend", "dist", "assets"))))
 	public := http.StripPrefix("/public/", http.FileServer(http.Dir(filepath.Join(config.Root, "frontend", "public"))))

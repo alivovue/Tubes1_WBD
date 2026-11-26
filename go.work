@@ -1,0 +1,12 @@
+go 1.26.0
+
+toolchain go1.26.10
+
+use (
+	./src/apps/admin
+	./src/apps/user
+	./src/schemas
+	./src/shared/backend
+	./src/tests
+	./src/tools
+)

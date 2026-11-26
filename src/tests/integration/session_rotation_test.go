@@ -36,7 +36,7 @@ func currentHash(t *testing.T, f *fixture, session string) []byte {
 }
 func userHandler(t *testing.T, f *fixture) http.Handler {
 	t.Helper()
-	root, err := filepath.Abs(filepath.Join(repositoryRoot(t), "src"))
+	root, err := filepath.Abs(filepath.Join(sourceRoot(t), "apps", "user"))
 	must(t, err)
 	handler, err := backend.NewHandlerWithServices(root, backend.Services{Access: f.userAccess, Databases: f.databases, Migrations: f.migrations})
 	must(t, err)
@@ -44,7 +44,7 @@ func userHandler(t *testing.T, f *fixture) http.Handler {
 }
 func adminHandler(t *testing.T, f *fixture) http.Handler {
 	t.Helper()
-	root, err := filepath.Abs(filepath.Join(repositoryRoot(t), "src-admin"))
+	root, err := filepath.Abs(filepath.Join(sourceRoot(t), "apps", "admin"))
 	must(t, err)
 	handler, err := adminbackend.NewHandlerWithServices(root, adminbackend.Services{Authentication: f.adminAuth, Access: f.adminAuth, Connections: f.connections})
 	must(t, err)

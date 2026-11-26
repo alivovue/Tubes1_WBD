@@ -205,7 +205,7 @@ func TestServerStartupRejectsEmptySchemasWithoutInitializingData(t *testing.T) {
 }
 func TestStandaloneAdminBinaryRunsWithoutTheUserModule(t *testing.T) {
 	root := t.TempDir()
-	source, err := filepath.Abs(filepath.Join(repositoryRoot(t), "src-admin"))
+	source, err := filepath.Abs(filepath.Join(sourceRoot(t), "apps", "admin"))
 	must(t, err)
 	binary := filepath.Join(root, "admin-server")
 	if runtime.GOOS == "windows" {
@@ -213,7 +213,7 @@ func TestStandaloneAdminBinaryRunsWithoutTheUserModule(t *testing.T) {
 	}
 	buildContext, stopBuild := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer stopBuild()
-	build := exec.CommandContext(buildContext, "go", "build", "-o", binary, ".")
+	build := exec.CommandContext(buildContext, "go", "build", "-o", binary, "./cmd/server")
 	build.Dir = source
 	build.Env = append(os.Environ(), "GOWORK=off", "CGO_ENABLED=0")
 	if out, err := build.CombinedOutput(); err != nil {

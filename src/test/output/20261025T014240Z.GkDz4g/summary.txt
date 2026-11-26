@@ -1,3 +1,0 @@
-Schakker automated tests
-PASS unit
-FAIL integration

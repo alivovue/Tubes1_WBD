@@ -36,7 +36,7 @@ The PDF's revision formatting matters: pages 12–13 cross out the earlier succe
 
 Dashboard recent migrations remain a summary of verified commits. Changelog shows all completed attempts; Jobs retains live status and batch progress. Failed ordinary SQL can be retried using the same approved job or followed by another migration. Partial/uncertain work retains its existing safety block until recovery is resolved.
 
-Fresh provisioning uses `src/tests/fixtures/website/schema.sql`, which includes the attempt snapshot columns and write-once protection. Startup validates that the current schema is present.
+Fresh provisioning uses `src/schemas/platform/schema.sql`, which includes the attempt snapshot columns and write-once protection. Startup validates that the current schema is present.
 
 Regression coverage is in `qna_spec_test.go`, `committed_history_test.go`, `m2_resources_test.go` and the Chromium UI contract suite. It covers failed up/down attempts, approved retries, immutable failure evidence, exact successful reversal filtering before pagination, continuation after failure, missing-leader pending submission, View Only permissions and one leader representing multiple groups.
 

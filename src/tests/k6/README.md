@@ -1,11 +1,11 @@
 # Real approved-job stress test
 
-Run `bash scripts/run-k6.sh` from the repository root with Go, PostgreSQL server tools, Python 3 and k6 on PATH. The launcher creates a disposable fixture, runs k6, renders results and stops/removes the fixture databases. It never reads application `.env` files or uses a production connection URL. Set `TMPDIR` to a spacious directory when needed. Existing listeners on 3300/9464 must be stopped or overridden with `SCHAKKER_K6_LISTEN` / `SCHAKKER_METRICS_ADDR`.
+Run `bash src/tools/run-k6.sh` from the repository root with Go, PostgreSQL server tools, Python 3 and k6 on PATH. The launcher creates a disposable fixture, runs k6, renders results and stops/removes the fixture databases. It never reads application `.env` files or uses a production connection URL. Set `TMPDIR` to a spacious directory when needed. Existing listeners on 3300/9464 must be stopped or overridden with `SCHAKKER_K6_LISTEN` / `SCHAKKER_METRICS_ADDR`.
 
 To export this test's telemetry to the local observability stack:
 
 ```bash
-OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4318 bash scripts/run-k6.sh
+OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4318 bash src/tools/run-k6.sh
 ```
 
 The fixture creates real independent admin/platform/target PostgreSQL databases, active test users, an editor group and a View Only approval group. Both group decisions go through the normal workflow policy. Every third migration uses the supported 1000-row, 100-row-per-batch BIGINT template. Others execute ordinary reversible SQL. The same production queue and four-concurrency worker execute all jobs.

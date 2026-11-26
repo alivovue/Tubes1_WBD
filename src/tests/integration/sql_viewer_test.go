@@ -76,7 +76,7 @@ func TestSQLViewerHTTPReaderPageAndCSRFProtection(t *testing.T) {
 	identity, cookie := f.login(t, reader.Username)
 	csrf, err := f.access.CSRFToken(identity)
 	must(t, err)
-	root := filepath.Join(repositoryRoot(t), "src")
+	root := filepath.Join(sourceRoot(t), "apps", "user")
 	handler, err := backend.NewHandlerWithServices(root, backend.Services{Access: f.userAccess, Databases: f.databases, Migrations: f.migrations})
 	must(t, err)
 	request := func(method, route string, form url.Values) *httptest.ResponseRecorder {

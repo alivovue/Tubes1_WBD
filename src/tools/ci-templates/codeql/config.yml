@@ -1,0 +1,15 @@
+# Shared by local scans and the inactive workflow template.
+name: Schakker Go and React security coverage
+paths:
+  - src/apps/user
+  - src/apps/admin
+  - src/shared
+  - src/schemas
+  - src/tests
+  - src/tools
+paths-ignore:
+  - '**/node_modules/**'
+  - '**/dist/**'
+  - '**/bin/**'
+  - '**/.schakker/**'
+  - '**/output/**'

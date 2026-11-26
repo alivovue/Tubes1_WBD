@@ -16,7 +16,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	adminfixtures "schakker_tests/fixtures/admin"
+	adminschema "schakker_schemas/admin"
 	fixtures "schakker_tests/fixtures/setup"
 	"tubes1_wbd/backend/access"
 	"tubes1_wbd/backend/controlplane"
@@ -118,7 +118,7 @@ func newFixture(t *testing.T, admin bool) *fixture {
 			t.Error(err)
 		}
 	})
-	must(t, adminfixtures.Initialize(ctx, adminDB))
+	must(t, adminschema.Initialize(ctx, adminDB))
 	_, err = adminDB.ExecContext(ctx, `ALTER SEQUENCE admin_users_id_seq RESTART WITH 1000`)
 	must(t, err)
 	adminStore, err := admindao.New(adminDB)
@@ -277,7 +277,7 @@ func toAdminIdentity(i access.Identity) adminaccess.Identity {
 	return adminaccess.Identity{User: admindao.User{ID: i.User.ID, Username: i.User.Username, DisplayName: i.User.DisplayName, Active: i.User.Active}, SessionID: i.SessionID, AbsoluteExpires: i.AbsoluteExpires}
 }
 
-func repositoryRoot(t *testing.T) string {
+func sourceRoot(t *testing.T) string {
 	t.Helper()
 	_, filename, _, ok := runtime.Caller(0)
 	if !ok {

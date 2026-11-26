@@ -11,8 +11,8 @@ import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 const evidence = process.env.SCHAKKER_QA_OUTPUT || join(root, "docs/qa/person1");
-const userDist = join(root, "src/src/frontend/dist");
-const adminDist = join(root, "src/src-admin/frontend/dist");
+const userDist = join(root, "src/apps/user/frontend/dist");
+const adminDist = join(root, "src/apps/admin/frontend/dist");
 const browserPath =
   process.env.SCHAKKER_QA_BROWSER ||
   [
@@ -520,7 +520,7 @@ const serve = async (req, res) => {
     if (path.startsWith("/public/")) {
       res.writeHead(200, { "Content-Type": "image/png" });
       res.end(
-        await readFile(join(root, "src/src/frontend/public/sc logo.png")),
+        await readFile(join(root, "src/apps/user/frontend/public/sc logo.png")),
       );
       return;
     }

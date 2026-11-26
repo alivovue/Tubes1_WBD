@@ -7,7 +7,7 @@ Before submission:
 - [ ] Review the mandatory Milestone 2 acceptance criteria and remaining limits in `m2-integration.md`.
 - [ ] Run backend unit/integration tests and both frontend builds.
 - [ ] Verify the worker, ordinary migration, batch recovery, leader review, rollback/forward and history demo.
-- [ ] Review the real local Go and JavaScript CodeQL findings and dispositions for the submitted source. The hosted workflow is intentionally inactive in `temp/workflows/`.
+- [ ] Review the real local Go and JavaScript CodeQL findings and dispositions for the submitted source. The hosted workflow is intentionally inactive in `src/tools/ci-templates/workflows/`.
 - [ ] Retain k6 measured results/analysis and observability correlation/configuration evidence.
 - [ ] Commit and push the final intended source and evidence to the existing team repository.
 - [ ] Submit the repository link through the course form before the cutoff.
