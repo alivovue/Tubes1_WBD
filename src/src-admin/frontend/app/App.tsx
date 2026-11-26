@@ -1,479 +1,133 @@
-import { AeroScene, useNavigation } from "@schakker/ui";
 import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useRef,
-  useState,
-  type FormEvent,
-  type ReactNode,
-} from "react";
-import {
-  Link,
-  Navigate,
-  NavLink,
-  Outlet,
-  Route,
-  Routes,
-  useLocation,
-  useNavigate,
-} from "react-router-dom";
-import { api, APIError, formFields } from "./api";
-import type { APIResult, Fields, PageData } from "./types";
-import { Button, Field, Icon, initials, Notice, PageContext } from "./ui";
+  LoginPage,
+  PageFrame,
+  SessionProvider,
+  SidebarLink,
+  WorkspaceShell,
+  usePageRequest,
+  useSession,
+  type LoginContent,
+} from "@schakker/ui";
+import type { ReactNode } from "react";
+import { Link, Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { api } from "./api";
+import type { PageData } from "./types";
+import { PageContext } from "./ui";
 import { Connections, Groups, Users } from "./admin";
 
-const SessionContext = createContext<{
-  session: APIResult;
-  update: (data: APIResult) => void;
-  expire: () => void;
-} | null>(null);
-function useSession() {
-  return useContext(SessionContext)!;
-}
+const home = "/admin/users";
+const loginContent: LoginContent = {
+  eyebrow: "Platform access administration.",
+  title: "Manage platform access with confidence.",
+  description: "Kelola akun, keanggotaan grup, dan konfigurasi akses database dari satu ruang administrasi.",
+  features: [
+    "Permission berbasis grup",
+    "Kelola akun dan keanggotaan grup",
+    "Konfigurasi koneksi tanpa mengakses data",
+  ],
+  portal: "Administration portal",
+  icon: "users",
+  submitLabel: "Masuk ke administrasi",
+  securityNote: "Akses terbatas untuk platform administrator. Aplikasi ini hanya mengelola akses dan konfigurasi.",
+  people: true,
+};
 
 export function App() {
-  const [session, update] = useState<APIResult>({});
-  const expire = useCallback(() => update({}), []);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const load = useCallback(() => {
-    setLoading(true);
-    setError("");
-    api("/session")
-      .then(update)
-      .catch((problem) => setError(problem.message))
-      .finally(() => setLoading(false));
-  }, []);
-  useEffect(load, [load]);
-  if (loading)
-    return (
-      <p className="empty-state" role="status">
-        Loading workspace…
-      </p>
-    );
-  if (error)
-    return (
-      <main className="page">
-        <Notice error>{error}</Notice>
-        <Button onClick={load}>Retry</Button>
-      </main>
-    );
   return (
-    <SessionContext.Provider value={{ session, update, expire }}>
-      <Routes>
-        <Route
-          path="/"
-          element={
-            <Navigate
-              to={session.User?.ID ? "/admin/users" : "/login"}
-              replace
-            />
-          }
-        />
-        <Route
-          path="/login"
-          element={
-            session.User?.ID ? (
-              <Navigate to="/admin/users" replace />
-            ) : (
-              <Login />
-            )
-          }
-        />
-        <Route
-          element={
-            session.User?.ID ? <Layout /> : <Navigate to="/login" replace />
-          }
-        >
-          {[
-            "admin/users",
-            "admin/administrators",
-            "admin/groups",
-            "admin/connections",
-          ].map((path) => (
-            <Route key={path} path={path} element={<Page />} />
-          ))}
-          <Route
-            path="admin/access"
-            element={<Navigate to="/admin/groups" replace />}
-          />
-        </Route>
-        <Route
-          path="*"
-          element={
-            <main className="page">
-              <h1>Page not found</h1>
-              <Link to="/">Return to workspace</Link>
-            </main>
-          }
-        />
-      </Routes>
-    </SessionContext.Provider>
+    <SessionProvider request={api}>
+      <AppRoutes />
+    </SessionProvider>
   );
 }
 
-function Login() {
-  const { session, update } = useSession();
-  const navigate = useNavigate();
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  useEffect(() => {
-    if (!session.CSRF)
-      api("/session")
-        .then(update)
-        .catch((problem) => setError(problem.message));
-  }, [session.CSRF, update]);
-  async function login(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (busy || !session.CSRF) return;
-    setBusy(true);
-    setError("");
-    try {
-      await api("/login", formFields(event.currentTarget, null), session.CSRF);
-      const identity = await api("/session");
-      update(identity);
-      navigate("/admin/users", { replace: true });
-    } catch (problem) {
-      if (problem instanceof APIError && problem.result.CSRF)
-        update(problem.result);
-      setError(
-        problem instanceof Error
-          ? problem.message
-          : "Login failed. Please retry.",
-      );
-    } finally {
-      setBusy(false);
-    }
-  }
+function AppRoutes() {
+  const { session } = useSession();
   return (
-    <main className="auth-shell">
-      <section className="auth-showcase" aria-labelledby="showcase-title">
-        <Brand />
-        <div className="auth-showcase__copy">
-          <p className="eyebrow">Platform access administration.</p>
-          <h1 id="showcase-title">Manage platform access with confidence.</h1>
-          <p>
-            Kelola akun, keanggotaan grup, dan konfigurasi akses database dari
-            satu ruang administrasi.
-          </p>
-          <ul className="feature-list">
-            <li>
-              <span>
-                <Icon name="check" />
-              </span>
-              Permission berbasis grup
-            </li>
-            <li>
-              <span>
-                <Icon name="check" />
-              </span>
-              Kelola akun dan keanggotaan grup
-            </li>
-            <li>
-              <span>
-                <Icon name="check" />
-              </span>
-              Konfigurasi koneksi tanpa mengakses data
-            </li>
-          </ul>
-        </div>
-        <AeroScene people />
-        <p className="auth-showcase__footer">
-          Schakker Technologies · Internal systems
-        </p>
-      </section>
-      <section className="auth-panel" aria-labelledby="login-title">
-        <div className="auth-card">
-          <div className="auth-card__mobile-brand">
-            <Brand />
-          </div>
-          <div className="auth-card__emblem" aria-hidden="true">
-            <Icon name="users" />
-          </div>
-          <p className="eyebrow">Administration portal</p>
-          <h2 id="login-title">Welcome back</h2>
-          <p className="auth-card__lead">
-            Masuk menggunakan akun internal Schakker Anda.
-          </p>
-          {error && <Notice error>{error}</Notice>}
-          <form className="form-stack" onSubmit={login}>
-            <Field label="Username">
-              <input name="username" autoComplete="username" required />
-            </Field>
-            <Field label="Password">
-              <span className="input-with-action">
-                <input
-                  name="password"
-                  type={showPassword ? "text" : "password"}
-                  autoComplete="current-password"
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((value) => !value)}
-                  aria-label={showPassword ? "Hide password" : "Show password"}
-                >
-                  {showPassword ? "Hide" : "Show"}
-                </button>
-              </span>
-            </Field>
-            <Button disabled={busy || !session.CSRF}>
-              {busy ? "Signing in…" : "Masuk ke administrasi"}
-            </Button>
-          </form>
-          <p className="security-note">
-            Akses terbatas untuk platform administrator. Aplikasi ini hanya
-            mengelola akses dan konfigurasi.
-          </p>
-          <p className="auth-help">
-            Kesulitan masuk? Hubungi Platform Admin Anda.
-          </p>
-        </div>
-      </section>
-    </main>
-  );
-}
-
-function Brand() {
-  return (
-    <Link className="brand" to="/admin/users">
-      <img
-        className="brand__mark"
-        src="/public/sc%20logo.png"
-        width="34"
-        height="34"
-        alt=""
+    <Routes>
+      <Route
+        path="/"
+        element={<Navigate to={session.User?.ID ? home : "/login"} replace />}
       />
-      <span>
-        <strong>Schakker.</strong>
-        <small>Data Platform</small>
-      </span>
-    </Link>
+      <Route
+        path="/login"
+        element={session.User?.ID ? (
+          <Navigate to={home} replace />
+        ) : (
+          <LoginPage home={home} content={loginContent} />
+        )}
+      />
+      <Route element={session.User?.ID ? (
+        <WorkspaceShell
+          home={home}
+          section="Administration"
+          role="Administrator"
+          navigation={<Navigation />}
+        />
+      ) : <Navigate to="/login" replace />}>
+        {[
+          "admin/users", "admin/administrators", "admin/groups", "admin/connections",
+        ].map((path) => (
+          <Route key={path} path={path} element={<Page />} />
+        ))}
+        <Route path="admin/access" element={<Navigate to="/admin/groups" replace />} />
+      </Route>
+      <Route path="*" element={
+        <main className="page">
+          <h1>Page not found</h1>
+          <Link to="/">Return to workspace</Link>
+        </main>
+      } />
+    </Routes>
   );
 }
 
-function Layout() {
-  const { session, expire } = useSession();
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-  const location = useLocation();
-  const { open, setOpen } = useNavigation(location.pathname, location.search);
-  async function logout() {
-    setBusy(true);
-    setError("");
-    try {
-      await api("/logout", {}, session.CSRF);
-      expire();
-    } catch (problem) {
-      if (problem instanceof APIError && problem.status === 401) expire();
-      else setError((problem as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
-  const nav = (to: string, label: string, icon: string) => (
-    <NavLink
-      end
-      className={({ isActive }) =>
-        `nav-item${isActive || false ? " is-active" : ""}`
-      }
-      to={to}
-    >
-      <Icon name={icon} />
-      <span>{label}</span>
-    </NavLink>
-  );
+function Navigation() {
+  const { pathname } = useLocation();
   return (
     <>
-      <a className="skip-link" href="#main-content">
-        Lewati ke konten utama
-      </a>
-      <div className={`app-shell${open ? " sidebar-open" : ""}`}>
-        <aside
-          className={`sidebar${open ? " is-open" : ""}`}
-          aria-label="Navigasi aplikasi"
-        >
-          <div className="sidebar__header">
-            <Brand />
-            <button
-              className="icon-button sidebar__close"
-              onClick={() => setOpen(false)}
-              aria-label="Close navigation"
-            >
-              <Icon name="close" />
-            </button>
-          </div>
-          <nav className="sidebar__nav">
-            <p className="nav-label">Administration</p>
-            {nav("/admin/users", "Employees", "users")}
-            {nav("/admin/administrators", "Administrators", "shield")}
-            {nav("/admin/groups", "Groups", "users")}
-            {nav("/admin/connections", "DB Connections", "server")}
-          </nav>
-          <div className="sidebar__footer">
-            <div className="avatar avatar--small">
-              {initials(session.User!.DisplayName)}
-            </div>
-            <div className="user-summary">
-              <strong>{session.User!.DisplayName}</strong>
-              <span>Administrator</span>
-            </div>
-            <button
-              className="icon-button"
-              onClick={logout}
-              disabled={busy}
-              aria-label="Logout"
-            >
-              <Icon name="logout" />
-            </button>
-          </div>
-        </aside>
-        <button
-          className="sidebar-backdrop"
-          type="button"
-          onClick={() => setOpen(false)}
-          aria-label="Close navigation"
+      <p className="nav-label">Administration</p>
+      {[
+        ["/admin/users", "Employees", "users"],
+        ["/admin/administrators", "Administrators", "shield"],
+        ["/admin/groups", "Groups", "users"],
+        ["/admin/connections", "DB Connections", "server"],
+      ].map(([to, label, icon]) => (
+        <SidebarLink
+          key={to}
+          to={to}
+          label={label}
+          icon={icon}
+          active={pathname === to}
         />
-        <div className="app-stage">
-          <header className="topbar">
-            <div className="topbar__left">
-              <button
-                className="icon-button topbar__menu"
-                onClick={() => setOpen((value) => !value)}
-                aria-expanded={open}
-                aria-label="Open navigation"
-              >
-                <Icon name="menu" />
-              </button>
-              <nav className="breadcrumb" aria-label="Breadcrumb">
-                <span>Administration</span>
-                <strong>
-                  {session.Title ||
-                    location.pathname.split("/").filter(Boolean).at(-1)}
-                </strong>
-              </nav>
-            </div>
-            <div className="avatar">{initials(session.User!.DisplayName)}</div>
-          </header>
-          <main className="page" id="main-content" tabIndex={-1}>
-            {error && <Notice error>{error}</Notice>}
-            <Outlet />
-          </main>
-        </div>
-      </div>
+      ))}
     </>
   );
 }
 
 function Page() {
-  const location = useLocation();
-  const navigate = useNavigate();
-  const { update, expire } = useSession();
-  const [data, setData] = useState<PageData | null>(null);
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
-  const [revision, setRevision] = useState(0);
-  const currentPath = location.pathname + location.search;
-  const apiParams = new URLSearchParams(location.search);
-  apiParams.delete("tab");
-  const requestPath =
-    location.pathname + (apiParams.size ? `?${apiParams}` : "");
-  const activePath = useRef(currentPath);
-  activePath.current = currentPath;
-  const refresh = () => setRevision((value) => value + 1);
-  useEffect(() => {
-    const controller = new AbortController();
-    setLoading(true);
-    setError("");
-    setData(null);
-    api(requestPath, undefined, undefined, controller.signal)
-      .then((result) => {
-        if (result.location) {
-          navigate(result.location, { replace: true });
-          return;
-        }
-        setData(result as PageData);
-        update(result);
-      })
-      .catch((problem) => {
-        if (controller.signal.aborted) return;
-        if (problem instanceof APIError && problem.status === 401) expire();
-        else setError(problem.message);
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
-      });
-    return () => controller.abort();
-  }, [requestPath, revision, navigate, update, expire]);
-  useEffect(() => {
-    if (data?.Title) document.title = `${data.Title} · Schakker Administration`;
-  }, [data?.Title]);
-  async function submit(fields: Fields) {
-    if (busy || !data) return false;
-    setBusy(true);
-    setError("");
-    const submittedPath = currentPath;
-    try {
-      const result = await api(location.pathname, fields, data.CSRF);
-      if (activePath.current !== submittedPath) return false;
-      if (result.location) {
-        if (result.location === currentPath) refresh();
-        else navigate(result.location);
-      } else {
-        setData(result as PageData);
-        update(result);
-      }
-      return true;
-    } catch (problem) {
-      if (activePath.current !== submittedPath) return false;
-      if (problem instanceof APIError && problem.status === 401) expire();
-      else setError((problem as Error).message);
-      return false;
-    } finally {
-      setBusy(false);
-    }
-  }
-  if (loading)
-    return (
-      <p className="empty-state" role="status">
-        Loading page…
-      </p>
-    );
-  if (!data)
-    return (
-      <>
-        <Notice error>{error || "Page unavailable."}</Notice>
-        <Button onClick={refresh}>Retry</Button>
-      </>
-    );
+  const { pathname, search } = useLocation();
+  const params = new URLSearchParams(search);
+  params.delete("tab");
+  const requestPath = pathname + (params.size ? `?${params}` : "");
+  const page = usePageRequest<PageData>({
+    request: api,
+    requestPath,
+    titleSuffix: "Schakker Administration",
+  });
   let content: ReactNode;
-  switch (location.pathname) {
-    case "/admin/administrators":
-      content = <Users administrators />;
-      break;
-    case "/admin/users":
-      content = <Users />;
-      break;
-    case "/admin/groups":
-      content = <Groups />;
-      break;
-    case "/admin/connections":
-      content = <Connections />;
-      break;
+  switch (pathname) {
+    case "/admin/administrators": content = <Users administrators />; break;
+    case "/admin/users": content = <Users />; break;
+    case "/admin/groups": content = <Groups />; break;
+    case "/admin/connections": content = <Connections />; break;
   }
-
   return (
-    <PageContext.Provider value={{ data, busy, submit, refresh }}>
-      <div aria-busy={busy}>
-        {error && <Notice error>{error}</Notice>}
-        {data.Message && <Notice>{data.Message}</Notice>}
-        {busy && <p role="status">Processing…</p>}
-        {content}
-      </div>
-    </PageContext.Provider>
+    <PageFrame {...page}>
+      {page.data && (
+        <PageContext.Provider value={{ data: page.data, busy: page.busy, submit: page.submit, refresh: page.refresh }}>
+          {content}
+        </PageContext.Provider>
+      )}
+    </PageFrame>
   );
 }

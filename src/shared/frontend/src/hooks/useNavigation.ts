@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-// Only navigation presentation is shared; authentication and routes remain local.
+// Navigation state belongs to each mounted application shell.
 export function useNavigation(pathname: string, search: string) {
   const [open, setOpen] = useState(false);
   useEffect(() => {

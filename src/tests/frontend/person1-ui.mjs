@@ -191,10 +191,13 @@ const state = {
   noDatabases: false,
   failure: null,
   delay: 0,
+  formResponse: null,
   loggedOut: false,
 };
 const requests = [];
 const jobReads = [];
+const sessionFixtures = new Map();
+let secondaryServer;
 function page(admin = false) {
   const db = { ...database, Permission: state.permission };
   return {
@@ -259,10 +262,11 @@ const json = (res, status, body) => {
   res.writeHead(status, { "Content-Type": "application/json" });
   res.end(JSON.stringify(body));
 };
-const server = createServer(async (req, res) => {
+const serve = async (req, res) => {
   try {
     const url = new URL(req.url, "http://localhost");
     const path = url.pathname;
+    const sessionFixture = sessionFixtures.get(req.headers.host);
     if (path.startsWith("/api/")) {
       const chunks = [];
       for await (const chunk of req) chunks.push(chunk);
@@ -270,12 +274,51 @@ const server = createServer(async (req, res) => {
         ? JSON.parse(Buffer.concat(chunks).toString())
         : {};
       requests.push({
+        origin: req.headers.host,
         method: req.method,
         path,
         body,
         csrf: req.headers["x-csrf-token"],
         key: req.headers["idempotency-key"],
       });
+      if (req.method === "POST" && state.formResponse?.path === path) {
+        const reply = state.formResponse;
+        state.formResponse = null;
+        await new Promise((done) => setTimeout(done, 500));
+        return json(res, 200, reply.body);
+      }
+      if (sessionFixture) {
+        const response = () => ({
+          ...page(sessionFixture.admin),
+          User: { ...person, DisplayName: sessionFixture.name },
+          CSRF: sessionFixture.csrf,
+        });
+        if (path === "/api/session") {
+          if (sessionFixture.sessionFailures > 0) {
+            sessionFixture.sessionFailures--;
+            return json(res, 503, { error: "Session unavailable" });
+          }
+          return json(res, 200, sessionFixture.loggedIn ? response() : { CSRF: sessionFixture.csrf });
+        }
+        if (req.method !== "GET" && req.headers["x-csrf-token"] !== sessionFixture.csrf)
+          return json(res, 403, { error: "Wrong application CSRF" });
+        if (path === "/api/login") {
+          if (sessionFixture.rejectLogin) {
+            sessionFixture.rejectLogin = false;
+            sessionFixture.csrf += "-refreshed";
+            return json(res, 401, { error: "Login challenge expired", CSRF: sessionFixture.csrf });
+          }
+          sessionFixture.loggedIn = true;
+          return json(res, 200, {});
+        }
+        if (!sessionFixture.loggedIn)
+          return json(res, 401, { error: "Session expired" });
+        if (path === "/api/logout") {
+          sessionFixture.loggedIn = false;
+          return json(res, 200, {});
+        }
+        return json(res, 200, response());
+      }
       if (state.delay)
         await new Promise((done) => setTimeout(done, state.delay));
       if (
@@ -485,7 +528,7 @@ const server = createServer(async (req, res) => {
     res.end(
       await readFile(
         join(
-          path.startsWith("/admin") || url.searchParams.get("admin") === "1"
+          sessionFixture?.admin || path.startsWith("/admin") || url.searchParams.get("admin") === "1"
             ? adminDist
             : userDist,
           "index.html",
@@ -495,7 +538,8 @@ const server = createServer(async (req, res) => {
   } catch (error) {
     json(res, 500, { error: error.message });
   }
-});
+};
+const server = createServer(serve);
 await new Promise((done) => server.listen(0, "127.0.0.1", done));
 const origin = `http://127.0.0.1:${server.address().port}`;
 const profile = await mkdtemp(join(tmpdir(), "schakker-ui-"));
@@ -594,7 +638,7 @@ try {
   const text = (value) =>
     `!!document.body?.innerText.includes(${JSON.stringify(value)})`;
   const navigate = async (path, expected) => {
-    const navigation = await cdp("Page.navigate", { url: origin + path });
+    const navigation = await cdp("Page.navigate", { url: new URL(path, origin).href });
     assert.equal(navigation.errorText, undefined);
     // Shared navigation labels can already exist in the previous document.
     // Wait for this document to load before checking its rendered content.
@@ -1139,6 +1183,84 @@ try {
     await wait(`document.querySelector('textarea')?.value === 'ALTER TABLE demo ADD reviewed boolean;'`);
     assert.equal(requests.some((request) => ["save_draft", "delete_draft"].includes(request.body.action)), false);
   });
+  await test("Shared page handling ignores form responses after navigating away in both SPAs", async () => {
+    for (const admin of [false, true]) {
+      await navigate(admin ? "/admin/groups" : "/migrations/new?db=7", admin ? "Designate leader" : "Create migration");
+      if (admin) {
+        await click("Designate leader");
+        await field("Leader for Editors", "2");
+      } else {
+        await field("Migration title", "Pending analysis");
+        await evaluate(`(() => {
+          const input = document.querySelector('textarea[name=sql]');
+          Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(input, 'SELECT 1;');
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+        })()`);
+      }
+      state.formResponse = {
+        path: admin ? "/api/admin/groups" : "/api/migrations/new",
+        body: { location: admin ? "/admin/connections?late=1" : "/sql-viewer?late=1" },
+      };
+      await click(admin ? "Save leader" : "Analyze migration");
+      await wait("!!document.querySelector('main [aria-busy=true]')");
+      await click(admin ? "Employees" : "My Databases");
+      const target = admin ? "/admin/users" : "/databases";
+      await wait(`location.pathname === ${JSON.stringify(target)} && !document.querySelector('.empty-state[role=status]')`);
+      await delay(650);
+      assert.equal(await evaluate("location.pathname"), target);
+      assert.equal(await evaluate("location.search.includes('late=1')"), false);
+    }
+  });
+  await test("Shared session UI keeps two origins independent and handles login recovery and expiry", async () => {
+    secondaryServer = createServer(serve);
+    await new Promise((done) => secondaryServer.listen(0, "127.0.0.1", done));
+    const adminOrigin = `http://127.0.0.1:${secondaryServer.address().port}`;
+    const apps = [
+      { origin, admin: false, name: "User session", home: "/dashboard", csrf: "user-csrf" },
+      { origin: adminOrigin, admin: true, name: "Admin session", home: "/admin/users", csrf: "admin-csrf" },
+    ];
+    const start = requests.length;
+    try {
+      for (const app of apps) {
+        sessionFixtures.set(new URL(app.origin).host, {
+          ...app, sessionFailures: 1, rejectLogin: true, loggedIn: false,
+        });
+        await navigate(`${app.origin}/login`, "Session unavailable");
+        await click("Retry");
+        await wait(text("Username"));
+        assert.equal(
+          await evaluate("document.querySelector('.auth-card > .eyebrow').textContent"),
+          app.admin ? "Administration portal" : "Employee portal",
+        );
+        await field("Username", "demo.leader");
+        await field("Password", "SyntheticPassword123!");
+        await evaluate("document.querySelector('form').requestSubmit()");
+        await wait(text("Login challenge expired"));
+        await evaluate("document.querySelector('form').requestSubmit()");
+        await wait(text(app.name));
+        await wait(`location.pathname === ${JSON.stringify(app.home)}`);
+        const logins = requests.slice(start).filter((request) => request.origin === new URL(app.origin).host && request.path === "/api/login");
+        assert.deepEqual(logins.map((request) => request.csrf), [app.csrf, app.csrf + "-refreshed"]);
+      }
+      await navigate(origin + "/dashboard", "User session");
+      await evaluate("document.querySelector('[aria-label=Logout]').click()");
+      await wait(text("Username"));
+      assert.equal(sessionFixtures.get(new URL(adminOrigin).host).loggedIn, true);
+      await field("Username", "demo.leader");
+      await field("Password", "SyntheticPassword123!");
+      await evaluate("document.querySelector('form').requestSubmit()");
+      await wait(text("User session"));
+      await navigate(adminOrigin + "/admin/users", "Admin session");
+      sessionFixtures.get(new URL(adminOrigin).host).loggedIn = false;
+      await click("Groups");
+      await wait(text("Username"));
+      await wait("location.pathname === '/login'");
+      await navigate(origin + "/dashboard", "User session");
+      assert.equal(sessionFixtures.get(new URL(origin).host).loggedIn, true);
+    } finally {
+      sessionFixtures.clear();
+    }
+  });
   await test("No browser runtime errors or direct migration execution from new screens", async () => {
     assert.deepEqual(browserErrors, []);
     assert.equal(
@@ -1167,6 +1289,8 @@ try {
   socket?.close();
   browser.kill();
   await new Promise((done) => server.close(done));
+  if (secondaryServer)
+    await new Promise((done) => secondaryServer.close(done));
   // Only remove the unique browser profile created by this script under tmpdir.
   if (
     profile.startsWith(resolve(tmpdir()) + sep) &&

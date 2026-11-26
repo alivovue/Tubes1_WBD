@@ -24,6 +24,8 @@ The three implementations are now connected. The current transport contract is [
 
 The SQL analysis editor retains M1 tools. Its synchronous HTTP execute action is rejected; migrations run through reviewed durable jobs.
 
+Shared frontend behavior lives in `src/shared/frontend/src/app/`: `SessionProvider` owns session loading/retry, `LoginPage` owns sign-in and refreshed CSRF challenges, `WorkspaceShell` owns layout/navigation presentation and logout, and `usePageRequest`/`PageFrame` own page loading, form submission, redirects, errors and stale-response protection. Each app supplies its own API client, routes, navigation and login copy. The user app also supplies the migration-workspace data adapter and derives SQL-analysis status from the shared submission state. Each provider has independent React state; API clients continue to use their application's own origin. Database and backend authorization ownership are unchanged.
+
 ## Verification and evidence
 
 From `src/`:
@@ -40,6 +42,8 @@ The last command launches an installed Chromium browser against an ephemeral loo
 The script saves a machine-readable [report](qa/person1/report.json) and screenshots under `docs/qa/person1/`. The fixtures contain only invented users, database names and SQL. They are outside the production frontend and cannot be activated in a real app.
 
 Checks cover existing SPA routes; reversible/irreversible validation; optimistic draft editing; batch configuration; separate View Only leader approval; enqueue; partial progress, retry and cancellation; rollback/forward review requests; exact-pair filtering; HTTP 403/409/422/503, loading/empty/missing states; permission presentation; active-member leader selection; login/logout; and layout at 1440×1000, 390×844 and 375×812.
+
+Shared-app regressions additionally run the user and admin bundles on two loopback origins with independent synthetic session fixtures. They cover session-load retry, login rejection with a refreshed CSRF challenge, independent logout/expiry, and late form responses after navigation in both SPAs. These fixtures verify frontend behavior and make no database authorization claim.
 
 Screenshots: [user desktop](qa/person1/user-1440.png), [user 390px](qa/person1/user-390.png), [user 375px](qa/person1/user-375.png), [admin desktop](qa/person1/admin-1440.png), [admin 390px](qa/person1/admin-390.png), [admin 375px](qa/person1/admin-375.png), [partial batch](qa/person1/user-partial-desktop.png).
 

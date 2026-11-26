@@ -19,6 +19,8 @@ Source workspace Schakker berada di folder `src/` repositori. Di dalamnya terdap
 
 Pengguna memiliki explorer, SQL viewer, query plan dan migrasi sesuai permission. Admin mengelola akun, grup, keanggotaan, permission dan registrasi koneksi terenkripsi. Server admin tidak memiliki adapter target, explorer, eksekusi SQL atau mesin migrasi. Registrasi hanya menyimpan konfigurasi; pengujian koneksi admin telah dihapus.
 
+Kedua SPA memakai `@schakker/ui` untuk sesi, login/logout, layout navigasi, pemuatan halaman dan submit form. Implementasi bersama ada di `src/shared/frontend/src/app/`; masing-masing `App.tsx` menentukan rute, navigasi, konten login dan pemetaan data halamannya sendiri. Setiap SPA tetap menggunakan client `/api` pada origin servernya sendiri dan memiliki state sesi terpisah.
+
 ## Kepemilikan database
 
 - `schakker_admin`: akun/password/sesi admin, definisi akun pengguna biasa beserta password, grup, membership, permission, registrasi koneksi dan atribusi administrasi.
