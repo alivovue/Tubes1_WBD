@@ -21,6 +21,8 @@ type Database = dao.Database
 type AdminData = dao.AdminData
 
 type Service struct {
+	auth.CSRF[Identity]
+	rotation  auth.Rotation
 	store     *dao.Store
 	config    Config
 	dummyHash []byte
@@ -43,7 +45,13 @@ func NewService(store *dao.Store, config Config) (*Service, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Service{store: store, config: config, dummyHash: []byte(dummy)}, nil
+	return &Service{
+		CSRF:      auth.NewCSRF[Identity](config.Key, config.Now),
+		rotation:  auth.Rotation{Key: config.Key, GracePeriod: config.GracePeriod, NotFound: ErrNotFound},
+		store:     store,
+		config:    config,
+		dummyHash: []byte(dummy),
+	}, nil
 }
 
 func (s *Service) RequireAdmin(ctx context.Context, actor int64) error {

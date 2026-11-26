@@ -7,10 +7,12 @@ import (
 	"encoding/json"
 
 	"schakker_shared/authority"
+
+	sqldb "schakker_shared/database"
 )
 
 func (d *Store) SetGroupLeader(ctx context.Context, group, user int64) error {
-	return affected(d.q.ExecContext(ctx, `UPDATE access_groups SET leader_user_id=$2 WHERE id=$1
+	return sqldb.Affected(d.q.ExecContext(ctx, `UPDATE access_groups SET leader_user_id=$2 WHERE id=$1
  AND EXISTS(SELECT 1 FROM user_groups m JOIN users u ON u.id=m.user_id
  WHERE m.group_id=$1 AND m.user_id=$2 AND u.is_active)`, group, user))
 }
@@ -21,7 +23,7 @@ func (d *Store) CreateLedGroup(ctx context.Context, name, description string, le
 	err := d.Transaction(ctx, func(tx *Store) error {
 		if err := tx.q.QueryRowContext(ctx, `INSERT INTO access_groups(name,description) SELECT $1,$2
    WHERE EXISTS(SELECT 1 FROM users WHERE id=$3 AND is_active) RETURNING id`, name, description, leader).Scan(&id); err != nil {
-			return classify(err)
+			return sqldb.Classify(err)
 		}
 		if err := tx.SetMembership(ctx, leader, id, true); err != nil {
 			return err
@@ -52,7 +54,7 @@ func (d *Store) MigrationAuthority(ctx context.Context, actor, database int64) (
  AND EXISTS(SELECT 1 FROM user_groups m JOIN group_database_permissions p ON p.group_id=m.group_id
  WHERE m.user_id=$1 AND p.database_id=d.id)`, actor, database).Scan(&snapshot.DatabaseID, &snapshot.Revision, &connection, &groups)
 	if err != nil {
-		return snapshot, classify(err)
+		return snapshot, sqldb.Classify(err)
 	}
 	if err = json.Unmarshal(groups, &snapshot.Groups); err != nil {
 		return snapshot, err

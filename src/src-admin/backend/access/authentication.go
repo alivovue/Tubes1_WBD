@@ -18,6 +18,10 @@ type Identity struct {
 	AbsoluteExpires time.Time `json:"-"`
 }
 
+func (i Identity) SessionInfo() auth.SessionInfo {
+	return auth.SessionInfo{UserID: i.User.ID, SessionID: i.SessionID, AbsoluteExpires: i.AbsoluteExpires}
+}
+
 func (s *Service) Login(ctx context.Context, username, password, oldToken string) (Identity, string, error) {
 	if len(username) > 100 || len(password) > 72 {
 		return Identity{}, "", ErrUnauthenticated
@@ -101,9 +105,9 @@ func (s *Service) Authenticate(ctx context.Context, raw string) (Identity, strin
 			return ErrUnauthenticated
 		}
 		if token.ReplacedAt == nil && !now.Before(token.IssuedAt.Add(s.config.RotationInterval)) {
-			replacement, err = s.rotateSession(ctx, tx, session, auth.TokenHash(raw), now)
+			replacement, err = s.rotation.Rotate(ctx, tx, session.ID, session.AbsoluteExpires, auth.TokenHash(raw), now)
 		} else if token.ReplacedAt != nil {
-			replacement, err = s.replacementForGraceToken(ctx, tx, session.ID, auth.TokenHash(raw), now)
+			replacement, err = s.rotation.Recover(ctx, tx, session.ID, auth.TokenHash(raw), now)
 		}
 		if err != nil {
 			return err

@@ -1,19 +1,23 @@
 package dao
 
-import "context"
+import (
+	"context"
+
+	sqldb "schakker_shared/database"
+)
 
 func (d *Store) GroupPermission(ctx context.Context, group, database int64) (Permission, error) {
 	var permission Permission
 	err := d.q.QueryRowContext(ctx, `SELECT COALESCE((SELECT access_level FROM group_database_permissions WHERE group_id=$1 AND database_id=$2),'')`, group, database).Scan(&permission)
-	return permission, classify(err)
+	return permission, sqldb.Classify(err)
 }
 
 func (d *Store) SaveGroup(ctx context.Context, id int64, name, description string) error {
 	if id == 0 {
 		_, err := d.q.ExecContext(ctx, `INSERT INTO access_groups(name,description) VALUES($1,$2)`, name, description)
-		return classify(err)
+		return sqldb.Classify(err)
 	}
-	return affected(d.q.ExecContext(ctx, `UPDATE access_groups SET name=$2,description=$3 WHERE id=$1`, id, name, description))
+	return sqldb.Affected(d.q.ExecContext(ctx, `UPDATE access_groups SET name=$2,description=$3 WHERE id=$1`, id, name, description))
 }
 
 func (d *Store) DeleteGroup(ctx context.Context, id int64) error {
@@ -24,14 +28,14 @@ func (d *Store) DeleteGroup(ctx context.Context, id int64) error {
 		if _, err := tx.q.ExecContext(ctx, `DELETE FROM user_groups WHERE group_id=$1`, id); err != nil {
 			return err
 		}
-		return affected(tx.q.ExecContext(ctx, `DELETE FROM access_groups WHERE id=$1`, id))
+		return sqldb.Affected(tx.q.ExecContext(ctx, `DELETE FROM access_groups WHERE id=$1`, id))
 	})
 }
 
 func (d *Store) SetMembership(ctx context.Context, user, group int64, member bool) error {
 	var exists bool
 	if err := d.q.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM users u CROSS JOIN access_groups g WHERE u.id=$1 AND g.id=$2)`, user, group).Scan(&exists); err != nil {
-		return classify(err)
+		return sqldb.Classify(err)
 	}
 	if !exists {
 		return ErrNotFound
@@ -42,7 +46,7 @@ func (d *Store) SetMembership(ctx context.Context, user, group int64, member boo
 	} else {
 		_, err = d.q.ExecContext(ctx, `DELETE FROM user_groups WHERE user_id=$1 AND group_id=$2`, user, group)
 	}
-	return classify(err)
+	return sqldb.Classify(err)
 }
 
 func (d *Store) SetGrant(ctx context.Context, actor, group, database int64, permission Permission) error {
@@ -51,7 +55,7 @@ func (d *Store) SetGrant(ctx context.Context, actor, group, database int64, perm
 	}
 	var exists bool
 	if err := d.q.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM access_groups g CROSS JOIN managed_databases d WHERE g.id=$1 AND d.id=$2)`, group, database).Scan(&exists); err != nil {
-		return classify(err)
+		return sqldb.Classify(err)
 	}
 	if !exists {
 		return ErrNotFound
@@ -62,56 +66,56 @@ func (d *Store) SetGrant(ctx context.Context, actor, group, database int64, perm
 	} else {
 		_, err = d.q.ExecContext(ctx, `INSERT INTO group_database_permissions(group_id,database_id,access_level,granted_by_admin_id) VALUES($1,$2,$3,NULLIF($4,0)) ON CONFLICT(group_id,database_id) DO UPDATE SET access_level=EXCLUDED.access_level,granted_by_admin_id=EXCLUDED.granted_by_admin_id,granted_at=CURRENT_TIMESTAMP`, group, database, permission, actor)
 	}
-	return classify(err)
+	return sqldb.Classify(err)
 }
 
 func (d *Store) Groups(ctx context.Context) ([]Group, error) {
 	rows, err := d.q.QueryContext(ctx, `SELECT g.id,g.name,COALESCE(g.description,''),g.leader_user_id,COALESCE(u.display_name,''),COALESCE(u.is_active AND EXISTS(SELECT 1 FROM user_groups m WHERE m.group_id=g.id AND m.user_id=u.id),FALSE) FROM access_groups g LEFT JOIN users u ON u.id=g.leader_user_id ORDER BY g.name`)
 	if err != nil {
-		return nil, classify(err)
+		return nil, sqldb.Classify(err)
 	}
 	defer rows.Close()
 	result := make([]Group, 0)
 	for rows.Next() {
 		var group Group
 		if err := rows.Scan(&group.ID, &group.Name, &group.Description, &group.LeaderUserID, &group.LeaderName, &group.LeaderValid); err != nil {
-			return nil, classify(err)
+			return nil, sqldb.Classify(err)
 		}
 		result = append(result, group)
 	}
-	return result, classify(rows.Err())
+	return result, sqldb.Classify(rows.Err())
 }
 
 func (d *Store) Memberships(ctx context.Context) ([]Membership, error) {
 	rows, err := d.q.QueryContext(ctx, `SELECT user_id,group_id FROM user_groups ORDER BY user_id,group_id`)
 	if err != nil {
-		return nil, classify(err)
+		return nil, sqldb.Classify(err)
 	}
 	defer rows.Close()
 	result := make([]Membership, 0)
 	for rows.Next() {
 		var membership Membership
 		if err := rows.Scan(&membership.UserID, &membership.GroupID); err != nil {
-			return nil, classify(err)
+			return nil, sqldb.Classify(err)
 		}
 		result = append(result, membership)
 	}
-	return result, classify(rows.Err())
+	return result, sqldb.Classify(rows.Err())
 }
 
 func (d *Store) Grants(ctx context.Context) ([]Grant, error) {
 	rows, err := d.q.QueryContext(ctx, `SELECT group_id,database_id,access_level FROM group_database_permissions ORDER BY group_id,database_id`)
 	if err != nil {
-		return nil, classify(err)
+		return nil, sqldb.Classify(err)
 	}
 	defer rows.Close()
 	result := make([]Grant, 0)
 	for rows.Next() {
 		var grant Grant
 		if err := rows.Scan(&grant.GroupID, &grant.DatabaseID, &grant.Permission); err != nil {
-			return nil, classify(err)
+			return nil, sqldb.Classify(err)
 		}
 		result = append(result, grant)
 	}
-	return result, classify(rows.Err())
+	return result, sqldb.Classify(rows.Err())
 }

@@ -172,6 +172,33 @@ func TestSeparatedLoginsCookiesCSRFAndLogout(t *testing.T) {
 	if ordinary.Name == administrator.Name || ordinary.Value == administrator.Value {
 		t.Fatal("applications share a cookie namespace or session")
 	}
+	// Even after relabeling a cookie to the other application's namespace,
+	// its login signature must not authorize credentials on that application.
+	for _, test := range []struct {
+		from, to                   http.Handler
+		fromCookie, toCookie, user string
+	}{
+		{userServer, adminServer, userauth.UserLoginCookieName, adminhttp.AdminLoginCookieName, "it.admin"},
+		{adminServer, userServer, adminhttp.AdminLoginCookieName, userauth.UserLoginCookieName, "it.editor"},
+	} {
+		challenge := apiRequest(t, test.from, http.MethodGet, "/session", "", nil)
+		csrf := decodeAPI[struct{ CSRF string }](t, challenge).CSRF
+		body, _ := json.Marshal(map[string]string{"username": test.user, "password": password})
+		request := httptest.NewRequest(http.MethodPost, "/api/login", strings.NewReader(string(body)))
+		request.Header.Set("Content-Type", "application/json")
+		request.Header.Set("X-CSRF-Token", csrf)
+		for _, cookie := range challenge.Result().Cookies() {
+			if cookie.Name == test.fromCookie {
+				cookie.Name = test.toCookie
+				request.AddCookie(cookie)
+			}
+		}
+		response := httptest.NewRecorder()
+		test.to.ServeHTTP(response, request)
+		if response.Code != http.StatusForbidden {
+			t.Fatalf("application accepted the other application's login challenge: %d", response.Code)
+		}
+	}
 	for _, test := range []struct {
 		handler http.Handler
 		name    string

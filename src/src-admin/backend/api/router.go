@@ -37,10 +37,7 @@ type router struct {
 
 func NewHandler(auth, administration *access.Service, registered *connectionconfig.Service, production bool) http.Handler {
 	return &router{
-		auth: apiauth.Auth{
-			Access: auth, Production: production, SessionCookie: apiauth.AdminCookieName,
-			LoginCookie: apiauth.AdminLoginCookieName, Home: "/admin/users",
-		},
+		auth:           apiauth.New(auth, production),
 		authentication: auth,
 		users:          users.Handler{Users: administration, Administrators: auth},
 		groups: groups.Handler{

@@ -14,8 +14,8 @@ import (
 )
 
 var (
-	ErrUnauthenticated = errors.New("silakan login kembali")
-	ErrForbidden       = errors.New("akses ditolak")
+	ErrUnauthenticated = auth.ErrUnauthenticated
+	ErrForbidden       = auth.ErrForbidden
 	ErrInvalid         = dao.ErrInvalid
 	ErrConflict        = dao.ErrConflict
 	ErrNotFound        = dao.ErrNotFound
@@ -58,3 +58,7 @@ func (c *Config) validate() error {
 func cleanName(s string, max int) bool { return strings.TrimSpace(s) != "" && len(s) <= max }
 
 func HashPassword(password string) (string, error) { return auth.HashPassword(password) }
+
+func permissionIncreased(previous, next Permission) bool {
+	return previous == NoAccess && (next == ViewOnly || next == ViewEdit) || previous == ViewOnly && next == ViewEdit
+}

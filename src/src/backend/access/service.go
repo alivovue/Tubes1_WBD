@@ -3,7 +3,10 @@ package access
 import (
 	"context"
 	"errors"
+
+	"schakker_shared/auth"
 	"schakker_shared/authority"
+
 	"tubes1_wbd/database/dao"
 )
 
@@ -29,6 +32,8 @@ func (s *Service) MigrationAuthority(ctx context.Context, actor, database int64)
 }
 
 type Service struct {
+	auth.CSRF[Identity]
+	rotation  auth.Rotation
 	store     *dao.Store
 	config    Config
 	authority Authority
@@ -42,7 +47,13 @@ func NewService(store *dao.Store, config Config) (*Service, error) {
 		return nil, err
 	}
 	config.Key = append([]byte(nil), config.Key...)
-	return &Service{store: store, config: config, authority: config.Authority}, nil
+	return &Service{
+		CSRF:      auth.NewCSRF[Identity](config.Key, config.Now),
+		rotation:  auth.Rotation{Key: config.Key, GracePeriod: config.GracePeriod, NotFound: ErrNotFound},
+		store:     store,
+		config:    config,
+		authority: config.Authority,
+	}, nil
 }
 func (s *Service) DatabaseConnection(ctx context.Context, user, database int64, required Permission) (dao.DatabaseMetadata, error) {
 	if user < 1 || database < 1 || (required != ViewOnly && required != ViewEdit) {

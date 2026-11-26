@@ -4,12 +4,14 @@ import (
 	"errors"
 	"time"
 
+	"schakker_shared/auth"
+
 	"tubes1_wbd/database/dao"
 )
 
 var (
-	ErrUnauthenticated = errors.New("silakan login kembali")
-	ErrForbidden       = errors.New("akses ditolak")
+	ErrUnauthenticated = auth.ErrUnauthenticated
+	ErrForbidden       = auth.ErrForbidden
 	ErrInvalid         = dao.ErrInvalid
 	ErrConflict        = dao.ErrConflict
 	ErrNotFound        = dao.ErrNotFound

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"schakker_shared/config"
+	"schakker_shared/database"
 	"schakker_shared/observability"
 
 	"tubes1_wbd/backend/access"
@@ -42,7 +43,7 @@ func Open(root string) (*Runtime, error) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	db, err := setup.Open(ctx, dsn)
+	db, err := database.OpenPostgres(ctx, dsn)
 	if err != nil {
 		return nil, err
 	}

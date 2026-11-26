@@ -50,11 +50,8 @@ func NewHandler(auth *access.Service, databases *dbmanagement.Service, migration
 		jobService = jobs[0]
 	}
 	return &router{
-		jobs: migrationsapi.JobsHandler{Jobs: jobService},
-		auth: apiauth.Auth{
-			Access: auth, Production: production, SessionCookie: access.CookieName,
-			LoginCookie: apiauth.UserLoginCookieName, Home: "/dashboard",
-		},
+		jobs:       migrationsapi.JobsHandler{Jobs: jobService},
+		auth:       apiauth.New(auth, production),
 		dashboard:  dashboard.Handler{Databases: databases, Migrations: migrations},
 		explorer:   explorer.Handler{Databases: databases},
 		viewer:     sqlviewer.Handler{Databases: databases},

@@ -1,6 +1,10 @@
 package dao
 
-import "time"
+import (
+	"time"
+
+	"schakker_shared/auth"
+)
 
 type User struct {
 	ID          int64
@@ -82,8 +86,4 @@ type Session struct {
 	Revoked         bool
 }
 
-type SessionToken struct {
-	IssuedAt       time.Time
-	ReplacedAt     *time.Time
-	GraceExpiresAt *time.Time
-}
+type SessionToken = auth.SessionToken

@@ -11,6 +11,7 @@ import (
 
 	"log/slog"
 	"schakker_shared/config"
+	"schakker_shared/database"
 	"schakker_shared/observability"
 
 	"tubes1_wbd_admin/backend/access"
@@ -57,7 +58,7 @@ func servicesFromEnvironment(root string) (Services, *runtime, error) {
 	production := os.Getenv("SCHAKKER_ADMIN_ENV") == "production"
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	db, err := setup.Open(ctx, dsn)
+	db, err := database.OpenPostgres(ctx, dsn)
 	if err != nil {
 		return Services{}, nil, err
 	}

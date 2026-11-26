@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"time"
+
+	sqldb "schakker_shared/database"
 )
 
 var ErrJobLeaseLost = errors.New("migration job lease lost")
@@ -42,7 +44,7 @@ type BatchProgress struct {
 
 func (d *Store) JobTimes(ctx context.Context, id string) (started, completed *time.Time, err error) {
 	err = d.q.QueryRowContext(ctx, `SELECT min(a.started_at), CASE WHEN j.status IN ('succeeded','failed','reverted') THEN max(a.finished_at) END FROM migration_jobs j LEFT JOIN migration_job_attempts a ON a.job_id=j.id WHERE j.id=$1 GROUP BY j.status`, id).Scan(&started, &completed)
-	return started, completed, classify(err)
+	return started, completed, sqldb.Classify(err)
 }
 
 func (d *Store) Jobs(ctx context.Context, database int64, limit, offset int) ([]MigrationJob, error) {
@@ -77,7 +79,7 @@ func (d *Store) Job(ctx context.Context, id string) (MigrationJob, error) {
 			err = json.Unmarshal(raw, &j.TraceContext)
 		}
 	}
-	return j, classify(err)
+	return j, sqldb.Classify(err)
 }
 func (d *Store) InsertJob(ctx context.Context, review, database, actor int64, operation, key, actionHash, sqlHash string, carrier map[string]string) (string, error) {
 	q, err := d.TransactionQueries()
@@ -90,7 +92,7 @@ func (d *Store) InsertJob(ctx context.Context, review, database, actor int64, op
 	raw, _ := json.Marshal(carrier)
 	var id string
 	err = q.QueryRowContext(ctx, `INSERT INTO migration_jobs(review_id,database_id,requested_by,operation,idempotency_key,action_hash,sql_hash,trace_context) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`, review, database, actor, operation, key, actionHash, sqlHash, string(raw)).Scan(&id)
-	return id, classify(err)
+	return id, sqldb.Classify(err)
 }
 func (d *Store) ReserveCancellation(ctx context.Context, original, cancelJob string) error {
 	if !d.inTx {
@@ -99,7 +101,7 @@ func (d *Store) ReserveCancellation(ctx context.Context, original, cancelJob str
 	var previous *string
 	err := d.q.QueryRowContext(ctx, `SELECT cancellation_job_id::text FROM migration_jobs WHERE id=$1 AND status IN('partial','uncertain','partially_reverted') AND lease_owner IS NULL FOR UPDATE`, original).Scan(&previous)
 	if err != nil {
-		if errors.Is(classify(err), ErrNotFound) {
+		if errors.Is(sqldb.Classify(err), ErrNotFound) {
 			return ErrConflict
 		}
 		return err
@@ -120,7 +122,7 @@ func (d *Store) ReserveCancellation(ctx context.Context, original, cancelJob str
 			return err
 		}
 	}
-	return affected(d.q.ExecContext(ctx, `UPDATE migration_jobs SET cancellation_job_id=$2 WHERE id=$1`, original, cancelJob))
+	return sqldb.Affected(d.q.ExecContext(ctx, `UPDATE migration_jobs SET cancellation_job_id=$2 WHERE id=$1`, original, cancelJob))
 }
 func (d *Store) ClaimJob(ctx context.Context, owner string, lease time.Duration) (out MigrationJob, err error) {
 	if owner == "" || lease < 3*time.Second {
@@ -140,7 +142,7 @@ func (d *Store) ClaimJob(ctx context.Context, owner string, lease time.Duration)
  AND (p.created_at,p.id)<(j.created_at,j.id))
  ORDER BY j.created_at,j.id FOR UPDATE OF j SKIP LOCKED LIMIT 1`).Scan(&id)
 		if err != nil {
-			return classify(err)
+			return sqldb.Classify(err)
 		}
 		if _, err = tx.q.ExecContext(ctx, `UPDATE migration_job_attempts SET finished_at=clock_timestamp(),outcome='uncertain',error_class='lease_expired' WHERE job_id=$1 AND finished_at IS NULL`, id); err != nil {
 			return err
@@ -157,7 +159,7 @@ func (d *Store) ClaimJob(ctx context.Context, owner string, lease time.Duration)
  CASE WHEN j.operation='rollback' THEN v.expected_active_version ELSE v.expected_active_version+1 END,
  CASE WHEN j.operation IN('rollback','batch_cancel') THEN r.down_sql ELSE r.up_sql END,v.target_execution_id
  FROM migration_jobs j JOIN migration_reviews v ON v.id=j.review_id JOIN migration_revisions r ON r.id=v.revision_id WHERE j.id=$1`, id)
-		return classify(err)
+		return sqldb.Classify(err)
 	})
 	return out, err
 }
@@ -187,13 +189,13 @@ func (d *Store) SaveBatchProgress(ctx context.Context, j MigrationJob, p BatchPr
 	return d.Transaction(ctx, func(tx *Store) error {
 		var id string
 		if err := tx.q.QueryRowContext(ctx, `SELECT id FROM migration_jobs WHERE id=$1 AND lease_owner=$2 AND attempt=$3 AND lease_until>clock_timestamp() AND status IN('running','reverting') FOR UPDATE`, j.ID, j.LeaseOwner, j.Attempt).Scan(&id); err != nil {
-			if errors.Is(classify(err), ErrNotFound) {
+			if errors.Is(sqldb.Classify(err), ErrNotFound) {
 				return ErrJobLeaseLost
 			}
 			return err
 		}
 		_, err := tx.q.ExecContext(ctx, `INSERT INTO migration_batch_progress(job_id,committed_batches,committed_rows,last_cursor,total_rows_estimate,partial_state,reverted_batches,reverted_rows) VALUES($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT(job_id) DO UPDATE SET committed_batches=EXCLUDED.committed_batches,committed_rows=EXCLUDED.committed_rows,last_cursor=EXCLUDED.last_cursor,total_rows_estimate=EXCLUDED.total_rows_estimate,partial_state=EXCLUDED.partial_state,reverted_batches=EXCLUDED.reverted_batches,reverted_rows=EXCLUDED.reverted_rows,updated_at=clock_timestamp()`, j.ID, p.Batches, p.Rows, p.Cursor, p.Total, p.State, p.RevertedBatches, p.RevertedRows)
-		return classify(err)
+		return sqldb.Classify(err)
 	})
 }
 func (d *Store) FinishJob(ctx context.Context, j MigrationJob, status, errorClass string, delay time.Duration) error {
@@ -228,7 +230,7 @@ func (d *Store) FinishJob(ctx context.Context, j MigrationJob, status, errorClas
 		if err == nil && status == "reverted" {
 			_, err = tx.q.ExecContext(ctx, `UPDATE migration_jobs SET status='reverted',updated_at=clock_timestamp() WHERE cancellation_job_id=$1`, j.ID)
 		}
-		return classify(err)
+		return sqldb.Classify(err)
 	})
 }
 func (d *Store) RetryJob(ctx context.Context, id string, recoveryActor ...int64) error {
@@ -240,7 +242,7 @@ func (d *Store) RetryJob(ctx context.Context, id string, recoveryActor ...int64)
 	if actor > 0 {
 		class = "reconcile_only"
 	}
-	err := affected(d.q.ExecContext(ctx, `UPDATE migration_jobs SET status='pending',error_class=$2,trace_context=CASE WHEN $3::bigint>0 THEN trace_context||jsonb_build_object('recovery_actor_id',$3::text) ELSE trace_context-'recovery_actor_id' END,next_attempt_at=clock_timestamp(),updated_at=clock_timestamp() WHERE id=$1 AND status IN('failed','partial','uncertain','partially_reverted') AND (attempt<max_attempts OR (status='uncertain' AND $2='reconcile_only')) AND cancellation_job_id IS NULL AND lease_owner IS NULL`, id, class, actor))
+	err := sqldb.Affected(d.q.ExecContext(ctx, `UPDATE migration_jobs SET status='pending',error_class=$2,trace_context=CASE WHEN $3::bigint>0 THEN trace_context||jsonb_build_object('recovery_actor_id',$3::text) ELSE trace_context-'recovery_actor_id' END,next_attempt_at=clock_timestamp(),updated_at=clock_timestamp() WHERE id=$1 AND status IN('failed','partial','uncertain','partially_reverted') AND (attempt<max_attempts OR (status='uncertain' AND $2='reconcile_only')) AND cancellation_job_id IS NULL AND lease_owner IS NULL`, id, class, actor))
 	if errors.Is(err, ErrNotFound) {
 		return ErrConflict
 	}

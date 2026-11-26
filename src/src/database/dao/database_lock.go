@@ -5,6 +5,8 @@ import (
 	"database/sql/driver"
 	"schakker_shared/observability"
 	"time"
+
+	sqldb "schakker_shared/database"
 )
 
 func (d *Store) WithDatabaseLock(ctx context.Context, id int64, action func(*Store) error) error {
@@ -50,5 +52,5 @@ func (d *Store) LockDatabase(ctx context.Context, id int64) error {
 	started := time.Now()
 	_, err := d.q.ExecContext(ctx, `SELECT pg_advisory_xact_lock($1)`, -id)
 	observability.LockWait(ctx, "transaction", time.Since(started), err)
-	return classify(err)
+	return sqldb.Classify(err)
 }

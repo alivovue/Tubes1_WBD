@@ -21,6 +21,8 @@ Pengguna memiliki explorer, SQL viewer, query plan dan migrasi sesuai permission
 
 Kedua SPA memakai `@schakker/ui` untuk sesi, login/logout, layout navigasi, pemuatan halaman dan submit form. Implementasi bersama ada di `src/shared/frontend/src/app/`; masing-masing `App.tsx` menentukan rute, navigasi, konten login dan pemetaan data halamannya sendiri. Setiap SPA tetap menggunakan client `/api` pada origin servernya sendiri dan memiliki state sesi terpisah.
 
+Backend berbagi mekanisme di `src/shared/backend/`: `database` untuk membuka pool PostgreSQL dan menerjemahkan error SQL, `auth` untuk token/CSRF dan rotasi, `authhttp` untuk HTTP login/sesi/logout, serta `webapp` untuk static asset, shell React dan routing prefix `/api/`. Pool dibuat terpisah dari DSN yang diberikan masing-masing aplikasi; helper tidak membaca environment atau menyimpan koneksi global. Setiap aplikasi memasok nama cookie, tujuan login dan identitasnya sendiri. Verifikasi kredensial, policy otorisasi, DAO/query SQL, transaksi/locking, validasi schema dan startup tetap dimiliki backend masing-masing. Kode bersama tidak memberikan akses database tambahan atau mengubah kontrak API internal admin.
+
 ## Kepemilikan database
 
 - `schakker_admin`: akun/password/sesi admin, definisi akun pengguna biasa beserta password, grup, membership, permission, registrasi koneksi dan atribusi administrasi.

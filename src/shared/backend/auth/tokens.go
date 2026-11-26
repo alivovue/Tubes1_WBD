@@ -1,5 +1,5 @@
-// Package auth implements cryptographic mechanisms without owning identity,
-// session storage, authorization decisions, configuration, or secrets.
+// Package auth implements cryptographic and session mechanisms. Applications
+// own identity verification, storage, authorization, configuration and secrets.
 package auth
 
 import (

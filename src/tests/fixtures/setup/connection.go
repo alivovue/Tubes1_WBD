@@ -6,7 +6,9 @@ import (
 	"context"
 	"database/sql"
 
-	runtime "tubes1_wbd/database/setup"
+	"schakker_shared/database"
 )
 
-func OpenConnection(ctx context.Context, dsn string) (*sql.DB, error) { return runtime.Open(ctx, dsn) }
+func OpenConnection(ctx context.Context, dsn string) (*sql.DB, error) {
+	return database.OpenPostgres(ctx, dsn)
+}
