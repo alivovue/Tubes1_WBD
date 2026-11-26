@@ -23,8 +23,6 @@ func ErrorStatus(err error) (string, int) {
 	switch {
 	case errors.Is(err, migration.ErrDefinitionInvalid):
 		return "Supply valid SQL up and SQL down, or mark the migration irreversible with a reason.", 422
-	case errors.Is(err, migration.ErrWorkflowRequired):
-		return "Submit an immutable migration revision for leader approval and asynchronous execution.", 409
 	case errors.Is(err, migration.ErrWorkflowConflict):
 		return "The revision, approval, authority or active migration position changed, or the database is blocked. Refresh and start a new review.", 409
 	case errors.Is(err, migration.ErrWorkflowUnavailable), errors.Is(err, controlplane.ErrUnavailable):
@@ -39,12 +37,6 @@ func ErrorStatus(err error) (string, int) {
 		return "This item changed or already exists. Reload and try again.", 409
 	case errors.Is(err, ErrUnsavedDraft):
 		return "This draft has unsaved SQL. Save the draft, then analyze the saved SQL before execution.", 409
-	case errors.Is(err, migration.ErrNonAtomicAcceptance):
-		return "Accept the non-atomic execution warning before continuing.", 400
-	case errors.Is(err, migration.ErrOutcomeUnknown), errors.Is(err, migration.ErrHistoryPending):
-		return "The execution outcome needs reconciliation. Check the changelog before retrying.", 409
-	case errors.Is(err, migration.ErrExecution):
-		return "Migration failed. Check its changelog entry for the outcome and completed statements.", 400
 	case errors.Is(err, migration.ErrUnsafeSQL):
 		return "Migration SQL cannot run procedural blocks, define executable routines, change session settings, use dynamic SQL helpers, or access internal migration metadata. Use explicit schema or data statements.", 400
 	case errors.Is(err, diff.ErrDependency):

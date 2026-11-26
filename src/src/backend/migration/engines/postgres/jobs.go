@@ -103,8 +103,8 @@ func RunJob(ctx context.Context, db *sql.DB, adapter adapters.Adapter, r engines
 			observability.Event(ctx, event, rollbackErr, "job_id", r.JobID)
 		}
 	}()
-	s := &session{tx: tx, adapter: adapter}
-	if err = s.Prepare(ctx, engines.Receipt{TotalStatements: len(statements)}); err != nil {
+	s := &session{tx: tx}
+	if err = s.prepare(ctx); err != nil {
 		return out, err
 	}
 	for _, statement := range statements {
@@ -114,7 +114,7 @@ func RunJob(ctx context.Context, db *sql.DB, adapter adapters.Adapter, r engines
 		queryCtx, querySpan := observability.Start(ctx, "migration.query")
 		started := time.Now()
 		observability.Event(queryCtx, "sql.start", nil, "job_id", r.JobID, "query", "[redacted]")
-		err = s.Execute(queryCtx, statement)
+		err = s.execute(queryCtx, statement)
 		observability.SQL(queryCtx, statement.SQL, 0, s.lastRows, started, err)
 		querySpan.End()
 		if err != nil {

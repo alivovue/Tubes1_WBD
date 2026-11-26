@@ -20,7 +20,6 @@ var (
 	ErrWorkflowConflict    = errors.New("migration workflow changed or is blocked")
 	ErrDefinitionInvalid   = errors.New("supply validated up/down SQL or an irreversible reason")
 	ErrWorkflowUnavailable = errors.New("migration workflow infrastructure is unavailable")
-	ErrWorkflowRequired    = errors.New("submit a migration revision for leader review and asynchronous execution")
 )
 var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 

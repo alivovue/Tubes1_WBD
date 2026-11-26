@@ -38,6 +38,15 @@ func enqueueP3(t *testing.T, f *workflowFixture, title string) string {
 	must(t, err)
 	return id
 }
+func enqueueDefinition(t *testing.T, f *workflowFixture, input migration.DefinitionInput) string {
+	t.Helper()
+	revision, err := f.workflow.CreateDefinition(f.ctx, f.editor, f.database, input)
+	must(t, err)
+	review := f.approve(t, f.submit(t, revision))
+	id, err := f.workflow.Enqueue(f.ctx, f.editor, review.ID, fmt.Sprintf("definition-%d", revision.ID))
+	must(t, err)
+	return id
+}
 func assertJob(t *testing.T, f *workflowFixture, id, status string) dao.MigrationJob {
 	t.Helper()
 	j, err := f.runtimeStore.Job(f.ctx, id)
@@ -62,6 +71,11 @@ func TestP3WorkerExecutesApprovedJobAndRollbackForward(t *testing.T) {
 		t.Fatal("job not claimed")
 	}
 	j := assertJob(t, f, id, "succeeded")
+	var legacyReceipts bool
+	must(t, f.dbs.Managed.QueryRowContext(f.ctx, `SELECT to_regclass('_schakker.migration_receipts') IS NOT NULL`).Scan(&legacyReceipts))
+	if legacyReceipts {
+		t.Fatal("M2 worker created the retired synchronous receipt table")
+	}
 	if f.state(t).ActiveVersion != 1 {
 		t.Fatal("committed head missing")
 	}

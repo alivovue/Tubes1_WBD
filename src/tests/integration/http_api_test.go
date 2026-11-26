@@ -145,7 +145,7 @@ func TestSPAAuthenticationLoginLogoutAndExpiration(t *testing.T) {
 	}
 }
 
-func TestMigrationAPIReviewDraftAndExecute(t *testing.T) {
+func TestMigrationAPIAnalysisDraftAndRetiredActions(t *testing.T) {
 	f := newFixture(t, true)
 	reader := f.user(t, "spa.reader")
 	target := f.register(t)
@@ -176,8 +176,8 @@ func TestMigrationAPIReviewDraftAndExecute(t *testing.T) {
 		Review     migration.Analysis
 		SchemaDiff json.RawMessage
 	}](t, analyzed)
-	if review.Review.Signature == "" || review.Review.SchemaDiffAvailable || review.Review.SchemaDiffMessage == "" {
-		t.Fatal("arbitrary SQL did not return its signed review and diff-unavailable state")
+	if review.Review.SQLHash != migration.SQLHash(draft.SQL) || review.Review.SchemaDiffAvailable || review.Review.SchemaDiffMessage == "" {
+		t.Fatal("arbitrary SQL did not return its analysis and diff-unavailable state")
 	}
 	visual := url.Values{"csrf": {csrf}, "db": {fmt.Sprint(target.ID)}, "action": {"analyze_visual"}, "description": {"Add SPA note"}, "operations": {`[{"Kind":"add_column","Schema":"public","Table":"employees","Column":{"Name":"spa_note","DataType":"text","Nullable":true}}]`}}
 	visualResponse := apiRequest(t, handler, http.MethodPost, "/migrations/new", cookie, visual)
@@ -202,24 +202,26 @@ func TestMigrationAPIReviewDraftAndExecute(t *testing.T) {
 	if denied.Code != 403 {
 		t.Fatalf("View Only migration analysis returned %d", denied.Code)
 	}
-	encoded, err := json.Marshal(review.Review)
+	for _, action := range []string{"execute", "resolve", "reconcile"} {
+		form.Set("action", action)
+		form.Set("confirm", "on")
+		form.Set("id", "1")
+		form.Set("outcome", "applied")
+		path := "/migrations/new"
+		if action == "reconcile" {
+			path = "/migrations"
+		}
+		blocked := apiRequest(t, handler, http.MethodPost, path, cookie, form)
+		if blocked.Code != http.StatusBadRequest {
+			t.Fatalf("retired action %q was accepted: %d %s", action, blocked.Code, blocked.Body.String())
+		}
+	}
+	table, err = f.databases.DescribeTable(f.ctx, f.editor, target.ID, "public", "employees")
 	must(t, err)
-	form.Set("review", string(encoded))
-	form.Set("action", "execute")
-	missingConfirmation := apiRequest(t, handler, http.MethodPost, "/migrations/new", cookie, form)
-	if missingConfirmation.Code != 400 {
-		t.Fatalf("execution without confirmation returned %d", missingConfirmation.Code)
-	}
-	form.Set("confirm", "on")
-	form.Set("sql", draft.SQL+" SELECT 1;")
-	stale := apiRequest(t, handler, http.MethodPost, "/migrations/new", cookie, form)
-	if stale.Code != 409 {
-		t.Fatalf("changed SQL returned %d", stale.Code)
-	}
-	form.Set("sql", draft.SQL)
-	blocked := apiRequest(t, handler, http.MethodPost, "/migrations/new", cookie, form)
-	if blocked.Code != 409 {
-		t.Fatalf("browser bypassed approval/async workflow: %d %s", blocked.Code, blocked.Body.String())
+	for _, column := range table.Columns {
+		if column.Name == "spa_note" {
+			t.Fatal("retired browser action executed SQL")
+		}
 	}
 	entries, err := f.migrations.History(f.ctx, f.editor, target.ID, 50, 0)
 	must(t, err)

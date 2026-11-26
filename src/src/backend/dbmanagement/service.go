@@ -2,9 +2,6 @@ package dbmanagement
 
 import (
 	"context"
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/base64"
 	"time"
 
 	"tubes1_wbd/backend/access"
@@ -55,9 +52,4 @@ func NewService(store *dao.Store, auth *access.Service, config Config) (*Service
 func (s *Service) SupportedDBMS() []string { return s.registry.Supported() }
 func (s *Service) Databases(ctx context.Context, actor int64) ([]dao.Database, error) {
 	return s.access.AccessibleDatabases(ctx, actor)
-}
-func (s *Service) SignReview(value string) string {
-	mac := hmac.New(sha256.New, s.config.Key)
-	mac.Write([]byte("schakker/migration-review/v1\x00" + value))
-	return base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
 }

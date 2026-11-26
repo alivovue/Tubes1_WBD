@@ -2,12 +2,10 @@ package migration
 
 import (
 	"context"
-	"crypto/hmac"
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
 	"errors"
-	"fmt"
 	"strings"
 	"time"
 
@@ -22,14 +20,10 @@ import (
 )
 
 var (
-	ErrInvalid             = access.ErrInvalid
-	ErrForbidden           = access.ErrForbidden
-	ErrStale               = errors.New("migration review is stale; analyze the current SQL again")
-	ErrExecution           = errors.New("migration execution failed")
-	ErrUnsafeSQL           = engines.ErrUnsafeSQL
-	ErrOutcomeUnknown      = engines.ErrOutcomeUnknown
-	ErrHistoryPending      = errors.New("migration history requires reconciliation")
-	ErrNonAtomicAcceptance = errors.New("explicit acceptance is required for a non-atomic migration")
+	ErrInvalid   = access.ErrInvalid
+	ErrForbidden = access.ErrForbidden
+	ErrStale     = errors.New("migration review is stale; analyze the current SQL again")
+	ErrUnsafeSQL = engines.ErrUnsafeSQL
 )
 
 type Service struct {
@@ -62,13 +56,6 @@ type Analysis struct {
 	SchemaDiffAvailable   bool
 	SchemaDiffMessage     string
 	SchemaDiff            *diff.Result
-	Signature             string
-}
-type ExecuteInput struct {
-	Review          Analysis
-	Description     string
-	DraftID         int64
-	AcceptNonAtomic bool
 }
 
 func NewService(store *dao.Store, auth *access.Service, databases *dbmanagement.Service) (*Service, error) {
@@ -108,9 +95,6 @@ func ValidateSQL(query string, dbms ...string) ([]Statement, error) {
 		return nil, err
 	}
 	return engine.Parse(query)
-}
-func (s *Service) signature(a Analysis) string {
-	return s.databases.SignReview(fmt.Sprintf("%d\x00%s\x00%d\x00%s\x00%s\x00%s\x00%s", a.DatabaseID, a.SQLHash, a.BaseVersion, a.SchemaFingerprint, a.ConnectionFingerprint, a.DBMS, a.Mode))
 }
 func (s *Service) SaveDraft(ctx context.Context, actor, database int64, input DraftInput) (dao.MigrationDraft, error) {
 	if err := s.access.RequirePermission(ctx, actor, database, access.ViewEdit); err != nil {
@@ -246,7 +230,6 @@ func (s *Service) Analyze(ctx context.Context, actor, database int64, query stri
 		return Analysis{}, ErrStale
 	}
 	a := Analysis{DatabaseID: database, DBMS: engine.Name(), SQL: query, SQLHash: SQLHash(query), BaseVersion: version, SchemaFingerprint: fingerprint, ConnectionFingerprint: connection, Plans: plans, Mode: mode, Transactional: mode == engines.Transactional, Warnings: warnings, SchemaDiffMessage: "Schema diff is unavailable for arbitrary SQL; use a desired schema or structured change set"}
-	a.Signature = s.signature(a)
 	return a, nil
 }
 func (s *Service) AnalyzeDesired(ctx context.Context, actor, database int64, desired diff.Snapshot) (Analysis, error) {
@@ -292,14 +275,4 @@ func (s *Service) analyzeDiff(ctx context.Context, actor, database int64, curren
 	a.SchemaDiffMessage = ""
 	a.SchemaDiff = &result
 	return a, nil
-}
-func (s *Service) validateReview(database int64, a Analysis) ([]Statement, error) {
-	if database != a.DatabaseID || a.BaseVersion < 0 || a.SQLHash != SQLHash(a.SQL) || a.SchemaFingerprint == "" || a.ConnectionFingerprint == "" || !hmac.Equal([]byte(a.Signature), []byte(s.signature(a))) {
-		return nil, ErrStale
-	}
-	engine, err := s.engines.Select(a.DBMS)
-	if err != nil {
-		return nil, err
-	}
-	return engine.Parse(a.SQL)
 }

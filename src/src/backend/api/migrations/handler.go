@@ -158,38 +158,6 @@ func (h Handler) Action(w http.ResponseWriter, r *http.Request, data *response.D
 		}
 		response.Redirect(w, r, "/migrations/new", "Draft deleted", "db", db)
 		return true, nil
-	case "execute":
-		if r.URL.Path != "/migrations/new" || form.Get("confirm") != "on" {
-			return false, access.ErrInvalid
-		}
-		var review migration.Analysis
-		if err := httpapi.DecodeStrictJSON(form.Get("review"), &review); err != nil {
-			return false, err
-		}
-		if data.SQL != review.SQL {
-			return false, migration.ErrStale
-		}
-		return false, migration.ErrWorkflowRequired
-	case "reconcile":
-		if err := h.Migrations.Reconcile(r.Context(), actor, db); err != nil {
-			return false, err
-		}
-		response.Redirect(w, r, "/migrations", "History reconciled", "db", db)
-		return true, nil
-	case "resolve":
-		id, err := httpapi.ID(form.Get("id"))
-		if err != nil {
-			return false, err
-		}
-		outcome := form.Get("outcome")
-		if outcome != "applied" && outcome != "failed" {
-			return false, access.ErrInvalid
-		}
-		if err := h.Migrations.ResolveOutcome(r.Context(), actor, db, id, outcome == "applied", form.Get("reason")); err != nil {
-			return false, err
-		}
-		response.Redirect(w, r, "/migrations", "Execution outcome recorded", "db", db, "id", id)
-		return true, nil
 	}
 	return false, access.ErrInvalid
 }

@@ -12,7 +12,6 @@ import (
 	"tubes1_wbd/backend/access"
 	userauth "tubes1_wbd/backend/api/auth"
 	"tubes1_wbd/backend/dbmanagement"
-	"tubes1_wbd/backend/migration"
 	adminhttp "tubes1_wbd_admin/backend/api/auth"
 )
 
@@ -92,13 +91,9 @@ func TestSeparatedApplicationsEnforceAuthenticationDomainsAndManagedEndpointBoun
 		{"drafts", func() error { _, err := f.migrations.Drafts(f.ctx, f.admin, target.ID, 10, 0); return err }},
 		{"history", func() error { _, err := f.migrations.History(f.ctx, f.admin, target.ID, 10, 0); return err }},
 		{"analysis", func() error { _, err := f.migrations.Analyze(f.ctx, f.admin, target.ID, "SELECT 1"); return err }},
-		{"execution", func() error {
-			_, err := f.migrations.Execute(f.ctx, f.admin, target.ID, migration.ExecuteInput{})
+		{"migration definition", func() error {
+			_, err := f.migrations.Workflow().CreateDefinition(f.ctx, f.admin, target.ID, reversible("admin_denied"))
 			return err
-		}},
-		{"reconciliation", func() error { return f.migrations.Reconcile(f.ctx, f.admin, target.ID) }},
-		{"outcome resolution", func() error {
-			return f.migrations.ResolveOutcome(f.ctx, f.admin, target.ID, 1, true, "Manually verified")
 		}},
 	}
 	for _, test := range deniedCalls {

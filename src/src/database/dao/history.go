@@ -48,14 +48,6 @@ func (d *Store) AppendCommittedExecution(ctx context.Context, e CommittedExecuti
 func (d *Store) SetDefinitionVersion(ctx context.Context, id, version int64) error {
 	return affected(d.q.ExecContext(ctx, `UPDATE migration_definitions SET logical_version=$2 WHERE id=$1 AND (logical_version IS NULL OR logical_version=$2)`, id, version))
 }
-func (d *Store) WorkflowEnabled(ctx context.Context, database int64) (bool, error) {
-	var enabled bool
-	err := d.q.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM migration_definitions WHERE database_id=$1)`, database).Scan(&enabled)
-	return enabled, classify(err)
-}
-
-// Block a new reviewed migration sequence when synchronous executions have
-// already committed or have unresolved effects on the same target database.
 func (d *Store) BlockingSynchronousHistory(ctx context.Context, database int64) (bool, error) {
 	var unsafe bool
 	err := d.q.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM migration_executions e WHERE e.database_id=$1 AND

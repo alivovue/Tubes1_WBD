@@ -91,21 +91,6 @@ func TestDAOHistoryPreservesPartialProgressAndAppliedVersions(t *testing.T) {
 		t.Fatal("successful execution history lost version or draft association")
 	}
 }
-func TestDAORejectsInvalidExecutionFinalization(t *testing.T) {
-	_, store, _ := newSQLStub(t)
-	version := int64(1)
-	zero := int64(0)
-	for _, tc := range []struct {
-		status    string
-		version   *int64
-		completed int
-	}{{"running", nil, 0}, {"succeeded", nil, 0}, {"failed", &version, 0}, {"succeeded", &zero, 0}, {"failed", nil, -1}} {
-		wantError(t, store.FinishExecution(context.Background(), 3, 1, tc.status, tc.version, "", testTime, tc.completed), dao.ErrInvalid)
-	}
-	_, err := store.StartExecution(context.Background(), dao.MigrationExecution{Mode: "unknown"})
-	wantError(t, err, dao.ErrInvalid)
-}
-
 func TestDraftDeletionRollsBackHistoryDetachmentOnFailure(t *testing.T) {
 	_, store, _ := newSQLStub(t,
 		sqlStep{kind: "begin"},

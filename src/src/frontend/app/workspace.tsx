@@ -529,16 +529,6 @@ export function History() {
                     value={execution.SQL}
                   />
                 </Field>
-                {data.CanEdit && execution.Status === "running" && (
-                  <>
-                    <Form>
-                      <Hidden name="db" value={data.Database.ID} />
-                      <Button action="reconcile" secondary>
-                        Reconcile from target receipt
-                      </Button>
-                    </Form>
-                  </>
-                )}
               </div>
             </Panel>
           )}

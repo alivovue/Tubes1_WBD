@@ -4,31 +4,18 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"maps"
 	"schakker_shared/observability"
-	"time"
 
 	"tubes1_wbd/backend/migration/engines"
 )
 
-type receiptKey struct {
-	namespace string
-	attemptID int64
-}
-
-type protectedReceipt struct {
-	version   int64
-	sqlHash   string
-	appliedAt time.Time
-}
-
 type protectedMetadata struct {
-	catalog  string
-	receipts map[receiptKey]protectedReceipt
-	jobs     string
+	catalog string
+	jobs    string
 }
 
-const protectedCatalogSQL = `SELECT COALESCE((SELECT c.relkind='r' AND NOT c.relrowsecurity AND NOT c.relforcerowsecurity FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='_schakker' AND c.relname='migration_receipts'),false),
+const protectedCatalogSQL = `SELECT COALESCE((SELECT c.relkind='r' AND NOT c.relrowsecurity AND NOT c.relforcerowsecurity FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='_schakker' AND c.relname='job_receipts'),false)
+AND NOT EXISTS(SELECT 1 FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='_schakker' AND c.relname='migration_receipts' AND (c.relkind<>'r' OR c.relrowsecurity OR c.relforcerowsecurity)),
 COALESCE(pg_catalog.string_agg(item,E'\n' ORDER BY item),'') FROM (
 SELECT pg_catalog.json_build_array('schema',n.oid,n.nspowner,n.nspacl)::text AS item FROM pg_catalog.pg_namespace n WHERE n.nspname='_schakker'
 UNION ALL SELECT pg_catalog.json_build_array('relation',c.oid,c.relname,c.relkind,c.relowner,c.relpersistence,c.relrowsecurity,c.relforcerowsecurity,c.relacl,c.reloptions)::text FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='_schakker'
@@ -44,29 +31,12 @@ UNION ALL SELECT pg_catalog.json_build_array('setting',name,setting)::text FROM 
 ) protected`
 
 func (s *session) captureProtectedMetadata(ctx context.Context) (*protectedMetadata, error) {
-	state := &protectedMetadata{receipts: make(map[receiptKey]protectedReceipt)}
+	state := &protectedMetadata{}
 	var valid bool
 	if err := observability.WrapSQL(s.tx).QueryRowContext(ctx, protectedCatalogSQL).Scan(&valid, &state.catalog); err != nil || !valid {
 		return nil, engines.ErrProtectedMetadata
 	}
-	rows, err := observability.WrapSQL(s.tx).QueryContext(ctx, `SELECT namespace,attempt_id,version,sql_hash,applied_at FROM _schakker.migration_receipts`)
-	if err != nil {
-		return nil, engines.ErrProtectedMetadata
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var key receiptKey
-		var receipt protectedReceipt
-		if err := rows.Scan(&key.namespace, &key.attemptID, &receipt.version, &receipt.sqlHash, &receipt.appliedAt); err != nil {
-			return nil, engines.ErrProtectedMetadata
-		}
-		receipt.appliedAt = receipt.appliedAt.UTC()
-		state.receipts[key] = receipt
-	}
-	if rows.Err() != nil {
-		return nil, engines.ErrProtectedMetadata
-	}
-	rows.Close()
+	var err error
 	state.jobs, err = s.hashJobMetadata(ctx)
 	if err != nil {
 		return nil, engines.ErrProtectedMetadata
@@ -76,7 +46,9 @@ func (s *session) captureProtectedMetadata(ctx context.Context) (*protectedMetad
 
 func (s *session) hashJobMetadata(ctx context.Context) (string, error) {
 	hash := sha256.New()
-	for _, table := range []string{"job_receipts", "batch_jobs", "batch_undo", "batch_receipts"} {
+	// Existing legacy receipts remain protected evidence, but are never created
+	// or reconciled by the M2 worker.
+	for _, table := range []string{"job_receipts", "batch_jobs", "batch_undo", "batch_receipts", "migration_receipts"} {
 		var exists bool
 		if err := observability.WrapSQL(s.tx).QueryRowContext(ctx, `SELECT to_regclass($1) IS NOT NULL`, "_schakker."+table).Scan(&exists); err != nil {
 			return "", err
@@ -91,7 +63,11 @@ func (s *session) hashJobMetadata(ctx context.Context) (string, error) {
 			query += ` WHERE execution_id::text<>$1`
 			args = []any{s.jobReceiptException}
 		}
-		query += ` ORDER BY namespace,job_id`
+		if table == "migration_receipts" {
+			query += ` ORDER BY namespace,attempt_id`
+		} else {
+			query += ` ORDER BY namespace,job_id`
+		}
 		if table == "batch_undo" {
 			query += `,row_id`
 		}
@@ -125,7 +101,7 @@ func (s *session) verifyProtectedMetadata(ctx context.Context) error {
 		return engines.ErrProtectedMetadata
 	}
 	actual, err := s.captureProtectedMetadata(ctx)
-	if err != nil || actual.catalog != s.protected.catalog || actual.jobs != s.protected.jobs || !maps.Equal(actual.receipts, s.protected.receipts) {
+	if err != nil || actual.catalog != s.protected.catalog || actual.jobs != s.protected.jobs {
 		return engines.ErrProtectedMetadata
 	}
 	return nil

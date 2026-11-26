@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"tubes1_wbd/backend/access"
-	"tubes1_wbd/backend/migration"
 )
 
 func TestIT06PermissionsComeFromGroupsAndHighestGrantWins(t *testing.T) {
@@ -42,13 +41,13 @@ func TestIT07ViewOnlyUserCannotAnalyzeOrExecuteMigration(t *testing.T) {
 	f.grant(t, user.ID, target.ID, access.ViewOnly)
 	f.grant(t, f.editor, target.ID, access.ViewEdit)
 	sql := "CREATE TABLE public.forbidden_change(id INTEGER)"
-	review, err := f.migrations.Analyze(f.ctx, f.editor, target.ID, sql)
+	_, err := f.migrations.Analyze(f.ctx, f.editor, target.ID, sql)
 	must(t, err)
 	before, err := f.databases.Fingerprint(f.ctx, user.ID, target.ID)
 	must(t, err)
 	_, err = f.migrations.Analyze(f.ctx, user.ID, target.ID, sql)
 	wantError(t, err, access.ErrForbidden)
-	_, err = f.migrations.Execute(f.ctx, user.ID, target.ID, migration.ExecuteInput{Review: review})
+	_, err = f.migrations.Workflow().CreateDefinition(f.ctx, user.ID, target.ID, reversible("forbidden_change"))
 	wantError(t, err, access.ErrForbidden)
 	if f.tableExists(t, "forbidden_change") {
 		t.Fatal("denied migration changed the schema")

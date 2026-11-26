@@ -42,11 +42,6 @@ func TestMigrationWritesRequireEditPermission(t *testing.T) {
 			return err
 		}},
 		{"analyze changes", func() error { _, err := service.AnalyzeChanges(context.Background(), 7, 3, nil); return err }},
-		{"execute", func() error {
-			_, err := service.Execute(context.Background(), 7, 3, migration.ExecuteInput{})
-			return err
-		}},
-		{"reconcile", func() error { return service.Reconcile(context.Background(), 7, 3) }},
 	}
 	for _, tc := range calls {
 		t.Run(tc.name, func(t *testing.T) {
@@ -102,15 +97,6 @@ func TestDraftOptimisticConflictAndDeletion(t *testing.T) {
 	stub.append(permissionStep(access.ViewEdit), sqlStep{kind: "begin"}, scalarStep("FROM migration_drafts WHERE database_id=$1 AND id=$2 FOR UPDATE", int64(4)), execStep("UPDATE migration_executions SET draft_id=NULL"), execStep("DELETE FROM migration_drafts"), sqlStep{kind: "commit"})
 	if err := service.DeleteDraft(context.Background(), 7, 3, 4); err != nil {
 		t.Fatal(err)
-	}
-}
-func TestExecutionRejectsUntrustedOrEditedReviewBeforeConnecting(t *testing.T) {
-	_, store, stub := newSQLStub(t)
-	_, _, service := newServices(t, store)
-	for _, review := range []migration.Analysis{{}, {DatabaseID: 99, SQL: "SELECT 1", SQLHash: migration.SQLHash("SELECT 1")}, {DatabaseID: 3, BaseVersion: -1}, {DatabaseID: 3, SQL: "SELECT 2", SQLHash: migration.SQLHash("SELECT 1")}, {DatabaseID: 3, SQL: "SELECT 1", SQLHash: migration.SQLHash("SELECT 1"), SchemaFingerprint: "schema", ConnectionFingerprint: "connection", DBMS: "postgresql", Mode: engines.Transactional, Signature: "forged"}} {
-		stub.append(permissionStep(access.ViewEdit))
-		_, err := service.Execute(context.Background(), 7, 3, migration.ExecuteInput{Review: review})
-		wantError(t, err, migration.ErrStale)
 	}
 }
 func TestMigrationEngineModesAndRegistry(t *testing.T) {
@@ -190,10 +176,4 @@ func TestSQLHashBindsExactText(t *testing.T) {
 	if len(hash) != 64 || hash != migration.SQLHash("SELECT 1") || hash == migration.SQLHash("SELECT 1;") || hash == migration.SQLHash("SELECT 2") {
 		t.Fatal("SQL hash did not bind the exact reviewed text")
 	}
-}
-
-func TestManualOutcomeResolutionRemainsOperatorOnly(t *testing.T) {
-	_, store, _ := newSQLStub(t)
-	_, _, service := newServices(t, store)
-	wantError(t, service.ResolveOutcome(context.Background(), 7, 3, 1, true, "Verified target state"), access.ErrForbidden)
 }

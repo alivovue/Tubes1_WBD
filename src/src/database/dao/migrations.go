@@ -111,35 +111,6 @@ func (d *Store) MigrationVersion(ctx context.Context, database int64) (int64, er
 	return version, classify(err)
 }
 
-func (d *Store) StartExecution(ctx context.Context, e MigrationExecution) (MigrationExecution, error) {
-	if e.Mode == "" {
-		e.Mode = "transactional"
-	}
-	if e.Mode != "transactional" && e.Mode != "non_atomic" {
-		return MigrationExecution{}, ErrInvalid
-	}
-	var id int64
-	err := d.q.QueryRowContext(ctx, `INSERT INTO migration_executions(database_id,draft_id,executed_by,description,sql_text,attempted_version,status,execution_mode,total_statements) VALUES($1,$2,$3,$4,$5,$6,'running',$7,$8) RETURNING id`, e.DatabaseID, e.DraftID, e.ExecutedBy, e.Description, e.SQL, e.AttemptedVersion, e.Mode, e.TotalStatements).Scan(&id)
-	if err != nil {
-		return MigrationExecution{}, classify(err)
-	}
-	return d.Execution(ctx, e.DatabaseID, id)
-}
-
-func (d *Store) FinishExecution(ctx context.Context, database, id int64, status string, version *int64, message string, finished time.Time, completed ...int) error {
-	if (status != "succeeded" && status != "failed") || (status == "succeeded" && (version == nil || *version < 1)) || (status == "failed" && version != nil) {
-		return ErrInvalid
-	}
-	var progress *int
-	if len(completed) > 0 {
-		if completed[0] < 0 {
-			return ErrInvalid
-		}
-		progress = &completed[0]
-	}
-	return affected(d.q.ExecContext(ctx, `UPDATE migration_executions SET status=$3::text,applied_version=$4,error_message=NULLIF($5,''),finished_at=$6,completed_statements=COALESCE($7,CASE WHEN $3='succeeded' THEN total_statements ELSE completed_statements END) WHERE database_id=$1 AND id=$2 AND status='running'`, database, id, status, version, message, finished, progress))
-}
-
 func (d *Store) Execution(ctx context.Context, database, id int64) (MigrationExecution, error) {
 	return scanExecution(d.q.QueryRowContext(ctx, `SELECT `+executionColumns+` FROM migration_executions e JOIN users u ON u.id=e.executed_by WHERE e.database_id=$1 AND e.id=$2`, database, id))
 }
@@ -167,8 +138,4 @@ func (d *Store) executions(ctx context.Context, query string, args ...any) ([]Mi
 		result = append(result, e)
 	}
 	return result, classify(rows.Err())
-}
-
-func (d *Store) RecordResolution(ctx context.Context, database, id, actor int64, note string) error {
-	return affected(d.q.ExecContext(ctx, `UPDATE migration_executions SET description=COALESCE(description,'')||E'\nManual resolution by '||$3::bigint::text||': '||$4 WHERE database_id=$1 AND id=$2 AND status='running'`, database, id, actor, note))
 }

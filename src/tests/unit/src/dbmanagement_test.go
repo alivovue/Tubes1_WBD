@@ -1,9 +1,7 @@
 package unit_test
 
 import (
-	"bytes"
 	"context"
-	"encoding/base64"
 	"testing"
 	"time"
 
@@ -42,7 +40,7 @@ func TestExplorerEnforcesDatabasePermissionsBeforeConnecting(t *testing.T) {
 	_, err := service.QueryPlans(context.Background(), 7, 3, "SELECT 1")
 	wantError(t, err, access.ErrForbidden)
 }
-func TestDatabaseConfigurationAndReviewSigning(t *testing.T) {
+func TestDatabaseConfigurationValidation(t *testing.T) {
 	_, store, _ := newSQLStub(t)
 	auth := newAccess(t, store, nil)
 	for _, change := range []func(*dbmanagement.Config){func(c *dbmanagement.Config) { c.Key = nil }, func(c *dbmanagement.Config) { c.ConnectTimeout = 0 }, func(c *dbmanagement.Config) { c.QueryTimeout = -time.Second }} {
@@ -50,29 +48,5 @@ func TestDatabaseConfigurationAndReviewSigning(t *testing.T) {
 		change(&config)
 		_, err := dbmanagement.NewService(store, auth, config)
 		wantError(t, err, access.ErrInvalid)
-	}
-	key := bytes.Repeat([]byte{9}, 32)
-	service, err := dbmanagement.NewService(store, auth, dbmanagement.DefaultConfig(key, false))
-	if err != nil {
-		t.Fatal(err)
-	}
-	first := service.SignReview("exact SQL and metadata")
-	decoded, err := base64.RawURLEncoding.DecodeString(first)
-	if err != nil || len(decoded) != 32 {
-		t.Fatal("review signature is not a SHA-256 MAC")
-	}
-	if first != service.SignReview("exact SQL and metadata") || first == service.SignReview("edited SQL and metadata") {
-		t.Fatal("review MAC does not bind the reviewed data")
-	}
-	key[0]++
-	if first != service.SignReview("exact SQL and metadata") {
-		t.Fatal("service retained the caller's mutable key slice")
-	}
-	other, err := dbmanagement.NewService(store, auth, dbmanagement.DefaultConfig(key, false))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if first == other.SignReview("exact SQL and metadata") {
-		t.Fatal("review MAC is not bound to the secret key")
 	}
 }

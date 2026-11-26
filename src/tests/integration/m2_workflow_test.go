@@ -621,15 +621,12 @@ func TestM2PartialJobBlocksOtherMigrationActions(t *testing.T) {
 	}
 }
 
-func TestM2ReviewedWorkflowCannotResetSynchronousVersion(t *testing.T) {
+func TestM2ReviewedWorkflowPreservesExistingLegacyHistory(t *testing.T) {
 	f := newWorkflowFixture(t)
-	analysis, err := f.migrations.Analyze(f.ctx, f.editor, f.database, "CREATE TABLE synchronous_first(id integer)")
+	// An existing committed M1 record still blocks an unreviewed history reset.
+	_, err := f.dbs.Website.ExecContext(f.ctx, `INSERT INTO migration_executions(database_id,executed_by,sql_text,attempted_version,applied_version,status,total_statements,completed_statements,finished_at)
+VALUES($1,$2,'CREATE TABLE synchronous_first(id integer)',1,1,'succeeded',1,1,clock_timestamp())`, f.database, f.editor)
 	must(t, err)
-	execution, err := f.migrations.Execute(f.ctx, f.editor, f.database, migration.ExecuteInput{Review: analysis})
-	must(t, err)
-	if execution.AppliedVersion == nil || *execution.AppliedVersion != 1 {
-		t.Fatal("synchronous execution did not establish its version")
-	}
 	_, err = f.workflow.CreateDefinition(f.ctx, f.editor, f.database, reversible("reviewed_next"))
 	wantError(t, err, migration.ErrWorkflowConflict)
 	version, err := f.runtimeStore.MigrationVersion(f.ctx, f.database)

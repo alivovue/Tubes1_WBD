@@ -12,7 +12,6 @@ import (
 
 	"tubes1_wbd/backend/access"
 	"tubes1_wbd/backend/dbmanagement"
-	"tubes1_wbd/backend/migration"
 	"tubes1_wbd_admin/backend/connectionconfig"
 )
 
@@ -131,14 +130,14 @@ func TestIT11DisableConnectionRemovesAccessAndRevokesSessions(t *testing.T) {
 }
 
 func TestDuplicateDatabaseRegistrationPreservesExistingHistory(t *testing.T) {
-	f := newFixture(t, true)
+	f, _, runner := p3Fixture(t)
 	input := f.dbs.Connection()
-	target := f.register(t)
-	f.grant(t, f.editor, target.ID, access.ViewEdit)
-	review, err := f.migrations.Analyze(f.ctx, f.editor, target.ID, "SELECT 1")
+	target, err := f.store.DatabaseMetadata(f.ctx, f.database)
 	must(t, err)
-	_, err = f.migrations.Execute(f.ctx, f.editor, target.ID, migration.ExecuteInput{Review: review})
+	id := enqueueP3(t, f, "registration_history")
+	_, err = runner.RunOnce(f.ctx)
 	must(t, err)
+	assertJob(t, f, id, "succeeded")
 	duplicate := input
 	duplicate.Name = "Duplicate database under another name"
 	_, err = f.saveConnection(f.ctx, f.admin, 0, duplicate)
@@ -155,9 +154,9 @@ func TestDuplicateDatabaseRegistrationPreservesExistingHistory(t *testing.T) {
 	if saved.ID != target.ID || !saved.Active || saved.Name != input.Name {
 		t.Fatal("editing or reactivating the original connection did not preserve its identity")
 	}
-	history, err := f.migrations.History(f.ctx, f.editor, target.ID, 50, 0)
+	history, err := f.workflow.History(f.ctx, f.editor, target.ID, false, 50, 0)
 	must(t, err)
-	if len(history) != 1 || history[0].AppliedVersion == nil || *history[0].AppliedVersion != 1 {
+	if len(history) != 1 || history[0].JobID != id || history[0].LogicalVersion != 1 {
 		t.Fatal("rejecting duplicates or reactivating the connection changed migration history")
 	}
 	connections, err := f.connections.Connections(f.ctx, f.admin)

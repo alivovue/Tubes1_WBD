@@ -103,7 +103,8 @@ Set `TMPDIR` to a spacious writable directory when the root disk is nearly full.
 ## Remaining scope limits
 
 - Existing M1 synchronous target history is not automatically imported into the reviewed active stack; the backend blocks starting an M2 chain over unresolved/committed M1 history. An explicit legacy-history/schema upgrade is still required for that transition.
-- M2 execution is PostgreSQL only. MariaDB's existing viewer/analysis code is retained; the browser's old synchronous execute action is disabled for approval integrity.
+- M2 execution is PostgreSQL only. MariaDB's existing viewer/analysis code is retained. New migrations execute only through immutable definitions, leader approval, the durable queue and the worker. The synchronous execution service, signed analysis review, legacy reconciliation service/button, and browser `execute`/`resolve`/`reconcile` actions have been removed; retired actions return 400 as unsupported actions. Execution recovery uses M2 job retry and worker receipt/checkpoint reconciliation.
+- Existing M1 history remains readable. Tests for existing history seed historical records directly; transaction and receipt-protection tests execute approved M2 jobs through the worker.
 - The batch template updates one BIGINT column by a fixed nonzero integer using a BIGINT primary key. Arbitrary batch SQL and unsupported table shapes are rejected.
 - Submitted/frozen revisions are inspected or copied into new drafts in the UI. Original executed SQL is preserved.
 - JSON logs and stdout OpenTelemetry traces are wired. SQL/parameter values are redacted and SQL hashes retained; this is not evidence of full literal-SQL logging compliance.
