@@ -18,6 +18,8 @@ import (
 var JobsSchema string
 
 func RunJob(ctx context.Context, db *sql.DB, adapter adapters.Adapter, r engines.JobRequest, h engines.JobHooks) (out engines.JobReceipt, err error) {
+	ctx = observability.WithSQLDialect(ctx, "postgresql")
+	ctx = observability.WithMigration(ctx, observability.MigrationContext{DefinitionID: r.DefinitionID, RevisionID: r.RevisionID, JobID: r.JobID, ExecutionID: r.ExecutionID, Attempt: r.Attempt, Operation: r.Operation})
 	out = engines.JobReceipt{Namespace: r.Namespace, JobID: r.JobID, ExecutionID: r.ExecutionID, SQLHash: r.SQLHash, ActionHash: r.ActionHash, Operation: r.Operation}
 	if r.Namespace == "" || r.SQLHash != engines.SQLDigest(r.SQL) || r.ActionHash == "" || h.Guard == nil || h.Progress == nil {
 		return out, adapters.ErrInvalid
@@ -28,16 +30,16 @@ func RunJob(ctx context.Context, db *sql.DB, adapter adapters.Adapter, r engines
 	}
 	defer conn.Close()
 	lockCtx, span := observability.Start(ctx, "target.lock.wait")
-	_, err = conn.ExecContext(lockCtx, `SELECT pg_catalog.pg_advisory_lock(73421108)`)
+	_, err = observability.WrapSQL(conn).ExecContext(lockCtx, `SELECT pg_catalog.pg_advisory_lock(73421108)`)
 	span.End()
 	if err != nil {
 		return out, err
 	}
 	defer func() {
-		cleanup, stop := context.WithTimeout(context.Background(), 5*time.Second)
+		cleanup, stop := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 		defer stop()
 		var unlocked bool
-		if conn.QueryRowContext(cleanup, `SELECT pg_catalog.pg_advisory_unlock(73421108)`).Scan(&unlocked) != nil || !unlocked {
+		if observability.WrapSQL(conn).QueryRowContext(cleanup, `SELECT pg_catalog.pg_advisory_unlock(73421108)`).Scan(&unlocked) != nil || !unlocked {
 			conn.Raw(func(any) error { return driver.ErrBadConn })
 		}
 	}()
@@ -53,7 +55,7 @@ func RunJob(ctx context.Context, db *sql.DB, adapter adapters.Adapter, r engines
 	}
 	if r.Batch != nil && r.Operation != "rollback" {
 		var exists bool
-		if err = conn.QueryRowContext(ctx, `SELECT to_regclass('_schakker.batch_jobs') IS NOT NULL`).Scan(&exists); err != nil {
+		if err = observability.WrapSQL(conn).QueryRowContext(ctx, `SELECT to_regclass('_schakker.batch_jobs') IS NOT NULL`).Scan(&exists); err != nil {
 			return out, engines.ErrJobUncertain
 		}
 		if exists {
@@ -113,7 +115,7 @@ func RunJob(ctx context.Context, db *sql.DB, adapter adapters.Adapter, r engines
 		}
 		queryCtx, querySpan := observability.Start(ctx, "migration.query")
 		started := time.Now()
-		observability.Event(queryCtx, "sql.start", nil, "job_id", r.JobID, "query", "[redacted]")
+		observability.SQLStart(queryCtx, statement.SQL, 0)
 		err = s.execute(queryCtx, statement)
 		observability.SQL(queryCtx, statement.SQL, 0, s.lastRows, started, err)
 		querySpan.End()

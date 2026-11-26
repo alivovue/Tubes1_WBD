@@ -36,6 +36,8 @@ type JobProgress struct {
 	State           string `json:"state"`
 }
 type JobRequest struct {
+	DefinitionID, RevisionID                                                    int64
+	Attempt                                                                     int
 	JobID, ExecutionID, Namespace, Operation, SQL, DownSQL, SQLHash, ActionHash string
 	OriginalJobID                                                               string
 	Batch                                                                       *BatchSpec

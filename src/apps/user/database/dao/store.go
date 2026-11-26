@@ -61,7 +61,7 @@ func (d *Store) Transaction(ctx context.Context, change func(*Store) error) erro
 	if err != nil {
 		return sqldb.Classify(err)
 	}
-	defer tx.Rollback()
+	defer observability.Rollback(ctx, tx.Rollback)
 	if err := change(&Store{db: d.db, q: observability.WrapSQL(tx), inTx: true, conn: d.conn, lockSlots: d.lockSlots}); err != nil {
 		return sqldb.Classify(err)
 	}

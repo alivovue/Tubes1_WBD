@@ -82,6 +82,7 @@ func (r *Runner) RunOnce(ctx context.Context) (claimed bool, err error) {
 	started := time.Now()
 	ctx = observability.Extract(ctx, j.TraceContext)
 	ctx = observability.WithActor(ctx, j.ActorID, j.DatabaseID)
+	ctx = observability.WithMigration(ctx, observability.MigrationContext{JobID: j.ID, ExecutionID: j.ExecutionID, Attempt: j.Attempt, Operation: j.Operation})
 	ctx, span := observability.Start(ctx, "worker.execute")
 	defer span.End()
 	if j.Attempt == 1 {
@@ -124,6 +125,7 @@ func (r *Runner) RunOnce(ctx context.Context) (claimed bool, err error) {
 		if err != nil {
 			return err
 		}
+		ctx := observability.WithMigration(ctx, observability.MigrationContext{DefinitionID: request.DefinitionID, RevisionID: request.RevisionID})
 		previous, err := locked.BatchProgress(ctx, j.ID)
 		if err != nil {
 			return err
@@ -258,7 +260,7 @@ func loadRequest(ctx context.Context, store *dao.Store, j dao.MigrationJob) (eng
 	if err != nil {
 		return engines.JobRequest{}, err
 	}
-	out := engines.JobRequest{Namespace: namespace, JobID: j.ID, ExecutionID: j.ExecutionID, Operation: j.Operation, SQL: sql, DownSQL: revision.DownSQL, SQLHash: j.SQLHash, ActionHash: j.ActionHash, Batch: batch}
+	out := engines.JobRequest{DefinitionID: revision.DefinitionID, RevisionID: revision.ID, Attempt: j.Attempt, Namespace: namespace, JobID: j.ID, ExecutionID: j.ExecutionID, Operation: j.Operation, SQL: sql, DownSQL: revision.DownSQL, SQLHash: j.SQLHash, ActionHash: j.ActionHash, Batch: batch}
 	if review.TargetJobID != nil {
 		out.OriginalJobID = *review.TargetJobID
 	}
@@ -280,8 +282,8 @@ func reconcile(ctx context.Context, target *dbmanagement.Target, request engines
 	if err != nil {
 		return false, receipt, err
 	}
-	defer tx.Rollback()
-	if _, err = tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(73421108)`); err != nil {
+	defer observability.Rollback(ctx, tx.Rollback)
+	if _, err = observability.WrapSQL(tx).ExecContext(ctx, `SELECT pg_advisory_xact_lock(73421108)`); err != nil {
 		return false, receipt, err
 	}
 	found, err := pgengine.ReadJobReceipt(ctx, tx, request, &receipt)

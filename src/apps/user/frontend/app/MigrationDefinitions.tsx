@@ -1,8 +1,14 @@
 import { useState, type FormEvent } from "react";
-import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import { migrationPaths, migrationsAPI } from "./api";
+import {
+  Link,
+  useLocation,
+  useNavigate,
+  useSearchParams,
+} from "react-router-dom";
+import { migrationPageSize, migrationPaths, migrationsAPI } from "./api";
 import type {
   DefinitionInput,
+  DefinitionResponse,
   DefinitionsResponse,
   MigrationDefinition,
 } from "./types";
@@ -10,6 +16,8 @@ import { Button, Field, Notice, Panel, stamp, usePage } from "./ui";
 import { MigrationBatch, batchSQL } from "./MigrationBatch";
 import {
   MigrationStatus,
+  MigrationPagination,
+  migrationOffset,
   ResourceState,
   SQLDetails,
   useMigrationAction,
@@ -20,79 +28,123 @@ import {
 export function MigrationDefinitions() {
   const { data } = usePage();
   const [params] = useSearchParams();
+  const offset = migrationOffset(params);
   const resource = useMigrationResource<DefinitionsResponse>(
-    migrationPaths.definitions(data.Database.ID),
+    migrationPaths.definitions(data.Database.ID, offset),
   );
   const selected = params.get("definition");
   const copy = params.get("copy");
-  const definition = resource.data?.definitions.find(
-    (item) => String(item.id) === selected,
-  );
-  const source = resource.data?.definitions.find(
-    (item) => String(item.id) === copy,
+  const definitions = (resource.data?.definitions || []).slice(
+    0,
+    migrationPageSize,
   );
   return (
-    <>
-      <ResourceState {...resource} />
-      {resource.data && (
-        <div className="migration-layout migration-definition-layout">
-          <Panel
-            title={
-              definition
-                ? `Revision ${definition.revision} · ${definition.title}`
-                : "New migration draft"
-            }
-          >
-            {(selected && !definition) || (copy && !source) ? (
-              <Notice error>
-                This definition is unavailable. Refresh or select another draft.
-              </Notice>
-            ) : (
-              <DefinitionEditor
-                key={`${definition?.id || `copy-${source?.id || "new"}`}-${definition?.revision || 0}`}
-                definition={definition}
-                source={source}
-                reload={resource.reload}
-              />
-            )}
-          </Panel>
-          <Panel
-            title="Definitions"
-            text="Submitted revisions are frozen. Executed SQL stays immutable."
-          >
-            <div className="migration-card-list">
-              <Link
-                className="button button--secondary"
-                to={migrationURL("definitions", data.Database.ID)}
-              >
-                New draft
-              </Link>
-              {resource.data.definitions.map((item) => (
-                <article className="migration-list-entry" key={item.id}>
-                  <Link
-                    to={migrationURL("definitions", data.Database.ID, {
-                      definition: item.id,
-                    })}
-                  >
-                    {item.title}
-                  </Link>
-                  <p>
-                    Revision {item.revision} ·{" "}
-                    <MigrationStatus status={item.status} />
-                  </p>
-                  <small>
-                    Updated {stamp(item.updated_at)} · {item.created_by}
-                  </small>
-                </article>
-              ))}
-              {!resource.data.definitions.length && (
-                <p>No migration definitions yet.</p>
-              )}
-            </div>
-          </Panel>
-        </div>
+    <div className="migration-layout migration-definition-layout">
+      {selected || copy ? (
+        <DefinitionDetail
+          key={`${data.Database.ID}-${selected || copy}-${!!selected}`}
+          id={(selected || copy)!}
+          copy={!selected}
+          reloadList={resource.reload}
+        />
+      ) : (
+        <Panel title="New migration draft">
+          <DefinitionEditor reload={resource.reload} />
+        </Panel>
       )}
-    </>
+      <Panel
+        title="Definitions"
+        text="Submitted revisions are frozen. Executed SQL stays immutable."
+      >
+        <ResourceState {...resource} />
+        <div className="migration-card-list">
+          <Link
+            className="button button--secondary"
+            to={migrationURL("definitions", data.Database.ID)}
+          >
+            New draft
+          </Link>
+          {definitions.map((item) => (
+            <article className="migration-list-entry" key={item.id}>
+              <Link
+                to={migrationURL("definitions", data.Database.ID, {
+                  definition: item.id,
+                  offset,
+                })}
+              >
+                {item.title}
+              </Link>
+              <p>
+                Revision {item.revision} ·{" "}
+                <MigrationStatus status={item.status} />
+              </p>
+              <small>
+                Updated {stamp(item.updated_at)} · {item.created_by}
+              </small>
+            </article>
+          ))}
+          {resource.data && !definitions.length && (
+            <p>
+              {offset > 0
+                ? "No definitions on this page. Use Previous to return to newer definitions."
+                : "No migration definitions yet."}
+            </p>
+          )}
+        </div>
+        {resource.data && (
+          <MigrationPagination
+            offset={offset}
+            hasMore={resource.data.definitions.length > migrationPageSize}
+            label="Definitions"
+          />
+        )}
+      </Panel>
+    </div>
+  );
+}
+
+function DefinitionDetail({
+  id,
+  copy,
+  reloadList,
+}: {
+  id: string;
+  copy: boolean;
+  reloadList: () => void;
+}) {
+  const { data } = usePage();
+  const resource = useMigrationResource<DefinitionResponse>(
+    migrationPaths.definition(id),
+  );
+  const definition = resource.data?.definition;
+  return (
+    <Panel
+      title={
+        definition && !copy
+          ? `Revision ${definition.revision} · ${definition.title}`
+          : copy
+            ? "Copy to new draft"
+            : "Migration definition"
+      }
+    >
+      <ResourceState {...resource} />
+      {definition &&
+        (definition.database_id === data.Database.ID ? (
+          <DefinitionEditor
+            key={`${definition.id}-${definition.revision}`}
+            definition={copy ? undefined : definition}
+            source={copy ? definition : undefined}
+            reload={() => {
+              resource.reload();
+              reloadList();
+            }}
+          />
+        ) : (
+          <Notice error>
+            This definition does not belong to the selected database.
+          </Notice>
+        ))}
+    </Panel>
   );
 }
 

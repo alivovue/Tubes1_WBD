@@ -28,6 +28,20 @@ func ValidateSchema(ctx context.Context, db *sql.DB) error {
 	if err = workflow.Close(); err != nil {
 		return err
 	}
+	var legacy, imports bool
+	if err := db.QueryRowContext(ctx, `SELECT to_regclass('public.migration_executions') IS NOT NULL,to_regclass('public.migration_legacy_imports') IS NOT NULL`).Scan(&legacy, &imports); err != nil {
+		return err
+	}
+	if legacy {
+		query := `SELECT EXISTS(SELECT 1 FROM migration_executions)`
+		if imports {
+			query = `SELECT EXISTS(SELECT 1 FROM migration_executions e WHERE NOT EXISTS(SELECT 1 FROM migration_legacy_imports m WHERE m.source_kind='execution' AND m.legacy_id=e.id))`
+		}
+		var pending bool
+		if err := db.QueryRowContext(ctx, query).Scan(&pending); err != nil || pending {
+			return errors.New("legacy migration history requires the explicit schema-upgrade command before startup")
+		}
+	}
 	var secrets bool
 	if err := db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='users' AND column_name IN ('password_hash','is_platform_admin','is_legacy_admin')) OR to_regclass('public.group_database_permissions') IS NOT NULL OR to_regclass('public.access_groups') IS NOT NULL OR to_regclass('public.user_groups') IS NOT NULL OR to_regclass('public.admin_users') IS NOT NULL OR EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='managed_databases' AND column_name IN ('db_username','encrypted_password'))`).Scan(&secrets); err != nil || secrets {
 		return errors.New("platform database still contains authoritative access-control storage; complete the documented control-plane cutover")

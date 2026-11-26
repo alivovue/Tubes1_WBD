@@ -26,6 +26,8 @@ func (s *Service) Options(recovery migration.RecoveryProvider) migration.Workflo
 	return migration.WorkflowOptions{Dispatcher: s, Recovery: recovery, Observer: observability.Observer{}, Logger: slog.Default()}
 }
 func (s *Service) Enqueue(ctx context.Context, tx *dao.Store, plan migration.ApprovedPlan, key string) (string, error) {
+	ctx = observability.WithActor(ctx, plan.ActorID, plan.DatabaseID)
+	ctx = observability.WithMigration(ctx, observability.MigrationContext{DefinitionID: plan.DefinitionID, RevisionID: plan.RevisionID, Operation: plan.Operation})
 	ctx, span := observability.Start(ctx, "queue.publish")
 	defer span.End()
 	if plan.SQLHash != migration.SQLHash(plan.SQL) || plan.ActionHash == "" {

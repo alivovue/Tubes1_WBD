@@ -34,11 +34,12 @@ func (s *Service) read(ctx context.Context, actor, database int64, permission ac
 		return err
 	}
 	defer target.DB.Close()
+	ctx = observability.WithSQLDialect(ctx, target.Adapter.Name())
 	tx, err := target.DB.BeginTx(ctx, &sql.TxOptions{ReadOnly: true, Isolation: sql.LevelRepeatableRead})
 	if err != nil {
 		return ErrConnection
 	}
-	defer tx.Rollback()
+	defer observability.Rollback(ctx, tx.Rollback)
 	if err := action(ctx, observability.WrapSQL(tx), target.Adapter); err != nil {
 		return err
 	}

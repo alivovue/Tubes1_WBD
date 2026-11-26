@@ -66,6 +66,33 @@ Windows memakai `run-admin.bat`, `run.bat` dan `run-worker.bat` di dalam `src\to
 
 ## Build dan test
 
+### Upgrade metadata dari M1 / sebelum M2Refactor
+
+Upgrade dijalankan secara eksplisit dari root repositori melalui `go -C src/tools run ./cmd/schema-upgrade`; startup aplikasi hanya memvalidasi schema. Perintah ini mendukung platform yang sudah memakai pemisahan control-plane admin/pengguna. URL metadata harus memakai role owner untuk DDL, sementara target hanya dibaca untuk verifikasi receipt.
+
+Selesaikan/reconcile job yang masih pending, partial atau uncertain, hentikan API dan worker, lalu siapkan backup metadata. Isi `SCHAKKER_UPGRADE_DATABASE_URL` dengan URL owner metadata. Untuk history M1 yang sukses, simpan mapping ID database ke URL PostgreSQL target aslinya di `.schakker/upgrade-targets.json` (direktori ini diabaikan Git), misalnya `{"7":"<URL target asli>"}`, lalu set `SCHAKKER_UPGRADE_TARGETS_FILE` ke path file tersebut. Nilai credential tidak dicetak oleh command.
+
+```powershell
+$env:SCHAKKER_UPGRADE_DATABASE_URL = '<URL owner metadata>'
+$env:SCHAKKER_UPGRADE_TARGETS_FILE = '.schakker/upgrade-targets.json'
+
+# Verifikasi seluruh upgrade; perubahan metadata di-rollback.
+go -C src/tools run ./cmd/schema-upgrade
+
+# Terapkan setelah hasil verifikasi sesuai.
+go -C src/tools run ./cmd/schema-upgrade -apply
+```
+
+Untuk metadata M2 tanpa commit M1, file target tidak diperlukan. Upgrade menambahkan snapshot/identitas attempt yang belum tersedia, mengimpor history M1 berhasil/gagal dan draft SQL, serta mempertahankan namespace, urutan version dan bukti commit. Hak DML role runtime yang sudah menjadi writer pada `public.users` diteruskan ke tabel/sequence workflow baru tanpa menambah hak DDL/superuser atau grant kepada PUBLIC. Commit M1 diverifikasi terhadap `_schakker.migration_receipts` pada namespace dan target asli; SQL target tidak diputar ulang. Migration lama menjadi irreversible karena SQL down aslinya tidak pernah disimpan. Failed legacy job tidak diberi jalur retry tanpa review baru.
+
+Script menolak receipt yang tidak cocok, version yang tidak berurutan, history M1/M2 yang bertumpang tindih, atau efek non-atomic yang belum direkonsiliasi. Seluruh perubahan metadata berada dalam satu transaksi. Tabel M1 tetap disimpan dan menjadi read-only; draft visual tanpa SQL tetap berada di tabel arsip dengan `operations` aslinya dan dilaporkan sebagai `archived_visual_drafts`. Menjalankan ulang script tidak menggandakan history atau mereset active position. Setelah upgrade, jalankan layanan kembali. Database development/tim tidak di-upgrade otomatis oleh test.
+
+### Kontrak log SQL
+
+Event JSON `sql.start` dan `sql.result` menyimpan struktur query dengan literal, komentar, parameter, serta identifier berpetik ganda yang berpotensi menjadi nilai pada MariaDB disamarkan. Parameter ditampilkan per posisi sebagai `[redacted]`; query hash tetap tersedia untuk pencocokan. Log mencakup durasi, affected rows (`-1` bila driver belum menyediakan jumlah), error class/SQLSTATE, actor/database dan, pada eksekusi migration, migration/revision/job/execution/attempt/batch yang relevan. `sql.rows` menambahkan jumlah row yang dikembalikan SQL Viewer. Commit, rollback dan commit yang belum terkonfirmasi dicatat terpisah; trace API → queue → worker → lock → target tetap diteruskan.
+
+### Perintah verifikasi
+
 Semua perintah berikut dijalankan dari root repositori:
 
 ```bash
@@ -91,6 +118,8 @@ npm run test:frontend:integration
 Unit test frontend memakai Node test runner, esbuild, dan React server rendering tanpa browser. Integration test frontend membangun kedua SPA lalu menguji komponen, routing, formulir, sesi dan interaksi melalui API fixture sintetis di Chrome/Chromium/Edge. Pilih browser dengan `SCHAKKER_QA_BROWSER`; hasil dan screenshot disimpan di `src/tests/output/frontend` atau direktori `SCHAKKER_QA_OUTPUT`.
 
 Integration test backend menjalankan PostgreSQL disposable (perlu `initdb`, `pg_ctl`, dan `psql`) serta MariaDB untuk fitur yang mendukungnya (perlu `mariadbd`, `mariadb-install-db`, dan `mariadb`). Fixture membuat database admin, platform dan target terpisah; tidak memakai data aplikasi development. Unit test backend tidak memerlukan layanan database. Test API backend membuat shell HTML sementara sehingga tidak membutuhkan build frontend. Benchmark batch merupakan pemeriksaan terpisah dengan `SCHAKKER_RUN_BATCH_BENCHMARK=1`.
+
+Timeout integration test adalah 20 menit agar startup cluster dan pemeriksaan build pada Windows memiliki waktu cukup. Verifikasi lengkap setelah perbaikan audit membutuhkan sekitar 12 menit pada workstation pengujian; batas lama 12 menit hanya menyisakan beberapa detik.
 
 | Fitur | Unit tests | Integration tests |
 | --- | --- | --- |

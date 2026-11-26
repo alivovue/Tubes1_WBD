@@ -220,4 +220,14 @@ BEGIN RAISE EXCEPTION 'committed history is append-only' USING ERRCODE='23514'; 
 CREATE TRIGGER append_only_migration_history BEFORE UPDATE OR DELETE ON public.migration_execution_history
  FOR EACH ROW EXECUTE FUNCTION public.protect_migration_history();
 
+CREATE TABLE public.migration_legacy_imports (
+ source_kind TEXT NOT NULL CHECK(source_kind IN('execution','draft')),
+ legacy_id BIGINT NOT NULL,
+ definition_id BIGINT NOT NULL REFERENCES public.migration_definitions(id),
+ execution_id UUID,
+ imported_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+ PRIMARY KEY(source_kind,legacy_id)
+);
+CREATE TRIGGER append_only_legacy_imports BEFORE UPDATE OR DELETE ON public.migration_legacy_imports
+ FOR EACH ROW EXECUTE FUNCTION public.protect_migration_history();
 COMMIT;

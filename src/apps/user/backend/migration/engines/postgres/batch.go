@@ -78,7 +78,7 @@ func initBatch(ctx context.Context, conn *sql.Conn, a adapters.Adapter, r engine
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer observability.Rollback(ctx, tx.Rollback)
 	if _, err = observability.WrapSQL(tx).ExecContext(ctx, `LOCK TABLE `+table+` IN SHARE ROW EXCLUSIVE MODE`); err != nil {
 		return err
 	}
@@ -138,6 +138,7 @@ func runBatch(ctx context.Context, conn *sql.Conn, a adapters.Adapter, r engines
 			return out, err
 		}
 		batchCtx, span := observability.Start(ctx, "migration.batch")
+		batchCtx = observability.WithMigration(batchCtx, observability.MigrationContext{Batch: p.Batches + 1})
 		finished, err := batchTransaction(batchCtx, conn, a, r, h, source, &out)
 		span.End()
 		if err != nil {
@@ -269,7 +270,8 @@ func batchTransaction(ctx context.Context, conn *sql.Conn, a adapters.Adapter, r
 		}
 	}
 	started := time.Now()
-	observability.Event(ctx, "sql.start", nil, "job_id", r.JobID, "batch_no", batch, "query", "[redacted]")
+	ctx = observability.WithMigration(ctx, observability.MigrationContext{Batch: batch})
+	observability.SQLStart(ctx, r.SQL, 2)
 	result, err := tx.ExecContext(ctx, r.SQL, s.Delta, ids)
 	var changed int64
 	if err == nil {

@@ -16,8 +16,8 @@ test("each app calls its own relative API and shares no credential origin", asyn
 test("resource paths encode job IDs and opaque history cursors", () => {
   assert.equal(migrationPaths.job("id/with ?&"), "/migration-jobs/id%2Fwith%20%3F%26");
   assert.equal(migrationPaths.history(7, true, "a+/=?"), "/migrations/history?database_id=7&hide_rollback=true&cursor=a%2B%2F%3D%3F");
-  assert.equal(migrationPaths.reviews(7), "/migration-reviews?database_id=7");
-  assert.equal(migrationPaths.jobs(7), "/migration-jobs?database_id=7");
+  assert.equal(migrationPaths.reviews(7), "/migration-reviews?database_id=7&limit=51&offset=0");
+  assert.equal(migrationPaths.jobs(7), "/migration-jobs?database_id=7&limit=51&offset=0");
 });
 test("saving maps recovery fields and preserves optimistic revisions without sending UI-only batch data", async t => {
   const calls = capture(t);

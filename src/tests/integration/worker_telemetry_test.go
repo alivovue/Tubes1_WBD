@@ -77,16 +77,57 @@ func TestWorkerTelemetryCrossesDurableQueueAndRedactsSQL(t *testing.T) {
 		t.Fatal("worker did not execute real queued work")
 	}
 	assertJob(t, f, id, "succeeded")
+	batch := batchDefinition(t, f, 5, 2)
+	batchReview := f.approve(t, f.submit(t, batch))
+	batchJob, err := f.workflow.Enqueue(f.ctx, f.editor, batchReview.ID, "telemetry-batches")
+	must(t, err)
+	_, err = runner.RunOnce(workerContext)
+	must(t, err)
+	assertJob(t, f, batchJob, "succeeded")
+	failure := enqueueDefinition(t, f, migration.DefinitionInput{Title: "Logged failure", UpSQL: "SELECT 1/0;", DownSQL: "SELECT 1;"})
+	if _, err = runner.RunOnce(workerContext); err == nil {
+		t.Fatal("test SQL unexpectedly succeeded")
+	}
+	assertJob(t, f, failure, "failed")
 	flush, stop := context.WithTimeout(context.Background(), 5*time.Second)
 	defer stop()
 	must(t, shutdown(flush))
-	if strings.Contains(logs.String(), "private-migration-value") || strings.Contains(logs.String(), "CREATE TABLE telemetry_probe") {
-		t.Fatal("SQL or row values leaked into operational logs")
+	if strings.Contains(logs.String(), "private-migration-value") {
+		t.Fatal("row values leaked into operational logs")
 	}
 	foundWorkerLog := false
+	foundSQL := false
+	batches := map[float64]bool{}
+	foundFailure, foundRollback := false, false
 	for _, line := range strings.Split(strings.TrimSpace(logs.String()), "\n") {
 		var event map[string]any
 		must(t, json.Unmarshal([]byte(line), &event))
+		query, _ := event["query"].(string)
+		if event["event"] == "sql.result" && event["job_id"] == batchJob && event["sql_hash"] == engines.SQLDigest(batch.UpSQL) {
+			if number, ok := event["batch_no"].(float64); ok {
+				batches[number] = true
+			}
+			if event["attempt"] != float64(1) || event["revision_id"] != float64(batch.ID) {
+				t.Error("batch SQL lost immutable operation context")
+			}
+		}
+		if event["event"] == "sql.result" && event["job_id"] == failure && event["sqlstate"] == "22012" && event["status"] == "failed" {
+			foundFailure = true
+		}
+		if event["event"] == "sql.rollback" && event["job_id"] == failure {
+			foundRollback = true
+		}
+		if event["event"] == "sql.result" && strings.HasPrefix(query, "CREATE TABLE telemetry_probe") {
+			foundSQL = true
+			for _, key := range []string{"migration_id", "revision_id", "job_id", "execution_id", "attempt", "actor_id", "database_id", "duration_ms", "affected_rows", "parameters", "sqlstate", "error_class"} {
+				if event[key] == nil {
+					t.Errorf("SQL event missing %s: %#v", key, event)
+				}
+			}
+			if event["job_id"] != id || event["trace_id"] != traceID.String() || event["status"] != "succeeded" {
+				t.Fatal("SQL context lost across queue/worker")
+			}
+		}
 		if event["event"] == "worker.finished" && event["job_id"] == id {
 			foundWorkerLog = true
 			if event["trace_id"] != traceID.String() || event["job_status"] != "succeeded" {
@@ -96,6 +137,12 @@ func TestWorkerTelemetryCrossesDurableQueueAndRedactsSQL(t *testing.T) {
 	}
 	if !foundWorkerLog {
 		t.Fatal("worker completion log missing")
+	}
+	if !foundSQL {
+		t.Fatal("safe, attributable SQL query structure was not logged")
+	}
+	if len(batches) != 3 || !foundFailure || !foundRollback {
+		t.Fatalf("batch/failure audit incomplete: batches=%v failure=%v rollback=%v", batches, foundFailure, foundRollback)
 	}
 	decoder := json.NewDecoder(strings.NewReader(spans.String()))
 	foundWorkerSpan, foundQueueSpan := false, false

@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"errors"
+	"schakker_shared/observability"
 	"time"
 
 	"tubes1_wbd/backend/access"
@@ -90,6 +91,7 @@ func ValidateSQL(query string, dbms ...string) ([]Statement, error) {
 	return engine.Parse(query)
 }
 func (s *Service) Analyze(ctx context.Context, actor, database int64, query string) (Analysis, error) {
+	ctx = observability.WithActor(ctx, actor, database)
 	if err := s.access.RequirePermission(ctx, actor, database, access.ViewEdit); err != nil {
 		return Analysis{}, err
 	}
@@ -112,12 +114,14 @@ func (s *Service) Analyze(ctx context.Context, actor, database int64, query stri
 		return Analysis{}, err
 	}
 	defer target.DB.Close()
+	ctx = observability.WithSQLDialect(ctx, target.Adapter.Name())
 	tx, err := target.DB.BeginTx(ctx, &sql.TxOptions{ReadOnly: true, Isolation: sql.LevelRepeatableRead})
 	if err != nil {
 		return Analysis{}, dbmanagement.ErrConnection
 	}
-	defer tx.Rollback()
-	mode, warnings, err := engine.Assess(ctx, tx, statements)
+	defer observability.Rollback(ctx, tx.Rollback)
+	queries := observability.WrapSQL(tx)
+	mode, warnings, err := engine.Assess(ctx, queries, statements)
 	if err != nil {
 		return Analysis{}, err
 	}
@@ -125,15 +129,15 @@ func (s *Service) Analyze(ctx context.Context, actor, database int64, query stri
 	if err != nil {
 		return Analysis{}, err
 	}
-	fingerprint, err := target.Adapter.Fingerprint(ctx, tx)
+	fingerprint, err := target.Adapter.Fingerprint(ctx, queries)
 	if err != nil {
 		return Analysis{}, err
 	}
-	plans, err := target.Adapter.QueryPlans(ctx, tx, statements)
+	plans, err := target.Adapter.QueryPlans(ctx, queries, statements)
 	if err != nil {
 		return Analysis{}, err
 	}
-	if err := tx.Commit(); err != nil {
+	if err := observability.Commit(ctx, tx.Commit); err != nil {
 		return Analysis{}, dbmanagement.ErrQuery
 	}
 	currentConnection, err := s.databases.ConnectionFingerprint(ctx, actor, database)

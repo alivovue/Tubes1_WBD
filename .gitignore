@@ -8,6 +8,10 @@ node_modules/
 .test-postgres.log
 /src/apps/*/frontend/dist/
 /src/apps/*/bin/
+# Generated output retained locally after the apps/ directory refactor.
+/src/src/frontend/dist/
+/src/src-admin/frontend/dist/
+/src/src-admin/bin/
 /src/tools/bin/
 /src/tests/output/*
 !/src/tests/output/.gitkeep

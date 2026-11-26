@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"net"
 	"net/url"
+	"schakker_shared/observability"
 	"strconv"
 
 	"github.com/jackc/pgx/v5"
@@ -40,7 +41,7 @@ func (Adapter) Connect(ctx context.Context, in adapters.Connection) (*sql.DB, er
 	check, cancel := context.WithTimeout(ctx, in.ConnectTimeout)
 	defer cancel()
 	var platform bool
-	err = db.QueryRowContext(check, `SELECT to_regclass('public.users') IS NOT NULL AND to_regclass('public.sessions') IS NOT NULL AND to_regclass('public.session_tokens') IS NOT NULL AND to_regclass('public.group_database_permissions') IS NOT NULL AND to_regclass('public.managed_databases') IS NOT NULL`).Scan(&platform)
+	err = observability.WrapSQL(db).QueryRowContext(check, `SELECT to_regclass('public.users') IS NOT NULL AND to_regclass('public.sessions') IS NOT NULL AND to_regclass('public.session_tokens') IS NOT NULL AND to_regclass('public.group_database_permissions') IS NOT NULL AND to_regclass('public.managed_databases') IS NOT NULL`).Scan(&platform)
 	if err != nil {
 		db.Close()
 		return nil, ErrConnection

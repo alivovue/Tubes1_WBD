@@ -215,6 +215,29 @@ func Event(ctx context.Context, event string, err error, fields ...any) {
 	if who, ok := ctx.Value(identityKey{}).(identity); ok {
 		args = append(args, "actor_id", who.actor, "database_id", who.database)
 	}
+	if m, ok := ctx.Value(migrationKey{}).(MigrationContext); ok {
+		if m.DefinitionID > 0 {
+			args = append(args, "migration_id", m.DefinitionID, "definition_id", m.DefinitionID)
+		}
+		if m.RevisionID > 0 {
+			args = append(args, "revision_id", m.RevisionID)
+		}
+		if m.JobID != "" {
+			args = append(args, "job_id", m.JobID)
+		}
+		if m.ExecutionID != "" {
+			args = append(args, "execution_id", m.ExecutionID)
+		}
+		if m.Operation != "" {
+			args = append(args, "operation", m.Operation)
+		}
+		if m.Attempt > 0 {
+			args = append(args, "attempt", m.Attempt)
+		}
+		if m.Batch > 0 {
+			args = append(args, "batch_no", m.Batch)
+		}
+	}
 	slog.Default().Log(ctx, level, event, append(args, fields...)...)
 }
 func SQL(ctx context.Context, query string, parameters int, rows int64, started time.Time, err error) {
@@ -224,7 +247,15 @@ func SQL(ctx context.Context, query string, parameters int, rows int64, started 
 	if errors.As(err, &pg) {
 		state = pg.SQLState()
 	}
-	Event(ctx, "sql.result", err, "query", "[redacted]", "sql_hash", hex.EncodeToString(hash[:]), "parameter_count", parameters, "parameters", "[redacted]", "affected_rows", rows, "sqlstate", state, "duration_ms", float64(time.Since(started).Microseconds())/1000)
+	masked := make([]string, max(0, parameters))
+	for i := range masked {
+		masked[i] = "[redacted]"
+	}
+	errorClass := ""
+	if err != nil {
+		errorClass = "sql_error"
+	}
+	Event(ctx, "sql.result", err, "query", SQLText(ctx, query), "sql_hash", hex.EncodeToString(hash[:]), "parameter_count", parameters, "parameters", masked, "affected_rows", rows, "error_class", errorClass, "sqlstate", state, "duration_ms", float64(time.Since(started).Microseconds())/1000)
 }
 
 type Observer struct{}

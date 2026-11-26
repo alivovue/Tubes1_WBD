@@ -62,6 +62,7 @@ func (s *Service) ReadQuery(ctx context.Context, actor, database int64, query st
 		return result, err
 	}
 	defer target.DB.Close()
+	ctx = observability.WithSQLDialect(ctx, dbms)
 	tx, err := target.DB.BeginTx(ctx, &sql.TxOptions{ReadOnly: true, Isolation: sql.LevelRepeatableRead})
 	if err != nil {
 		return result, ErrConnection
@@ -72,7 +73,7 @@ func (s *Service) ReadQuery(ctx context.Context, actor, database int64, query st
 	}()
 	if dbms == "mariadb" {
 		var name string
-		if tx.QueryRowContext(ctx, "SELECT DATABASE()").Scan(&name) != nil {
+		if observability.WrapSQL(tx).QueryRowContext(ctx, "SELECT DATABASE()").Scan(&name) != nil {
 			return result, ErrQuery
 		}
 		if err := adapters.ValidateMariaReferences(name, statement); err != nil {
@@ -126,6 +127,7 @@ func (s *Service) ReadQuery(ctx context.Context, actor, database int64, query st
 		return ReadResult{}, ErrQuery
 	}
 	result.Duration = time.Since(started)
+	observability.Event(ctx, "sql.rows", nil, "query", observability.SQLText(ctx, bounded), "returned_rows", len(result.Rows), "has_more", result.HasMore, "duration_ms", float64(result.Duration.Microseconds())/1000)
 	return result, nil
 }
 

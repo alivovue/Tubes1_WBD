@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"schakker_shared/observability"
 
 	"tubes1_wbd/backend/dbmanagement/adapters"
 	"tubes1_wbd/backend/migration/engines"
@@ -28,7 +29,7 @@ func (s *session) execute(ctx context.Context, statement adapters.Statement) err
 	if len(statements) != 1 || s.protected == nil {
 		return engines.ErrUnsafeSQL
 	}
-	if _, err := s.tx.ExecContext(ctx, `SELECT pg_catalog.set_config('standard_conforming_strings','on',true)`); err != nil {
+	if _, err := observability.WrapSQL(s.tx).ExecContext(ctx, `SELECT pg_catalog.set_config('standard_conforming_strings','on',true)`); err != nil {
 		return err
 	}
 	result, err := s.tx.ExecContext(ctx, statement.SQL)

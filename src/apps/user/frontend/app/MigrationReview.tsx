@@ -1,10 +1,16 @@
-import { useRef, useState, type FormEvent } from "react";
+import { useCallback, useRef, useState, type FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { migrationPaths, migrationsAPI } from "./api";
+import {
+  loadReviewInbox,
+  migrationPageSize,
+  migrationPaths,
+  migrationsAPI,
+} from "./api";
 import type {
   MigrationReview as ReviewDTO,
   RequiredApproval,
   ReviewsResponse,
+  ReviewResponse,
 } from "./types";
 import {
   Button,
@@ -18,6 +24,8 @@ import {
 } from "./ui";
 import {
   MigrationStatus,
+  MigrationPagination,
+  migrationOffset,
   ResourceState,
   SQLDetails,
   migrationURL,
@@ -26,23 +34,66 @@ import {
 } from "./migrationUI";
 
 export function MigrationReview() {
-  const { data } = usePage();
   const [params] = useSearchParams();
-  const [inbox, setInbox] = useState(false);
-  const resource = useMigrationResource<ReviewsResponse>(
-    migrationPaths.reviews(data.Database.ID),
+  const selected = params.get("review");
+  return selected ? (
+    <ReviewDetail key={selected} id={selected} />
+  ) : (
+    <ReviewList />
+  );
+}
+
+function ReviewDetail({ id }: { id: string }) {
+  const { data } = usePage();
+  const resource = useMigrationResource<ReviewResponse>(
+    migrationPaths.review(id),
     5000,
   );
-  const selected = params.get("review");
-  const reviews = (resource.data?.reviews || []).filter(
-    (review) =>
-      (!selected || String(review.id) === selected) &&
-      (!inbox ||
-        (review.required_groups.some(
-          (group) => group.can_decide && group.decision === "pending",
-        ) &&
-          review.status === "pending_review")),
+  const review = resource.data?.review;
+  return (
+    <>
+      <div className="toolbar">
+        <Link to={migrationURL("reviews", data.Database.ID)}>
+          Show all reviews
+        </Link>
+        <Button secondary onClick={resource.reload}>
+          Refresh review
+        </Button>
+      </div>
+      <ResourceState {...resource} />
+      {review &&
+        (review.database_id === data.Database.ID ? (
+          <ReviewCard
+            key={review.id}
+            review={review}
+            reload={resource.reload}
+            stale={!!resource.error}
+          />
+        ) : (
+          <Notice error>
+            This review does not belong to the selected database.
+          </Notice>
+        ))}
+    </>
   );
+}
+
+function ReviewList() {
+  const { data } = usePage();
+  const [params, setParams] = useSearchParams();
+  const offset = migrationOffset(params);
+  const inbox = params.get("inbox") === "true";
+  const loadInbox = useCallback(
+    (signal: AbortSignal) => loadReviewInbox(data.Database.ID, offset, signal),
+    [data.Database.ID, offset],
+  );
+  const resource = useMigrationResource<ReviewsResponse>(
+    migrationPaths.reviews(data.Database.ID, offset),
+    5000,
+    undefined,
+    inbox ? loadInbox : undefined,
+  );
+  const reviews = (resource.data?.reviews || []).slice(0, migrationPageSize);
   return (
     <>
       <div className="toolbar">
@@ -50,18 +101,19 @@ export function MigrationReview() {
           <input
             type="checkbox"
             checked={inbox}
-            onChange={(event) => setInbox(event.target.checked)}
+            onChange={(event) => {
+              const next = new URLSearchParams(params);
+              if (event.target.checked) next.set("inbox", "true");
+              else next.delete("inbox");
+              next.delete("offset");
+              setParams(next);
+            }}
           />
           <span>Only reviews awaiting my decision</span>
         </label>
         <Button secondary onClick={resource.reload}>
           Refresh reviews
         </Button>
-        {selected && (
-          <Link to={migrationURL("reviews", data.Database.ID)}>
-            Show all reviews
-          </Link>
-        )}
       </div>
       <ResourceState {...resource} />
       {reviews.map((review) => (
@@ -74,12 +126,19 @@ export function MigrationReview() {
       ))}
       {resource.data && !reviews.length && (
         <p className="empty-state">
-          {selected
-            ? "This review is unavailable or does not match your inbox filter."
+          {offset > 0
+            ? "No reviews on this page. Use Previous to return to newer reviews."
             : inbox
               ? "No reviews currently need your decision."
               : "No submitted reviews for this database."}
         </p>
+      )}
+      {resource.data && (
+        <MigrationPagination
+          offset={offset}
+          hasMore={resource.data.reviews.length > migrationPageSize}
+          label="Reviews"
+        />
       )}
     </>
   );

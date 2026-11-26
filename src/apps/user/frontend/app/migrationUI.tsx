@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { APIError, requestResource } from "@schakker/ui";
+import { Link, useSearchParams } from "react-router-dom";
+import { migrationPageSize } from "./api";
 import type { ResourceResponse } from "./types";
 import { Button, Notice, usePage, url } from "./ui";
 
@@ -9,6 +11,53 @@ export function migrationURL(
   extra: Record<string, string | number> = {},
 ) {
   return url("/migrations", { db: database, view, ...extra });
+}
+
+export function migrationOffset(params: URLSearchParams) {
+  const raw = params.get("offset") || "0";
+  const offset = /^\d+$/.test(raw) ? Number(raw) : 0;
+  return Number.isSafeInteger(offset) && offset <= 100000000 ? offset : 0;
+}
+
+export function MigrationPagination({
+  offset,
+  hasMore,
+  label,
+}: {
+  offset: number;
+  hasMore: boolean;
+  label: string;
+}) {
+  const [params] = useSearchParams();
+  function page(next: number) {
+    const query = new URLSearchParams(params);
+    if (next) query.set("offset", String(next));
+    else query.delete("offset");
+    return `?${query}`;
+  }
+  return (
+    <nav className="pagination" aria-label={`${label} pages`}>
+      <span>Page {Math.floor(offset / migrationPageSize) + 1}</span>
+      <div>
+        {offset > 0 && (
+          <Link
+            className="button button--secondary"
+            to={page(Math.max(0, offset - migrationPageSize))}
+          >
+            Previous
+          </Link>
+        )}
+        {hasMore && (
+          <Link
+            className="button button--secondary"
+            to={page(offset + migrationPageSize)}
+          >
+            Next
+          </Link>
+        )}
+      </div>
+    </nav>
+  );
 }
 
 export function migrationError(problem: unknown): string {
@@ -32,6 +81,7 @@ export function useMigrationResource<T extends ResourceResponse>(
   path: string | null,
   poll = 0,
   complete?: (result: T) => boolean,
+  loadResource?: (signal: AbortSignal) => Promise<T>,
 ) {
   const { expire, acceptCSRF } = usePage();
   const [data, setData] = useState<T | null>(null);
@@ -53,9 +103,11 @@ export function useMigrationResource<T extends ResourceResponse>(
       inFlight = true;
       let delay = poll;
       try {
-        const result = await requestResource<T>(`/api${path}`, {
-          signal: controller.signal,
-        });
+        const result = loadResource
+          ? await loadResource(controller.signal)
+          : await requestResource<T>(`/api${path}`, {
+              signal: controller.signal,
+            });
         if (controller.signal.aborted) return;
         acceptCSRF(result.CSRF);
         setData(result);
@@ -90,7 +142,7 @@ export function useMigrationResource<T extends ResourceResponse>(
       if (timer) clearTimeout(timer);
       document.removeEventListener("visibilitychange", visible);
     };
-  }, [path, poll, revision, expire, acceptCSRF, complete]);
+  }, [path, poll, revision, expire, acceptCSRF, complete, loadResource]);
   return { data, error, loading, reload };
 }
 

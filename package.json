@@ -16,7 +16,7 @@
     "test": "npm run test:backend && npm run test:frontend",
     "test:backend": "npm run test:backend:unit && npm run test:backend:integration",
     "test:backend:unit": "go -C src/tests test ./unit/...",
-    "test:backend:integration": "go -C src/tests test -count=1 -timeout=12m ./integration",
+    "test:backend:integration": "go -C src/tests test -count=1 -timeout=20m ./integration",
     "test:frontend:unit": "node src/tests/frontend/unit/run.mjs",
     "test:frontend:integration": "npm run build && node src/tests/frontend/application-ui.mjs"
   },

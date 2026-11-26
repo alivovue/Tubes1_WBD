@@ -29,7 +29,7 @@ func rollbackCompletedBatch(ctx context.Context, conn *sql.Conn, a adapters.Adap
 	if err != nil {
 		return out, err
 	}
-	defer tx.Rollback()
+	defer observability.Rollback(ctx, tx.Rollback)
 	if _, err = observability.WrapSQL(tx).ExecContext(ctx, `LOCK TABLE `+table+` IN SHARE ROW EXCLUSIVE MODE`); err != nil {
 		return out, err
 	}
@@ -56,6 +56,7 @@ func rollbackCompletedBatch(ctx context.Context, conn *sql.Conn, a adapters.Adap
 		return out, err
 	}
 	started := time.Now()
+	observability.SQLStart(ctx, r.SQL, 2)
 	var changed int64
 	err = observability.WrapSQL(tx).QueryRowContext(ctx, `SELECT _schakker.execute_batch_down($1,$2,ARRAY(SELECT row_id FROM _schakker.batch_undo WHERE namespace=$3 AND job_id=$4 AND batch_no IS NOT NULL ORDER BY row_id))`, r.SQL, spec.Delta, r.Namespace, r.OriginalJobID).Scan(&changed)
 	observability.SQL(ctx, r.SQL, 2, changed, started, err)
