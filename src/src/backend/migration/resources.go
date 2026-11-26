@@ -232,6 +232,40 @@ func (v *Resources) Execution(e dao.CommittedExecution) (map[string]any, error) 
 		"expected_generation":    v.state.Generation,
 	}, nil
 }
+func (v *Resources) ExecutionEvent(e dao.ExecutionEvent) (map[string]any, error) {
+	resource, err := v.Execution(e.CommittedExecution)
+	if err != nil {
+		return nil, err
+	}
+	resource["status"] = e.Status
+	resource["is_committed"] = e.IsCommitted
+	resource["attempt"] = e.AttemptNo
+	resource["occurred_at"] = e.OccurredAt
+	resource["started_at"] = e.StartedAt
+	resource["completed_at"] = e.FinishedAt
+	resource["error"] = e.ErrorClass
+	resource["can_retry"] = false
+	if !e.IsCommitted {
+		resource["committed_at"] = nil
+		resource["can_rollback"] = false
+		resource["can_forward"] = false
+		resource["duration_ms"] = nil
+		if e.StartedAt != nil && e.FinishedAt != nil {
+			resource["duration_ms"] = max(int64(0), e.FinishedAt.Sub(*e.StartedAt).Milliseconds())
+		}
+		job, err := v.w.store.Job(v.ctx, e.JobID)
+		if err != nil {
+			return nil, err
+		}
+		resource["can_retry"] = v.canRetry(job)
+	}
+	return resource, nil
+}
+
+func (v *Resources) canRetry(j dao.MigrationJob) bool {
+	return v.edit && j.CancellationJobID == nil && (j.Status == "uncertain" || (j.ActorID == v.actor && j.Attempt < j.MaxAttempts && (j.Status == "failed" || j.Status == "partial" || j.Status == "partially_reverted")))
+}
+
 func (v *Resources) Job(j dao.MigrationJob, p dao.BatchProgress) (map[string]any, error) {
 	review, err := v.w.store.Review(v.ctx, j.ReviewID, false)
 	if err != nil {
@@ -249,7 +283,7 @@ func (v *Resources) Job(j dao.MigrationJob, p dao.BatchProgress) (map[string]any
 	if j.Status == "pending" || ((j.Status == "partial" || j.Status == "partially_reverted") && j.ErrorClass == "temporary_failure" && j.Attempt < j.MaxAttempts) {
 		next = j.NextAttemptAt
 	}
-	retry := v.edit && j.CancellationJobID == nil && (j.Status == "uncertain" || (j.ActorID == v.actor && j.Attempt < j.MaxAttempts && (j.Status == "failed" || j.Status == "partial" || j.Status == "partially_reverted")))
+	retry := v.canRetry(j)
 	cancel := v.edit && j.CancellationJobID == nil && !r.Irreversible && batchResource(r) != nil && (j.Operation == "up" || j.Operation == "forward") && (j.Status == "partial" || j.Status == "uncertain" || j.Status == "partially_reverted") && p.Batches > p.RevertedBatches
 	return map[string]any{
 		"job_id":              j.ID,

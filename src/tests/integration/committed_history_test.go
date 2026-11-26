@@ -11,7 +11,7 @@ import (
 	"tubes1_wbd/database/setup"
 )
 
-func TestM2CommittedHistoryDrivesDashboardAndChangelog(t *testing.T) {
+func TestM2HistoryShowsFailuresAndDashboardShowsCommittedEvents(t *testing.T) {
 	f, jobs, runner := p3Fixture(t)
 	must(t, setup.ValidateSchema(f.ctx, f.dbs.Website))
 	var oldTable bool
@@ -46,6 +46,7 @@ func TestM2CommittedHistoryDrivesDashboardAndChangelog(t *testing.T) {
 		Operation    string    `json:"operation"`
 		CommittedAt  time.Time `json:"committed_at"`
 		Version      int64     `json:"version"`
+		Status       string    `json:"status"`
 	}
 	for _, cookie := range []string{editorCookie, readerCookie} {
 		dashboard := apiRequest(t, handler, http.MethodGet, "/dashboard", cookie, nil)
@@ -63,8 +64,8 @@ func TestM2CommittedHistoryDrivesDashboardAndChangelog(t *testing.T) {
 		events := decodeAPI[struct {
 			Executions []summary `json:"executions"`
 		}](t, history).Executions
-		if len(events) != 1 || events[0].ID != recent[0].ID || events[0].Title != recent[0].Title || !events[0].CommittedAt.Equal(recent[0].CommittedAt) {
-			t.Fatal("dashboard and Changelog disagree about committed history")
+		if len(events) != 2 || events[0].Status != "failed" || events[0].Title != "Failed attempt" || !events[0].CommittedAt.IsZero() || events[1].ID != recent[0].ID || !events[1].CommittedAt.Equal(recent[0].CommittedAt) {
+			t.Fatal("Changelog did not include the failure alongside the dashboard's committed event")
 		}
 	}
 	activity := apiRequest(t, handler, http.MethodGet, fmt.Sprintf("/migration-jobs?database_id=%d", f.database), readerCookie, nil)

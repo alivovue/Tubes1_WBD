@@ -112,6 +112,16 @@ func (w *Workflow) History(ctx context.Context, actor, database int64, hide bool
 	}
 	return w.store.CommittedHistory(ctx, database, hide, limit, offset)
 }
+func (w *Workflow) ExecutionHistory(ctx context.Context, actor, database int64, hide bool, limit, offset int) ([]dao.ExecutionEvent, error) {
+	if err := w.auth.RequirePermission(ctx, actor, database, access.ViewOnly); err != nil {
+		return nil, err
+	}
+	limit, err := validPage(limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	return w.store.ExecutionHistory(ctx, database, hide, limit, offset)
+}
 func (w *Workflow) Activities(ctx context.Context, actor, database int64, limit, offset int) ([]Activity, error) {
 	if err := w.auth.RequirePermission(ctx, actor, database, access.ViewOnly); err != nil {
 		return nil, err

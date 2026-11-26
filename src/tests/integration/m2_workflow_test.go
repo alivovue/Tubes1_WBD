@@ -204,7 +204,12 @@ func TestM2AuthorityChangesInvalidateApprovalsAndMissingLeadersBlock(t *testing.
 	wantError(t, err, migration.ErrWorkflowConflict)
 	unconfigured := f.group(t, "Unconfigured group")
 	must(t, f.adminAuth.SetGrant(f.ctx, f.admin, unconfigured.ID, f.database, admindao.ViewOnly))
-	_, err = f.workflow.SubmitReview(f.ctx, f.editor, migration.ReviewInput{RevisionID: r.ID, Action: "up"})
+	pending, err := f.workflow.SubmitReview(f.ctx, f.editor, migration.ReviewInput{RevisionID: r.ID, Action: "up"})
+	must(t, err)
+	if pending.State != "pending_review" || len(pending.AuthoritySnapshot.Groups) != 3 {
+		t.Fatal("a missing leader did not leave the review pending")
+	}
+	_, err = f.workflow.Enqueue(f.ctx, f.editor, pending.ID, "missing-leader")
 	wantError(t, err, migration.ErrWorkflowConflict)
 }
 func TestM2LeaderMembershipAndActivationInvariants(t *testing.T) {
@@ -533,7 +538,9 @@ func TestM2ActivitiesKeepFailuresOutsideCommittedHistory(t *testing.T) {
 	_, err = f.dbs.Website.ExecContext(f.ctx, `UPDATE migration_jobs SET status='failed' WHERE id=$1;
  `, job)
 	must(t, err)
-	_, err = f.dbs.Website.ExecContext(f.ctx, `INSERT INTO migration_job_attempts(job_id,attempt_no,outcome,error_class,error_message,finished_at) VALUES($1,1,'failed','syntax','sensitive-row-value-do-not-expose',now())`, job)
+	_, err = f.dbs.Website.ExecContext(f.ctx, `INSERT INTO migration_job_attempts(job_id,attempt_no,definition_id,revision_id,database_id,actor_id,operation,logical_version,sql_snapshot,outcome,error_class,error_message,finished_at)
+ SELECT j.id,1,r.definition_id,r.id,j.database_id,j.requested_by,j.operation,1,r.up_sql,'failed','syntax','sensitive-row-value-do-not-expose',now()
+ FROM migration_jobs j JOIN migration_reviews v ON v.id=j.review_id JOIN migration_revisions r ON r.id=v.revision_id WHERE j.id=$1`, job)
 	must(t, err)
 	activities, err := f.workflow.Activities(f.ctx, f.reader.ID, f.database, 50, 0)
 	must(t, err)

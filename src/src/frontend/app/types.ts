@@ -57,7 +57,7 @@ export type Rows = {
 export type RecentExecution = Pick<
   MigrationExecution,
   "id" | "database_id" | "title" | "actor" | "operation" | "committed_at" | "version"
-> & { database_name: string };
+> & { database_name: string; committed_at: string };
 export type Draft = {
   ID: number;
   Title: string;
@@ -306,7 +306,13 @@ export type MigrationExecution = {
   operation: MigrationAction;
   sql: string;
   actor: string;
-  committed_at: string;
+  status: "succeeded" | "failed" | "partial" | "uncertain";
+  is_committed: boolean;
+  attempt: number;
+  occurred_at: string;
+  started_at: string | null;
+  completed_at: string | null;
+  committed_at: string | null;
   duration_ms: number | null;
   job_id: string;
   review_id: number;
@@ -315,6 +321,8 @@ export type MigrationExecution = {
   irreversibility_reason: string;
   can_rollback: boolean;
   can_forward: boolean;
+  can_retry: boolean;
+  error: string;
   action_blocked_reason?: string;
 };
 export type ResourceResponse = { CSRF?: string; error?: string };

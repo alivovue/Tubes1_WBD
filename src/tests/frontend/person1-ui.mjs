@@ -159,7 +159,15 @@ const makeEvent = (id, operation, target = null) => ({
   operation,
   sql: operation === "rollback" ? definition.down_sql : definition.up_sql,
   actor: person.Username,
+  status: "succeeded",
+  is_committed: true,
+  attempt: 1,
+  occurred_at: date,
+  started_at: date,
+  completed_at: date,
   committed_at: date,
+  can_retry: false,
+  error: "",
   duration_ms: 125,
   job_id: `history-job-${id}`,
   review_id: id,
@@ -204,7 +212,7 @@ function page(admin = false) {
     Database: state.noDatabases ? { ID: 0 } : db,
     CanEdit: state.permission === "view_edit",
     EditableCount: 1,
-    Recent: state.noDatabases ? [] : state.history.slice(-1).map((event) => ({
+    Recent: state.noDatabases ? [] : state.history.filter((event) => event.is_committed).slice(-1).map((event) => ({
       id: event.id,
       database_id: event.database_id,
       database_name: db.Name,
@@ -435,7 +443,7 @@ const server = createServer(async (req, res) => {
         if (url.searchParams.get("hide_rollback") === "true") {
           const hidden = new Set(
             executions
-              .filter((event) => event.operation === "rollback")
+              .filter((event) => event.is_committed && event.status === "succeeded" && event.operation === "rollback")
               .flatMap((event) => [event.id, event.target_execution_id]),
           );
           executions = executions.filter((event) => !hidden.has(event.id));
@@ -645,9 +653,9 @@ try {
     ])
       await navigate(path, expected);
   });
-  await test("Default Changelog and dashboard links use M2 committed history", async () => {
+  await test("Default Changelog and dashboard links use M2 history", async () => {
     const start = requests.length;
-    await navigate("/migrations?db=7", "Committed execution history");
+    await navigate("/migrations?db=7", "Migration execution history");
     await wait("document.querySelector('tbody')?.children.length === 3");
     assert(requests.slice(start).some((request) => request.path === "/api/migrations/history"));
     assert.equal(requests.slice(start).some((request) => request.path === "/api/migrations"), false);
@@ -657,6 +665,37 @@ try {
     await wait(text("Execution #3"));
     assert.equal(await evaluate("new URLSearchParams(location.search).get('execution')"), "3");
     assert.equal(await evaluate("document.querySelector('h1').textContent"), "Changelog");
+  });
+  await test("Failed rollback stays in history and retries its existing approved job", async () => {
+    const savedHistory = state.history;
+    const savedJobs = state.jobs;
+    try {
+      state.history = [...savedHistory, {
+        ...makeEvent(4, "rollback", 3),
+        id: "failed-down",
+        status: "failed",
+        is_committed: false,
+        committed_at: null,
+        can_rollback: false,
+        can_retry: true,
+        error: "database_rejected",
+        job_id: "qna-failed-job",
+      }];
+      state.jobs = [{ ...makeJob(), job_id: "qna-failed-job", status: "failed", retryable: true }];
+      await navigate("/migrations?db=7&hide_rollback=true", "Migration execution history");
+      await wait("document.querySelector('tbody')?.children.length === 2");
+      await click("#failed-down · Add demo flag");
+      await wait(text("Retry approved job"));
+      assert.equal(await evaluate("[...document.querySelectorAll('button')].some(el => el.textContent.trim() === 'Request rollback review')"), false);
+      await check("Retry approved job for execution");
+      await click("Retry approved job");
+      await wait("new URLSearchParams(location.search).get('job') === 'qna-failed-job'");
+      assert(requests.some(request => request.path === "/api/migration-jobs/qna-failed-job/retry" && request.method === "POST"));
+      await navigate("/dashboard", "Welcome,");
+    } finally {
+      state.history = savedHistory;
+      state.jobs = savedJobs;
+    }
   });
   await test("Draft requires SQL down or irreversibility reason; batch settings persist", async () => {
     await navigate("/migrations?view=definitions&db=7", "New migration draft");
@@ -777,7 +816,7 @@ try {
   await test("Hide rollback uses exact execution pairs and preserves a later forward", async () => {
     await navigate(
       "/migrations?view=history&db=7",
-      "Committed execution history",
+      "Migration execution history",
     );
     assert.equal(
       await evaluate("document.querySelector('tbody').children.length"),
@@ -989,7 +1028,7 @@ try {
             ? "Review #"
             : view === "jobs"
               ? "Job activity"
-              : "Committed execution history",
+              : "Migration execution history",
         );
         await overflow();
       }

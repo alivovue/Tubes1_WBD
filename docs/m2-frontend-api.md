@@ -4,9 +4,9 @@ All paths include `/api`, use same-origin session cookies, and return JSON. Muta
 
 ## Changelog and dashboard
 
-The frontend route `/migrations` defaults to M2 committed history, also available with `view=history`. It loads database selection from `/api/databases` and executions from `/api/migrations/history`. The retired M1 `/api/migrations` endpoint returns 404.
+The frontend route `/migrations` defaults to M2 execution history, also available with `view=history`. It loads database selection from `/api/databases` and executions from `/api/migrations/history`. The retired M1 `/api/migrations` endpoint returns 404.
 
-`GET /dashboard` returns `Recent`, containing up to eight committed executions across accessible databases, newest commit first. Each entry has `id` (execution UUID), `database_id`, `database_name`, `title`, `actor`, `operation`, `committed_at` and `version`, using the same identity and display values as committed history. Dashboard links use `/migrations?db=<database_id>&execution=<id>`. Failed and running attempts are available in Jobs/activity, rather than committed history.
+`GET /dashboard` returns `Recent`, containing up to eight committed executions across accessible databases, newest commit first. Each entry has `id` (execution UUID), `database_id`, `database_name`, `title`, `actor`, `operation`, `committed_at` and `version`, using the same identity and display values as committed history. Dashboard links use `/migrations?db=<database_id>&execution=<id>`. Completed failed, partial and uncertain attempts also appear in Changelog. Jobs/activity provides live status and progress.
 
 ## Definitions
 
@@ -37,11 +37,11 @@ The UI's `irreversibility_reason` is mapped to the backend input `irreversible_r
 
 Request actions are `up`, `rollback`, `forward`, `batch_cancel`. Display actions infer `up_batch` from a signed batch template and use `cancel_batch` for compensation. The client maps these names on resubmission. Fresh cancellation reviews retain the original `target_job_id`.
 
-Review resources include exact SQL/revision/hash, authority revision, expected generation, original targets, `status`, `required_groups`, `job_id`, and actor-specific `can_enqueue`/`can_resubmit`. Groups expose their current review snapshot, assigned leader, decision and actor-specific `can_decide`. Response decisions are `pending|approved|rejected`. All access groups participate, including View Only; View Only leaders can decide but cannot enqueue.
+Review resources include exact SQL/revision/hash, authority revision, expected generation, original targets, `status`, `required_groups`, `job_id`, and actor-specific `can_enqueue`/`can_resubmit`. Groups expose their current review snapshot, assigned leader, decision and actor-specific `can_decide`. Response decisions are `pending|approved|rejected`. All access groups participate, including View Only; View Only leaders can decide but cannot enqueue. A missing leader permits submission with `pending_review` status, while enqueue remains blocked. Assigning a leader changes authority and requires a fresh review snapshot under the current invalidation policy. Self-approval and one user leading several groups are supported; each group has an explicit decision.
 
 Capability flags guide the UI. Every mutation and worker execution independently revalidates permission, approved content, current authority and active position. Stale approvals are invalidated on revalidation.
 
-## Jobs and committed history
+## Jobs and execution history
 
 - `GET /migration-jobs?database_id=7&limit=50&offset=0` → `{jobs: [...]}`.
 - `GET /migration-jobs/{uuid}` → `{job: ...}`.
@@ -52,9 +52,13 @@ Capability flags guide the UI. Every mutation and worker execution independently
 
 Job resources include title, definition/revision/review IDs, actor/time, status, attempt limits, nullable `next_retry_at`, committed/reverted batch/row counters, cursor, nullable total rows, classified error and capability flags. Raw driver errors and credentials are never included. Times without evidence are null. Every progress counter is present, including zero for ordinary SQL.
 
-Execution resource `id` and `target_execution_id` are UUID strings. Events contain exact committed SQL, original revision, logical version, job/review, actor/time, nullable duration, current expected generation, and rollback/forward eligibility. Duration measures first attempt start through target commit and includes retries; unavailable evidence is null. Hide rollback filters exact successful rollback/target pairs across all history before pagination, preserving later forward events. Pagination cursors currently encode an offset; clients should follow the server value. A full last page may lead to an empty final page.
+Execution resource `id` and `target_execution_id` are UUID strings. History contains every completed attempt, including `failed`, `partial` and `uncertain` outcomes. Each has its own stored SQL snapshot, original revision, logical version, job/review, actor, `status`, `attempt`, `occurred_at`, nullable `started_at`/`completed_at`, classified `error`, and `can_retry`. Raw driver errors remain private. `committed_at` is null for attempts that are not the verified committed event. `is_committed` distinguishes those events from attempt evidence.
 
-Definitions, reviews and job lists support `limit`/`offset` (default 50, maximum 200). The current SPA displays the most recent page of these lists; committed history also exposes older-page navigation.
+A verified commit retains its existing execution UUID and rollback/forward eligibility. Its successful attempt appears once under that commit ID; failed retries and additional reconciliation attempts retain distinct attempt UUIDs. The committed ledger alone advances the active stack. Finished attempt rows and their snapshots are immutable; an open attempt may only transition once to a finished outcome. Commit duration includes retries; other attempt durations measure that attempt's start/finish.
+
+Hide rollback filters only exact **successful** rollback/target pairs before pagination. Failed up/down attempts and later forward events remain visible. Pagination cursors currently encode an offset; clients should follow the server value. A full last page may lead to an empty final page.
+
+Definitions, reviews and job lists support `limit`/`offset` (default 50, maximum 200). The current SPA displays the most recent page of these lists; execution history also exposes older-page navigation.
 
 ## Supported batch template
 

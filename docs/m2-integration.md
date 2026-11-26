@@ -44,7 +44,7 @@ Verified on Windows on 22 November 2026: PowerShell and Git Bash launch paths; r
 
 Provision two separate application databases, restricted runtime roles, an initial administrator, existing master keys and a shared internal service token outside the application. Use `src/src/.env.example` and `src/src-admin/.env.example`; both `.env` files are ignored by Git. The complete fresh schemas are `src/tests/fixtures/website/schema.sql` and `src/tests/fixtures/admin/schema.sql`. These scripts create tables and should only be applied to empty application databases with suitable ownership/grants. They do not bootstrap the initial administrator.
 
-Existing databases need an explicit, reviewed upgrade. `src/src/database/dao/jobs_upgrade.sql` only upgrades the P2 queue schema to P3's columns; it is not an M1-to-M2 migration. Startup and launchers validate externally provisioned schemas and do not modify them.
+Fresh databases use the complete fixture schema directly, including attempt snapshots and write-once protection. `src/src/database/dao/jobs_upgrade.sql` only upgrades the P2 queue schema to P3's columns; it is not an M1-to-M2 migration or a substitute for the current complete schema. Startup and launchers validate externally provisioned schemas and do not modify them.
 
 From the repository root, run each command in a separate terminal:
 
@@ -64,9 +64,9 @@ The admin private authority defaults to `127.0.0.1:3002`; public apps default to
 2. Log in as an editor, open Migration workflow, select the target, and save reversible SQL up/down. The UI can generate the supported BIGINT increment batch template.
 3. Freeze and submit the revision. Log in as each assigned leader and record a separate decision for every group.
 4. As editor, enqueue the approved review. The API returns a durable job ID before any target SQL runs. Without a worker the job stays pending.
-5. Watch Jobs for attempt/progress state, then inspect Committed history. Request rollback of the last active reversible event, approve it and enqueue. Forward requires another review and reapplies only the selected original revision.
+5. Watch Jobs for attempt/progress state, then inspect Execution history, including failed attempts. Request rollback of the last active reversible event, approve it and enqueue. Forward requires another review and reapplies only the selected original revision.
 
-Database-wide locks, leases and target receipts prevent concurrent duplicate commits. Independent targets can run concurrently. Failed attempts remain in operational activity; only verified commits advance the active stack/history. Full transport details are in [m2-frontend-api.md](m2-frontend-api.md).
+Database-wide locks, leases and target receipts prevent concurrent duplicate commits. Independent targets can run concurrently. All completed attempts appear in execution history with immutable SQL evidence; only verified commits advance the active stack. Live state and progress remain in Jobs/activity. Full transport details are in [m2-frontend-api.md](m2-frontend-api.md).
 
 ## Partial work and recovery
 
@@ -100,9 +100,11 @@ Set `TMPDIR` to a spacious writable directory when the root disk is nearly full.
 - All 20 Chromium UI checks passed, including SQL analysis → approval draft and desktop/mobile layouts. Generated evidence is in `/home/audric/go-tmp/schakker-integration/browser/` for this verification run; the original tracked screenshots were preserved.
 - Windows launchers were reviewed but not executed on this Linux host. This integration checkpoint preceded the bonus work; see [M2 bonuses](m2-bonuses.md) for the subsequent real stack, k6 and CodeQL results.
 
+See [the specification and Q&A review](m2-specification-review.md) for the checked M2 v5 requirements and the corrected attempt-history and missing-leader behavior.
+
 ## Remaining scope limits
 
-- Changelog (`/migrations`) and the dashboard's recent migrations both read M2 committed history. Running, failed and uncertain attempts remain in Jobs/activity. The unused M1 history table, readers and compatibility checks have been removed from the fresh schema and application; no historical-data import is needed for this deployment.
+- Changelog (`/migrations`) reads M2 execution history, including completed failures, partial and uncertain attempts. The dashboard summarizes recent verified commits. Jobs/activity shows live status and progress. The unused M1 history table, readers and compatibility checks have been removed from the fresh schema and application; no historical-data import is needed for this deployment.
 - M2 execution is PostgreSQL only. MariaDB's existing viewer/analysis code is retained. New migrations execute only through immutable definitions, leader approval, the durable queue and the worker. The synchronous execution service, signed analysis review, legacy reconciliation service/button, and browser `execute`/`resolve`/`reconcile` actions have been removed. The retired `/api/migrations` endpoint returns 404; unsupported actions at `/api/migrations/new` return 400. Execution recovery uses M2 job retry and worker receipt/checkpoint reconciliation.
 - SQL analysis versions follow M2's active position, including rollback. Analysis drafts remain separate from immutable workflow definitions; deleting one does not alter committed history. Integration tests exercise actual approved M2 jobs for history, transaction and receipt protection.
 - The batch template updates one BIGINT column by a fixed nonzero integer using a BIGINT primary key. Arbitrary batch SQL and unsupported table shapes are rejected.

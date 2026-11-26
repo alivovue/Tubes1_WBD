@@ -200,7 +200,7 @@ func (h Handler) ServeWorkflow(w http.ResponseWriter, r *http.Request, actor int
 					}
 				}
 				if err == nil {
-					result, err = workflow.History(r.Context(), actor, database, hide, limit, offset)
+					result, err = workflow.ExecutionHistory(r.Context(), actor, database, hide, limit, offset)
 				}
 			}
 		}
@@ -263,7 +263,7 @@ func (h Handler) ServeWorkflow(w http.ResponseWriter, r *http.Request, actor int
 			items = append(items, resource)
 		}
 		result = map[string]any{"reviews": items}
-	case []dao.CommittedExecution:
+	case []dao.ExecutionEvent:
 		database, limit, offset, _ := pageInput(r)
 		if raw := r.URL.Query().Get("cursor"); raw != "" {
 			offset, _ = httpapi.Offset(raw)
@@ -275,7 +275,7 @@ func (h Handler) ServeWorkflow(w http.ResponseWriter, r *http.Request, actor int
 		}
 		items := make([]map[string]any, 0, len(value))
 		for _, item := range value {
-			resource, viewErr := view.Execution(item)
+			resource, viewErr := view.ExecutionEvent(item)
 			if viewErr != nil {
 				response.Fail(w, r, viewErr)
 				return

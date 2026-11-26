@@ -180,6 +180,13 @@ function ReviewCard({
             No required leaders were resolved. This review cannot be queued.
           </Notice>
         )}
+        {review.required_groups.some((group) => !group.leader_user_id) && (
+          <Notice>
+            This review stays pending while a group has no active leader. Ask a
+            platform administrator to assign one. Changed authority requires a
+            fresh review before execution.
+          </Notice>
+        )}
         <Table
           headers={[
             "Group / access",

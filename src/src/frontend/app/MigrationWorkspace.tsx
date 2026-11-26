@@ -60,7 +60,7 @@ export function MigrationWorkspace() {
                   definitions: "Drafts & SQL",
                   reviews: "Approval inbox",
                   jobs: "Jobs & activity",
-                  history: "Committed history",
+                  history: "Execution history",
                 }[tab]
               }
             </Link>

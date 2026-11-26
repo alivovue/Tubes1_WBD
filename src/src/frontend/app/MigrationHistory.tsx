@@ -5,6 +5,7 @@ import type { HistoryResponse, MigrationExecution } from "./types";
 import { Button, Notice, Panel, stamp, Table, usePage } from "./ui";
 import {
   ResourceState,
+  MigrationStatus,
   migrationURL,
   useMigrationAction,
   useMigrationResource,
@@ -15,7 +16,7 @@ import {
 export function hideRollbackPairs(executions: MigrationExecution[]) {
   const hidden = new Set<string>();
   for (const event of executions) {
-    if (event.operation === "rollback" && event.target_execution_id != null) {
+    if (event.is_committed && event.status === "succeeded" && event.operation === "rollback" && event.target_execution_id != null) {
       hidden.add(event.id);
       hidden.add(event.target_execution_id);
     }
@@ -57,13 +58,13 @@ export function MigrationHistory() {
           Refresh history
         </Button>
         <Link to={migrationURL("jobs", data.Database.ID)}>
-          View failures and job attempts
+          View jobs and progress
         </Link>
       </div>
       <p className="muted">
-        Only committed executions appear here. Hide rollback removes each
-        successful rollback and its exact target execution from this view.
-        Stored history is preserved; later forward executions remain visible.
+        Every completed attempt appears here, including failures and retries.
+        Hide rollback removes only successful rollback pairs. Failed attempts
+        and later forward executions remain visible; stored history is preserved.
       </p>
       <ResourceState {...resource} />
       {resource.data && (
@@ -81,14 +82,15 @@ export function MigrationHistory() {
               stale={!!resource.error}
             />
           )}
-          <Panel title="Committed execution history">
+          <Panel title="Migration execution history">
             <Table
               headers={[
                 "Execution / migration",
                 "Version / revision",
                 "Action / pairing",
                 "Actor",
-                "Committed",
+                "Status / attempt",
+                "Time",
                 "Duration",
                 "Job",
               ]}
@@ -113,7 +115,11 @@ export function MigrationHistory() {
                   )}
                 </>,
                 event.actor,
-                stamp(event.committed_at),
+                <>
+                  <MigrationStatus status={event.status} />
+                  {!!event.attempt && <small>Attempt {event.attempt}</small>}
+                </>,
+                stamp(event.occurred_at),
                 event.duration_ms == null ? "Unavailable" : `${event.duration_ms.toLocaleString()} ms`,
                 <Link
                   to={migrationURL("jobs", data.Database.ID, {
@@ -123,7 +129,7 @@ export function MigrationHistory() {
                   {event.job_id}
                 </Link>,
               ])}
-              empty="No committed executions match this view."
+              empty="No execution attempts match this view."
             />
           </Panel>
           <div className="toolbar">
@@ -176,10 +182,18 @@ function ExecutionDetail({
         migrationURL("reviews", data.Database.ID, { review: result.review.id }),
       );
   }
+  async function retry() {
+    if (!confirmed) return;
+    const result = await action.run((csrf) =>
+      migrationsAPI.retry(execution.job_id, csrf, crypto.randomUUID()),
+    );
+    if (result)
+      navigate(migrationURL("jobs", data.Database.ID, { job: result.job.job_id }));
+  }
   return (
     <Panel
       title={`Execution #${execution.id} · ${execution.title}`}
-      text={`${execution.operation.replaceAll("_", " ")} committed by ${execution.actor} on ${stamp(execution.committed_at)}`}
+      text={`${execution.operation.replaceAll("_", " ")} · ${execution.status} · ${execution.actor} · ${stamp(execution.occurred_at)}`}
     >
       <div className="integration-form form-stack">
         <p>
@@ -189,7 +203,14 @@ function ExecutionDetail({
         {execution.target_execution_id != null && (
           <p>Exact target execution #{execution.target_execution_id}</p>
         )}
-        <h3>Exact executed SQL</h3>
+        {execution.error && <Notice error>Outcome: {execution.error.replaceAll("_", " ")}</Notice>}
+        {!execution.is_committed && (
+          <Notice>
+            This attempt did not advance the migration's active position. Any
+            committed batch progress and recovery options are available in its job.
+          </Notice>
+        )}
+        <h3>SQL snapshot</h3>
         <pre tabIndex={0}>{execution.sql}</pre>
         {execution.irreversible && (
           <Notice error>
@@ -203,13 +224,12 @@ function ExecutionDetail({
         {action.error && <Notice error>{action.error}</Notice>}
         {data.CanEdit &&
           ((execution.can_rollback && !execution.irreversible) ||
-            execution.can_forward) && (
+            execution.can_forward || execution.can_retry) && (
             <>
               <Notice>
-                Rollback uses the original SQL down for the last active
-                reversible migration. Forward reapplies only the original SQL up
-                for this revision. Every action requires a new leader review and
-                a new background job.
+                {execution.can_retry
+                  ? "Retry reuses this job's unchanged approved SQL. Existing approvals remain valid while authority and the active position are unchanged."
+                  : "Rollback uses the original SQL down for the last active reversible migration. Forward reapplies the original SQL up. Each rollback or forward requires a new leader review and background job."}
               </Notice>
               <label className="check-control">
                 <input
@@ -219,7 +239,7 @@ function ExecutionDetail({
                   onChange={(event) => setConfirmed(event.target.checked)}
                 />
                 <span>
-                  Request review for execution #{execution.id} on{" "}
+                  {execution.can_retry ? "Retry approved job for execution" : "Request review for execution"} #{execution.id} on{" "}
                   {data.Database.Name}.
                 </span>
               </label>
@@ -239,6 +259,14 @@ function ExecutionDetail({
                     disabled={!confirmed || stale || action.busy}
                   >
                     Request forward review
+                  </Button>
+                )}
+                {execution.can_retry && (
+                  <Button
+                    onClick={retry}
+                    disabled={!confirmed || stale || action.busy}
+                  >
+                    Retry approved job
                   </Button>
                 )}
               </div>

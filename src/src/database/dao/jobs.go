@@ -152,7 +152,11 @@ func (d *Store) ClaimJob(ctx context.Context, owner string, lease time.Duration)
 		if err != nil {
 			return err
 		}
-		_, err = tx.q.ExecContext(ctx, `INSERT INTO migration_job_attempts(job_id,attempt_no) VALUES($1,$2)`, id, out.Attempt)
+		_, err = tx.q.ExecContext(ctx, `INSERT INTO migration_job_attempts(job_id,attempt_no,definition_id,revision_id,database_id,actor_id,operation,logical_version,sql_snapshot,target_execution_id)
+ SELECT j.id,j.attempt,r.definition_id,r.id,j.database_id,j.requested_by,j.operation,
+ CASE WHEN j.operation='rollback' THEN v.expected_active_version ELSE v.expected_active_version+1 END,
+ CASE WHEN j.operation IN('rollback','batch_cancel') THEN r.down_sql ELSE r.up_sql END,v.target_execution_id
+ FROM migration_jobs j JOIN migration_reviews v ON v.id=j.review_id JOIN migration_revisions r ON r.id=v.revision_id WHERE j.id=$1`, id)
 		return classify(err)
 	})
 	return out, err

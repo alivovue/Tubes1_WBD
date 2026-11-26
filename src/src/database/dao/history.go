@@ -41,6 +41,29 @@ func (d *Store) CommittedExecution(ctx context.Context, id string) (CommittedExe
 func (d *Store) CommittedHistory(ctx context.Context, database int64, hide bool, limit, offset int) ([]CommittedExecution, error) {
 	return workflowList[CommittedExecution](ctx, d, `SELECT row_to_json(x) FROM (SELECT h.*,'succeeded' AS status FROM migration_execution_history h WHERE h.database_id=$1 AND (NOT $2 OR (h.operation<>'rollback' AND NOT EXISTS(SELECT 1 FROM migration_execution_history r WHERE r.reverses_execution_id=h.execution_id))) ORDER BY h.history_seq DESC LIMIT $3 OFFSET $4) x`, database, hide, limit, offset)
 }
+
+func (d *Store) ExecutionHistory(ctx context.Context, database int64, hide bool, limit, offset int) ([]ExecutionEvent, error) {
+	// One successful attempt is represented by its committed execution ID, which
+	// remains the rollback target. Other attempts retain their own execution IDs.
+	// Filter committed reversal pairs before pagination; failures always remain.
+	return workflowList[ExecutionEvent](ctx, d, `WITH events AS (
+ SELECT to_jsonb(h)||jsonb_build_object('status','succeeded','is_committed',true,
+ 'attempt_no',COALESCE(a.attempt_no,0),'started_at',a.started_at,'finished_at',a.finished_at,
+ 'occurred_at',h.committed_at,'error_class','') AS payload,h.committed_at AS event_time,h.execution_id AS event_id
+ FROM migration_execution_history h LEFT JOIN LATERAL (
+ SELECT a.attempt_no,a.started_at,a.finished_at FROM migration_job_attempts a
+ WHERE a.job_id=h.job_id AND a.outcome='succeeded' ORDER BY a.attempt_no LIMIT 1) a ON true
+ WHERE h.database_id=$1 AND (NOT $2 OR (h.operation<>'rollback' AND NOT EXISTS(
+ SELECT 1 FROM migration_execution_history r WHERE r.reverses_execution_id=h.execution_id)))
+ UNION ALL
+ SELECT to_jsonb(a)||jsonb_build_object('status',a.outcome,'is_committed',false,
+ 'review_id',j.review_id,'occurred_at',a.finished_at) AS payload,a.finished_at,a.execution_id
+ FROM migration_job_attempts a JOIN migration_jobs j ON j.id=a.job_id
+ WHERE a.database_id=$1 AND a.finished_at IS NOT NULL AND NOT (
+ a.outcome='succeeded' AND EXISTS(SELECT 1 FROM migration_execution_history h WHERE h.job_id=a.job_id)
+ AND a.attempt_no=(SELECT min(s.attempt_no) FROM migration_job_attempts s WHERE s.job_id=a.job_id AND s.outcome='succeeded'))
+ ) SELECT payload FROM events ORDER BY event_time DESC,event_id DESC LIMIT $3 OFFSET $4`, database, hide, limit, offset)
+}
 func (d *Store) AppendCommittedExecution(ctx context.Context, e CommittedExecution) error {
 	_, err := d.q.ExecContext(ctx, `INSERT INTO migration_execution_history(execution_id,job_id,review_id,definition_id,revision_id,database_id,logical_version,actor_id,operation,sql_snapshot,committed_at,reverses_execution_id,target_execution_id,target_receipt) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`, e.ExecutionID, e.JobID, e.ReviewID, e.DefinitionID, e.RevisionID, e.DatabaseID, e.LogicalVersion, e.ActorID, e.Operation, e.SQL, e.CommittedAt, e.ReversesExecutionID, e.TargetExecutionID, e.TargetReceipt)
 	return classify(err)

@@ -114,11 +114,8 @@ func (w *Workflow) snapshot(ctx context.Context, actor, database int64) (authori
 	if len(s.Groups) == 0 {
 		return s, ErrWorkflowConflict
 	}
-	for _, g := range s.Groups {
-		if g.LeaderID < 1 || !g.Valid {
-			return s, ErrWorkflowConflict
-		}
-	}
+	// Missing leaders leave a submitted review pending. Execution still requires
+	// an explicit decision from every valid group leader.
 	return s, nil
 }
 func ContentHash(up, down string, irreversible bool, reason string) string {
@@ -194,6 +191,9 @@ func allApproved(r dao.MigrationReview) bool {
 		return false
 	}
 	for _, g := range r.AuthoritySnapshot.Groups {
+		if g.LeaderID < 1 || !g.Valid {
+			return false
+		}
 		found := false
 		for _, a := range r.Decisions {
 			if a.GroupID == g.ID && a.ApproverID == g.LeaderID && a.Decision == "approve" {

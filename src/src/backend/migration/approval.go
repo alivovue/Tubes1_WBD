@@ -120,7 +120,7 @@ func (w *Workflow) Decide(ctx context.Context, actor, id, group int64, decision,
 		}
 		leader := false
 		for _, g := range r.AuthoritySnapshot.Groups {
-			if g.ID == group && g.LeaderID == actor {
+			if g.ID == group && g.Valid && g.LeaderID == actor {
 				leader = true
 			}
 		}

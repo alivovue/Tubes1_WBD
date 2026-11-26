@@ -76,3 +76,15 @@ type CommittedExecution struct {
 	TargetReceipt       string    `json:"target_receipt"`
 	Status              string    `json:"status"`
 }
+
+// ExecutionEvent combines the committed chain with immutable attempt evidence.
+// Failed/partial/uncertain events never advance the active migration position.
+type ExecutionEvent struct {
+	CommittedExecution
+	IsCommitted bool       `json:"is_committed"`
+	AttemptNo   int        `json:"attempt_no"`
+	StartedAt   *time.Time `json:"started_at"`
+	FinishedAt  *time.Time `json:"finished_at"`
+	OccurredAt  time.Time  `json:"occurred_at"`
+	ErrorClass  string     `json:"error_class"`
+}

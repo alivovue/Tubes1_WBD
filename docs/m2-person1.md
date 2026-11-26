@@ -14,9 +14,9 @@ Scope follows section 6.1 / FE-01–FE-05 of the supplied Milestone 2 implementa
 | FE-04 | Polling job detail, job activity separate from committed history, execution details, exact execution-ID rollback pairing and Hide rollback. |
 | FE-05 | Rollback/forward review requests, PostgreSQL batch configuration, committed/reverted rows and batches, cursor, checkpoint retry, cancellation review, partial/uncertain/compensation states. |
 
-The navigation entry **Migration workflow** opens `/migrations?view=definitions`. The four views are `definitions`, `reviews`, `jobs` and `history`; all support `db=<database-id>`. **Changelog** opens `/migrations`, which defaults to M2 committed history; `view=history` also selects that view. Dashboard recent migrations link to these same committed executions. `/migrations/new` retains SQL analysis and analysis drafts, with a handoff into workflow definitions. Query parameters reuse Go's existing HTML routes, so deep links do not need new page handlers.
+The navigation entry **Migration workflow** opens `/migrations?view=definitions`. The four views are `definitions`, `reviews`, `jobs` and `history`; all support `db=<database-id>`. **Changelog** opens `/migrations`, which defaults to M2 execution history (including completed failed attempts); `view=history` also selects that view. Dashboard recent migrations link to these same committed executions. `/migrations/new` retains SQL analysis and analysis drafts, with a handoff into workflow definitions. Query parameters reuse Go's existing HTML routes, so deep links do not need new page handlers.
 
-Selection parameters: `definition`, `copy`, `review`, `job`, `execution`; committed history also uses `hide_rollback=true` and a server-provided `cursor`. Changing databases preserves the workflow view and drops the old selection.
+Selection parameters: `definition`, `copy`, `review`, `job`, `execution`; execution history also uses `hide_rollback=true` and a server-provided `cursor`. Changing databases preserves the workflow view and drops the old selection.
 
 ## Integration status
 
@@ -61,7 +61,7 @@ Browser fixtures verify client behavior; they do not prove real leader authority
 2. As an editor, open **Migration workflow → Drafts & SQL**. Enter up/down SQL, or enable irreversible and supply a reason. Save, edit, save again, then submit the exact revision.
 3. Sign in as every required group leader. Open **Approval inbox**, inspect the frozen SQL and record each group's decision, including View Only groups. Change authority during a review and verify invalidation.
 4. As an editor, queue the approved review. Follow **Jobs & activity** while navigating away and back; verify progress survives a reload.
-5. Open **Committed history**, inspect exact SQL/actor/date/job IDs, request rollback on the last reversible migration, approve and queue it. Toggle **Hide rollback**, then forward the original revision with a fresh review. Verify subsequent migrations are not forwarded automatically.
+5. Open **Execution history**, inspect exact SQL/actor/date/job IDs, request rollback on the last reversible migration, approve and queue it. Toggle **Hide rollback**, then forward the original revision with a fresh review. Verify subsequent migrations are not forwarded automatically.
 6. Submit a supported batch UPDATE. Interrupt after a committed batch and verify rows/checkpoint remain visible. Resume without repeating the committed work; separately request and approve compensation, and inspect partially reverted/reverted states.
 7. Repeat user/admin navigation at the recorded mobile widths. Confirm the page stays within the viewport while wide SQL and tables scroll inside their containers.
 
