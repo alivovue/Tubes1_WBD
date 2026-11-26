@@ -2,6 +2,7 @@
 // Requires Node 22 and a local Chromium browser; no test framework/dependency.
 import assert from "node:assert/strict";
 import { runFeatureChecks } from "./integration/workspace-admin-ui.mjs";
+import { runPaginationChecks } from "./integration/migration-pagination-ui.mjs";
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
 import { existsSync } from "node:fs";
@@ -198,6 +199,11 @@ const state = {
   respond: null,
 };
 const requests = [];
+function listPage(items, url) {
+  const offset = Number(url.searchParams.get("offset") || 0);
+  const limit = Number(url.searchParams.get("limit") || 50);
+  return [...items].sort((a,b) => b.id-a.id).slice(offset,offset+limit);
+}
 const jobReads = [];
 const sessionFixtures = new Map();
 let secondaryServer;
@@ -358,7 +364,11 @@ const serve = async (req, res) => {
         if (reply) return json(res, reply.status || 200, reply.body);
       }
       if (path === "/api/migration-definitions" && req.method === "GET")
-        return json(res, 200, { definitions: state.definitions });
+        return json(res, 200, { definitions: listPage(state.definitions,url) });
+      if (/^\/api\/migration-definitions\/[^/]+$/.test(path) && req.method === "GET") {
+        const selected = state.definitions.find(item => String(item.id) === path.split("/").at(-1));
+        return json(res, selected ? 200 : 404, selected ? {definition:selected} : {error:"Definition does not exist"});
+      }
       if (
         path.startsWith("/api/migration-definitions") &&
         req.method !== "GET"
@@ -388,7 +398,11 @@ const serve = async (req, res) => {
         return json(res, 200, { definition: saved });
       }
       if (path === "/api/migration-reviews" && req.method === "GET")
-        return json(res, 200, { reviews: state.reviews });
+        return json(res, 200, { reviews: listPage(state.reviews,url) });
+      if (/^\/api\/migration-reviews\/[^/]+$/.test(path) && req.method === "GET") {
+        const selected = state.reviews.find(item => String(item.id) === path.split("/").at(-1));
+        return json(res, selected ? 200 : 404, selected ? {review:selected} : {error:"Review does not exist"});
+      }
       if (path === "/api/migration-reviews" && req.method === "POST") {
         const source = state.definitions.find(
           (item) => item.revision_id === body.revision_id,
@@ -449,8 +463,11 @@ const serve = async (req, res) => {
           review_id: review.id,
         });
       }
-      if (path === "/api/migration-jobs")
-        return json(res, 200, { jobs: state.jobs });
+      if (path === "/api/migration-jobs") {
+        const offset = Number(url.searchParams.get("offset") || 0);
+        const limit = Number(url.searchParams.get("limit") || 50);
+        return json(res, 200, { jobs: state.jobs.slice(offset, offset + limit) });
+      }
       if (/\/migration-jobs\/[^/]+$/.test(path)) {
         const job = state.jobs.find(
           (item) => item.job_id === decodeURIComponent(path.split("/").at(-1)),
@@ -1292,6 +1309,7 @@ try {
     }
   });
   featureSuite = true;
+  await runPaginationChecks({ test, state, requests, definition, makeReview, makeJob, navigate, evaluate, wait, text, click, field, check, viewport });
   await runFeatureChecks({ test, state, requests, page, navigate, evaluate, wait, text, click, field, check, viewport, delay });
   await test("No browser runtime errors or direct migration execution from new screens", async () => {
     assert.deepEqual(browserErrors, []);

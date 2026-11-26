@@ -1,11 +1,13 @@
 import { useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { migrationPaths, migrationsAPI } from "./api";
+import { migrationPageSize, migrationPaths, migrationsAPI } from "./api";
 import type { JobResponse, JobsResponse } from "./types";
 import { Button, Notice, Panel, stamp, Table, usePage } from "./ui";
 import { BatchProgress } from "./MigrationBatch";
 import {
   MigrationStatus,
+  MigrationPagination,
+  migrationOffset,
   ResourceState,
   migrationURL,
   useMigrationAction,
@@ -25,11 +27,13 @@ const finished = (result: JobResponse) =>
 export function MigrationJobs() {
   const { data } = usePage();
   const [params] = useSearchParams();
+  const offset = migrationOffset(params);
   const resource = useMigrationResource<JobsResponse>(
-    migrationPaths.jobs(data.Database.ID),
+    migrationPaths.jobs(data.Database.ID, offset),
     5000,
   );
   const selected = params.get("job");
+  const jobs = (resource.data?.jobs || []).slice(0, migrationPageSize);
   return (
     <>
       <div className="toolbar">
@@ -46,41 +50,55 @@ export function MigrationJobs() {
       )}
       <Panel
         title="Job activity"
-        text="Queued work, failures and retries are separate from committed execution history."
+        text="Queued work, failures and retries. Completed attempts are also recorded in migration history."
       >
         <ResourceState {...resource} />
         {resource.data && (
-          <Table
-            headers={[
-              "Job / migration",
-              "Action",
-              "Status",
-              "Progress",
-              "Attempt",
-              "Requested",
-              "Latest error",
-            ]}
-            rows={resource.data.jobs.map((job) => [
-              <Link
-                to={migrationURL("jobs", data.Database.ID, { job: job.job_id })}
-              >
-                {job.title}
-                <small className="migration-secondary">{job.job_id}</small>
-              </Link>,
-              job.operation.replaceAll("_", " "),
-              <MigrationStatus status={job.status} />,
-              `${job.committed_batches} batches · ${job.committed_rows.toLocaleString()} rows`,
-              `${job.attempt} / ${job.max_attempts}`,
-              <>
-                {job.requested_by}
-                <small className="migration-secondary">
-                  {stamp(job.created_at)}
-                </small>
-              </>,
-              job.error || job.blocked_reason || "—",
-            ])}
-            empty="No migration jobs yet."
-          />
+          <>
+            <Table
+              headers={[
+                "Job / migration",
+                "Action",
+                "Status",
+                "Progress",
+                "Attempt",
+                "Requested",
+                "Latest error",
+              ]}
+              rows={jobs.map((job) => [
+                <Link
+                  to={migrationURL("jobs", data.Database.ID, {
+                    job: job.job_id,
+                    offset,
+                  })}
+                >
+                  {job.title}
+                  <small className="migration-secondary">{job.job_id}</small>
+                </Link>,
+                job.operation.replaceAll("_", " "),
+                <MigrationStatus status={job.status} />,
+                `${job.committed_batches} batches · ${job.committed_rows.toLocaleString()} rows`,
+                `${job.attempt} / ${job.max_attempts}`,
+                <>
+                  {job.requested_by}
+                  <small className="migration-secondary">
+                    {stamp(job.created_at)}
+                  </small>
+                </>,
+                job.error || job.blocked_reason || "—",
+              ])}
+              empty={
+                offset > 0
+                  ? "No jobs on this page. Use Previous to return to newer jobs."
+                  : "No migration jobs yet."
+              }
+            />
+            <MigrationPagination
+              label="Jobs"
+              offset={offset}
+              hasMore={resource.data.jobs.length > migrationPageSize}
+            />
+          </>
         )}
       </Panel>
     </>
@@ -191,7 +209,7 @@ function JobDetail({ id, reloadList }: { id: string; reloadList: () => void }) {
                 className="button button--secondary"
                 to={migrationURL("history", data.Database.ID)}
               >
-                Committed history
+                Migration history
               </Link>
               {data.CanEdit && job.retryable && (
                 <Button

@@ -12,20 +12,60 @@ import type {
   MigrationExecution,
   MigrationJob,
   ReviewResponse,
+  ReviewsResponse,
 } from "./types";
 
 const databaseQuery = (database: number) =>
   `database_id=${encodeURIComponent(database)}`;
+export const migrationPageSize = 50;
+const pageQuery = (database: number, offset: number) =>
+  `${databaseQuery(database)}&limit=${migrationPageSize + 1}&offset=${offset}`;
 export const migrationPaths = {
-  definitions: (database: number) =>
-    `/migration-definitions?${databaseQuery(database)}`,
-  reviews: (database: number) =>
-    `/migration-reviews?${databaseQuery(database)}`,
-  jobs: (database: number) => `/migration-jobs?${databaseQuery(database)}`,
+  definitions: (database: number, offset = 0) =>
+    `/migration-definitions?${pageQuery(database, offset)}`,
+  definition: (id: string | number) =>
+    `/migration-definitions/${encodeURIComponent(id)}`,
+  reviews: (database: number, offset = 0) =>
+    `/migration-reviews?${pageQuery(database, offset)}`,
+  review: (id: string | number) =>
+    `/migration-reviews/${encodeURIComponent(id)}`,
+  jobs: (database: number, offset = 0) =>
+    `/migration-jobs?${pageQuery(database, offset)}`,
   job: (id: string) => `/migration-jobs/${encodeURIComponent(id)}`,
   history: (database: number, hide: boolean, cursor?: string) =>
     `/migrations/history?${databaseQuery(database)}&hide_rollback=${hide}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`,
 };
+// Backend lists have no inbox filter. Scan pages until a full matching page and
+// one lookahead are available; failures never masquerade as an empty inbox.
+export async function loadReviewInbox(
+  database: number,
+  offset: number,
+  signal: AbortSignal,
+): Promise<ReviewsResponse> {
+  const reviews: MigrationReview[] = [];
+  let skipped = 0;
+  let CSRF: string | undefined;
+  for (let scan = 0; ; scan += 200) {
+    const result = await requestResource<ReviewsResponse>(
+      `/api/migration-reviews?${databaseQuery(database)}&limit=200&offset=${scan}`,
+      { signal },
+    );
+    CSRF = result.CSRF ?? CSRF;
+    for (const review of result.reviews) {
+      if (
+        review.status !== "pending_review" ||
+        !review.required_groups.some(
+          (group) => group.can_decide && group.decision === "pending",
+        )
+      )
+        continue;
+      if (skipped++ < offset) continue;
+      reviews.push(review);
+      if (reviews.length > migrationPageSize) return { CSRF, reviews };
+    }
+    if (result.reviews.length < 200) return { CSRF, reviews };
+  }
+}
 export const migrationsAPI = {
   definitions: (database: number, signal?: AbortSignal) =>
     requestResource<DefinitionsResponse>(
