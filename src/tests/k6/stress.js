@@ -18,7 +18,11 @@ export function api(data) { apiTraffic(data); }
 export function sameDatabase(data) { migrationTraffic(data, 'same_database'); }
 export function differentDatabases(data) { migrationTraffic(data, 'different_databases'); }
 export function handleSummary(data) {
-  data.schakker = { phases, stage_seconds: stageSeconds, normal_vus: 5, peak_target_vus: 24, success_definition: 'terminal committed job, not HTTP 202', approval_fixture: 'real current-generation approvals, isolated PostgreSQL targets' };
+  const proof = {
+    state: data.state,
+    metrics: data.metrics,
+    schakker: { phases, stage_seconds: stageSeconds, normal_vus: 5, peak_target_vus: 24, success_definition: 'terminal committed job, not HTTP 202', approval_fixture: 'real current-generation approvals, isolated PostgreSQL targets' },
+  };
   const destination = __ENV.SCHAKKER_K6_SUMMARY || './summary.json';
-  return { [destination]: JSON.stringify(data, null, 2), stdout: `Schakker k6 report: ${destination}\n${data.metrics.jobs_completed?.values.count || 0} jobs completed; thresholds recorded in report.\n` };
+  return { [destination]: JSON.stringify(proof, null, 2), stdout: `Schakker k6 report: ${destination}\n${data.metrics.jobs_completed?.values.count || 0} jobs completed; thresholds recorded in report.\n` };
 }

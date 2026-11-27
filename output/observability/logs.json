@@ -1,0 +1,2157 @@
+{
+  "status": "success",
+  "data": {
+    "resultType": "streams",
+    "result": [
+      {
+        "stream": {
+          "__stream_shard__": "0",
+          "actor_id": "1",
+          "attempt": "1",
+          "committed_batches": "0",
+          "committed_rows": "0",
+          "correlation_id": "0b545c801d3d76dd9c6f96d49851e039",
+          "database_id": "2",
+          "definition_id": "7",
+          "detected_level": "info",
+          "event": "worker.finished",
+          "execution_id": "e6d35969-79f6-42dc-80a8-5648401ac680",
+          "flags": "1",
+          "job_id": "25781592-5c61-413b-8649-6bcd5b9c735d",
+          "job_status": "succeeded",
+          "migration_id": "7",
+          "observed_timestamp": "1795789447063398744",
+          "review_id": "7",
+          "revision": "1",
+          "revision_id": "7",
+          "scope_name": "schakker-load-fixture",
+          "service_name": "schakker-load-fixture",
+          "severity_number": "9",
+          "severity_text": "INFO",
+          "span_id": "4d6c15da9d434226",
+          "sql_hash": "7eb853abe7e354a1ae59936a5aa4942b45b99aad8fd5a12a1f2652397c94a25a",
+          "sql_snapshot": "CREATE TABLE public . load_7 ( id bigint )",
+          "status": "succeeded",
+          "trace_id": "7c02681ddaa7392f625971a8bc44bd96"
+        },
+        "values": [
+          [
+            "1795789447063233109",
+            "worker.finished"
+          ]
+        ]
+      },
+      {
+        "stream": {
+          "__stream_shard__": "0",
+          "actor_id": "1",
+          "attempt": "1",
+          "committed_batches": "0",
+          "committed_rows": "0",
+          "correlation_id": "0e152ec6e828ff99612c57db5e6f3c12",
+          "database_id": "2",
+          "definition_id": "19",
+          "detected_level": "info",
+          "event": "worker.finished",
+          "execution_id": "6d7c0e6b-1b03-4d40-a8b8-0ae526478351",
+          "flags": "1",
+          "job_id": "3335fdac-1b08-4516-ab4f-9a06f47283fc",
+          "job_status": "succeeded",
+          "migration_id": "19",
+          "observed_timestamp": "1795789458957279301",
+          "review_id": "19",
+          "revision": "1",
+          "revision_id": "19",
+          "scope_name": "schakker-load-fixture",
+          "service_name": "schakker-load-fixture",
+          "severity_number": "9",
+          "severity_text": "INFO",
+          "span_id": "ba3738dfdcdcd34e",
+          "sql_hash": "1efb786ed7e1916f43d5fd23e49704a6838b01dae9d441771579f18e024abea3",
+          "sql_snapshot": "CREATE TABLE public . load_19 ( id bigint )",
+          "status": "succeeded",
+          "trace_id": "9d605b96711c7a0b1a8a20bc8febce6a"
+        },
+        "values": [
+          [
+            "1795789458957060415",
+            "worker.finished"
+          ]
+        ]
+      },
+      {
+        "stream": {
+          "__stream_shard__": "0",
+          "actor_id": "1",
+          "attempt": "1",
+          "committed_batches": "0",
+          "committed_rows": "0",
+          "correlation_id": "1a29cbe4df50676e031bec25b2ea7841",
+          "database_id": "2",
+          "definition_id": "8",
+          "detected_level": "info",
+          "event": "worker.finished",
+          "execution_id": "d359b2f4-f9b7-466d-94b9-65885283e7ed",
+          "flags": "1",
+          "job_id": "6d58e377-4072-45b1-93c6-73f94e41f0ff",
+          "job_status": "succeeded",
+          "migration_id": "8",
+          "observed_timestamp": "1795789448613273963",
+          "review_id": "8",
+          "revision": "1",
+          "revision_id": "8",
+          "scope_name": "schakker-load-fixture",
+          "service_name": "schakker-load-fixture",
+          "severity_number": "9",
+          "severity_text": "INFO",
+          "span_id": "b05c38f072e8a3dc",
+          "sql_hash": "fcdcbad9e25ab64202690f7e31665913c2c5e1ea64349bc7a95d1ea77f89a13a",
+          "sql_snapshot": "CREATE TABLE public . load_8 ( id bigint )",
+          "status": "succeeded",
+          "trace_id": "0564aac9b016be29c25dffd491de9f86"
+        },
+        "values": [
+          [
+            "1795789448613011775",
+            "worker.finished"
+          ]
+        ]
+      },
+      {
+        "stream": {
+          "__stream_shard__": "0",
+          "actor_id": "1",
+          "attempt": "1",
+          "committed_batches": "0",
+          "committed_rows": "0",
+          "correlation_id": "3d2eab1d51572b768091ace3bafe37a5",
+          "database_id": "1",
+          "definition_id": "16",
+          "detected_level": "info",
+          "event": "worker.finished",
+          "execution_id": "1c3e4eeb-8764-4bd9-8c55-631507225ff2",
+          "flags": "1",
+          "job_id": "6a923a68-8c72-4fd9-82cb-b67f606115e5",
+          "job_status": "succeeded",
+          "migration_id": "16",
+          "observed_timestamp": "1795789456536841217",
+          "review_id": "16",
+          "revision": "1",
+          "revision_id": "16",
+          "scope_name": "schakker-load-fixture",
+          "service_name": "schakker-load-fixture",
+          "severity_number": "9",
+          "severity_text": "INFO",
+          "span_id": "52d9a04b8f7d6e0b",
+          "sql_hash": "6e0dc755d13c2ce562b8485e10c189ea91bd3d29af538eb8166fcc7919681627",
+          "sql_snapshot": "CREATE TABLE public . load_16 ( id bigint )",
+          "status": "succeeded",
+          "trace_id": "892bd8948a7f6578a127b55c472e8c68"
+        },
+        "values": [
+          [
+            "1795789456536563940",
+            "worker.finished"
+          ]
+        ]
+      },
+      {
+        "stream": {
+          "__stream_shard__": "0",
+          "actor_id": "1",
+          "attempt": "1",
+          "committed_batches": "0",
+          "committed_rows": "0",
+          "correlation_id": "4c574c8cec2fe49218790e8a85d04558",
+          "database_id": "2",
+          "definition_id": "41",
+          "detected_level": "info",
+          "event": "worker.finished",
+          "execution_id": "dc1bb163-c65e-4cd5-b05c-8e1b3b79583b",
+          "flags": "1",
+          "job_id": "54f77228-8233-44f0-9d82-e2b8290e8774",
+          "job_status": "succeeded",
+          "migration_id": "41",
+          "observed_timestamp": "1795789501549252657",
+          "review_id": "41",
+          "revision": "1",
+          "revision_id": "41",
+          "scope_name": "schakker-load-fixture",
+          "service_name": "schakker-load-fixture",
+          "severity_number": "9",
+          "severity_text": "INFO",
+          "span_id": "d9df50d6b387b9dd",
+          "sql_hash": "1807668be3319aabf0088fcb9e86d77839fa402787da32ffb907cb6575102a18",
+          "sql_snapshot": "CREATE TABLE public . load_41 ( id bigint )",
+          "status": "succeeded",
+          "trace_id": "79758b93a94c16177dff3283ff140a3a"
+        },
+        "values": [
+          [
+            "1795789501548830495",
+            "worker.finished"
+          ]
+        ]
+      },
+      {
+        "stream": {
+          "__stream_shard__": "0",
+          "actor_id": "1",
+          "attempt": "1",
+          "committed_batches": "0",
+          "committed_rows": "0",
+          "correlation_id": "700c3fb093524cb024a08a8436b6a43b",
+          "database_id": "1",
+          "definition_id": "35",
+          "detected_level": "info",
+          "event": "worker.finished",
+          "execution_id": "b3115d86-f273-45d6-811c-3a5a161eca71",
+          "flags": "1",
+          "job_id": "025774fd-601d-404e-babd-71a9ee0b2cbd",
+          "job_status": "succeeded",
+          "migration_id": "35",
+          "observed_timestamp": "1795789491074345404",
+          "review_id": "35",
+          "revision": "1",
+          "revision_id": "35",
+          "scope_name": "schakker-load-fixture",
+          "service_name": "schakker-load-fixture",
+          "severity_number": "9",
+          "severity_text": "INFO",
+          "span_id": "d96bd12b9f7e9ab6",
+          "sql_hash": "639bca6ee9e69a741f1a2f0ac17e27bd5b4bef4fed2a9d859ca46551dbdd91ec",
+          "sql_snapshot": "CREATE TABLE public . load_35 ( id bigint )",
+          "status": "succeeded",
+          "trace_id": "4de1825e272d2c96577173a21438ffd4"
+        },
+        "values": [
+          [
+            "1795789491074033191",
+            "worker.finished"
+          ]
+        ]
+      },
+      {
+        "stream": {
+          "__stream_shard__": "0",
+          "actor_id": "1",
+          "attempt": "1",
+          "committed_batches": "0",
+          "committed_rows": "0",
+          "correlation_id": "8563fbc594dce5684339537e5f6d5f8d",
+          "database_id": "2",
+          "definition_id": "25",
+          "detected_level": "info",
+          "event": "worker.finished",
+          "execution_id": "aa8115d1-2c7a-444b-a406-3f876b204972",
+          "flags": "1",
+          "job_id": "3ad671f3-4943-4c2f-a54a-19b8fa15af32",
+          "job_status": "succeeded",
+          "migration_id": "25",
+          "observed_timestamp": "1795789469225086544",
+          "review_id": "25",
+          "revision": "1",
+          "revision_id": "25",
+          "scope_name": "schakker-load-fixture",
+          "service_name": "schakker-load-fixture",
+          "severity_number": "9",
+          "severity_text": "INFO",
+          "span_id": "66e9481d29f4126f",
+          "sql_hash": "ab6e0e70b8b0067d35aae41c05cb9b3c8f9864ff5ce68a2d1301814d640f1c23",
+          "sql_snapshot": "CREATE TABLE public . load_25 ( id bigint )",
+          "status": "succeeded",
+          "trace_id": "760ae061082a38f79d64ac45de5e57cd"
+        },
+        "values": [
+          [
+            "1795789469224442030",
+            "worker.finished"
+          ]
+        ]
+      },
+      {
+        "stream": {
+          "__stream_shard__": "0",
+          "actor_id": "1",
+          "attempt": "1",
+          "committed_batches": "0",
+          "committed_rows": "0",
+          "correlation_id": "9d1e301e616e89e1cdc694ec7e071a37",
+          "database_id": "1",
+          "definition_id": "14",
+          "detected_level": "info",
+          "event": "worker.finished",
+          "execution_id": "97eb73f4-7bac-4105-8db0-0f6517cd81c6",
+          "flags": "1",
+          "job_id": "d5b10ff3-7032-41ee-a47f-18b1c37d77a9",
+          "job_status": "succeeded",
+          "migration_id": "14",
+          "observed_timestamp": "1795789454250175374",
+          "review_id": "14",
+          "revision": "1",
+          "revision_id": "14",
+          "scope_name": "schakker-load-fixture",
+          "service_name": "schakker-load-fixture",
+          "severity_number": "9",
+          "severity_text": "INFO",
+          "span_id": "819dac02dcd943fd",
+          "sql_hash": "1b78d2b65982c9c76393a12ac0106f09ff42559caaf9a408db17ec6c8792fc81",
+          "sql_snapshot": "CREATE TABLE public . load_14 ( id bigint )",
+          "status": "succeeded",
+          "trace_id": "93aa9b1a2c047a89672d6309cadb09a5"
+        },
+        "values": [
+          [
+            "1795789454249996654",
+            "worker.finished"
+          ]
+        ]
+      },
+      {
+        "stream": {
+          "__stream_shard__": "0",
+          "actor_id": "1",
+          "attempt": "1",
+          "committed_batches": "0",
+          "committed_rows": "0",
+          "correlation_id": "bfc707ff99d3a85daf1fe74f9cc9a423",
+          "database_id": "3",
+          "definition_id": "11",
+          "detected_level": "info",
+          "event": "worker.finished",
+          "execution_id": "5666c386-3d5d-40ae-b2e8-239c566fc03e",
+          "flags": "1",
+          "job_id": "55d83b7c-71f7-459a-b6e8-7327d986fbf1",
+          "job_status": "succeeded",
+          "migration_id": "11",
+          "observed_timestamp": "1795789451815040954",
+          "review_id": "11",
+          "revision": "1",
+          "revision_id": "11",
+          "scope_name": "schakker-load-fixture",
+          "service_name": "schakker-load-fixture",
+          "severity_number": "9",
+          "severity_text": "INFO",
+          "span_id": "2659d604a2b4d7ef",
+          "sql_hash": "515eebc53027023dc96b64216aa39050b3cefaff7dac9379e7bdb2cb1975f315",
+          "sql_snapshot": "CREATE TABLE public . load_11 ( id bigint )",
+          "status": "succeeded",
+          "trace_id": "0053fd82d0dd4dfe4269120aa0fb2de3"
+        },
+        "values": [
+          [
+            "1795789451814684637",
+            "worker.finished"
+          ]
+        ]
+      },
+      {
+        "stream": {
+          "__stream_shard__": "0",
+          "actor_id": "1",
+          "attempt": "1",
+          "committed_batches": "0",
+          "committed_rows": "0",
+          "correlation_id": "c11d3b812ea74c73e88fdbca23f9541d",
+          "database_id": "3",
+          "definition_id": "40",
+          "detected_level": "info",
+          "event": "worker.finished",
+          "execution_id": "b45acfc5-5915-4559-8f55-c00b2d62dc35",
+          "flags": "1",
+          "job_id": "adacc56d-296d-4d17-8fc1-f72f0444cb40",
+          "job_status": "succeeded",
+          "migration_id": "40",
+          "observed_timestamp": "1795789500384326077",
+          "review_id": "40",
+          "revision": "1",
+          "revision_id": "40",
+          "scope_name": "schakker-load-fixture",
+          "service_name": "schakker-load-fixture",
+          "severity_number": "9",
+          "severity_text": "INFO",
+          "span_id": "a1cb05b754267d6d",
+          "sql_hash": "313755de0f340d6d9bf74d51f814e419aff054adbc32c0aeaa47723c3e6fa520",
+          "sql_snapshot": "CREATE TABLE public . load_40 ( id bigint )",
+          "status": "succeeded",
+          "trace_id": "e28b02d037966573357da4de84a95d4f"
+        },
+        "values": [
+          [
+            "1795789500384091381",
+            "worker.finished"
+          ]
+        ]
+      },
+      {
+        "stream": {
+          "__stream_shard__": "0",
+          "actor_id": "1",
+          "attempt": "1",
+          "committed_batches": "0",
+          "committed_rows": "0",
+          "correlation_id": "ca0ccf7acf3c4f646bb30ca742e93db4",
+          "database_id": "1",
+          "definition_id": "23",
+          "detected_level": "info",
+          "event": "worker.finished",
+          "execution_id": "80d58592-5ca2-4681-8c8a-b0ff01951f09",
+          "flags": "1",
+          "job_id": "1a35bbdd-ac04-459e-b178-9532115087c3",
+          "job_status": "succeeded",
+          "migration_id": "23",
+          "observed_timestamp": "1795789466566865269",
+          "review_id": "23",
+          "revision": "1",
+          "revision_id": "23",
+          "scope_name": "schakker-load-fixture",
+          "service_name": "schakker-load-fixture",
+          "severity_number": "9",
+          "severity_text": "INFO",
+          "span_id": "2281324838cf2b7c",
+          "sql_hash": "43a7229b08c8fa526be77557f61846749080d0301ebfbca4fa8df0ce2191555e",
+          "sql_snapshot": "CREATE TABLE public . load_23 ( id bigint )",
+          "status": "succeeded",
+          "trace_id": "0e59561c6f0b0f7ae0f7b3e517bf63bc"
+        },
+        "values": [
+          [
+            "1795789466566324661",
+            "worker.finished"
+          ]
+        ]
+      },
+      {
+        "stream": {
+          "__stream_shard__": "0",
+          "actor_id": "1",
+          "attempt": "1",
+          "committed_batches": "0",
+          "committed_rows": "0",
+          "correlation_id": "cb7d75fdbb2a0ae9b3ea11468def183b",
+          "database_id": "3",
+          "definition_id": "20",
+          "detected_level": "info",
+          "event": "worker.finished",
+          "execution_id": "3adacb86-0bc6-451b-a6e5-3f88380c933f",
+          "flags": "1",
+          "job_id": "007ced67-ff86-4d03-a201-f07cc289eb3d",
+          "job_status": "succeeded",
+          "migration_id": "20",
+          "observed_timestamp": "1795789460914160907",
+          "review_id": "20",
+          "revision": "1",
+          "revision_id": "20",
+          "scope_name": "schakker-load-fixture",
+          "service_name": "schakker-load-fixture",
+          "severity_number": "9",
+          "severity_text": "INFO",
+          "span_id": "49de999286f0e624",
+          "sql_hash": "25125fadc818c25ee60a6297d51c8b7080cce7da9c510b93eb0e7eefca9303a0",
+          "sql_snapshot": "CREATE TABLE public . load_20 ( id bigint )",
+          "status": "succeeded",
+          "trace_id": "174e727425bdfbe9e43faa27086c5b47"
+        },
+        "values": [
+          [
+            "1795789460913882397",
+            "worker.finished"
+          ]
+        ]
+      },
+      {
+        "stream": {
+          "__stream_shard__": "0",
+          "actor_id": "1",
+          "attempt": "1",
+          "committed_batches": "0",
+          "committed_rows": "0",
+          "correlation_id": "cee71a74347d5bef7e65336a6b02adaa",
+          "database_id": "2",
+          "definition_id": "32",
+          "detected_level": "info",
+          "event": "worker.finished",
+          "execution_id": "22e7f5ea-e61d-4541-82ee-5afe042cf120",
+          "flags": "1",
+          "job_id": "30256268-ef05-4e29-903f-76a7d308dbe0",
+          "job_status": "succeeded",
+          "migration_id": "32",
+          "observed_timestamp": "1795789485860741253",
+          "review_id": "32",
+          "revision": "1",
+          "revision_id": "32",
+          "scope_name": "schakker-load-fixture",
+          "service_name": "schakker-load-fixture",
+          "severity_number": "9",
+          "severity_text": "INFO",
+          "span_id": "b1e504b33c71856e",
+          "sql_hash": "df8bba9ee24757ca024c745400e1e8ce2b40810eadf389c4505bdb188039e79b",
+          "sql_snapshot": "CREATE TABLE public . load_32 ( id bigint )",
+          "status": "succeeded",
+          "trace_id": "87fdc452345aa25b9de0a3034f92158e"
+        },
+        "values": [
+          [
+            "1795789485860403492",
+            "worker.finished"
+          ]
+        ]
+      },
+      {
+        "stream": {
+          "__stream_shard__": "0",
+          "actor_id": "1",
+          "attempt": "1",
+          "committed_batches": "10",
+          "committed_rows": "1000",
+          "correlation_id": "081b9a126aec090ff2dab951f5b615f6",
+          "database_id": "1",
+          "definition_id": "30",
+          "detected_level": "info",
+          "event": "worker.finished",
+          "execution_id": "46622b48-4dec-4ddf-8606-5915392ed21e",
+          "flags": "1",
+          "job_id": "17cfc0ac-cc83-4ad5-9c68-91fc844408d5",
+          "job_status": "succeeded",
+          "migration_id": "30",
+          "observed_timestamp": "1795789486513867276",
+          "review_id": "30",
+          "revision": "1",
+          "revision_id": "30",
+          "scope_name": "schakker-load-fixture",
+          "service_name": "schakker-load-fixture",
+          "severity_number": "9",
+          "severity_text": "INFO",
+          "span_id": "d19127be99d25c30",
+          "sql_hash": "3f14101988128b08f41d0476f2b74bd609642399c8dfce12b96040c774e82aae",
+          "sql_snapshot": "UPDATE \"public\" . \"load_counters\" SET \"value\" = \"value\" + $1 WHERE \"id\" = ANY ( $2 :: bigint [ ] ) ;",
+          "status": "succeeded",
+          "trace_id": "e49247797d77122fa5f5c5bf2fd2086d"
+        },
+        "values": [
+          [
+            "1795789486513622801",
+            "worker.finished"
+          ]
+        ]
+      },
+      {
+        "stream": {
+          "__stream_shard__": "0",
+          "actor_id": "1",
+          "attempt": "1",
+          "committed_batches": "10",
+          "committed_rows": "1000",
+          "correlation_id": "0b783f2b2c7b0b224469afdb1d100665",
+          "database_id": "1",
+          "definition_id": "3",
+          "detected_level": "info",
+          "event": "worker.finished",
+          "execution_id": "796c0a60-7deb-4417-a8ab-73c0e727ff31",
+          "flags": "1",
+          "job_id": "7d3eb90b-0427-4c85-b09f-2697ca6d1631",
+          "job_status": "succeeded",
+          "migration_id": "3",
+          "observed_timestamp": "1795789447193224479",
+          "review_id": "3",
+          "revision": "1",
+          "revision_id": "3",
+          "scope_name": "schakker-load-fixture",
+          "service_name": "schakker-load-fixture",
+          "severity_number": "9",
+          "severity_text": "INFO",
+          "span_id": "e6f1c7d551ac12c2",
+          "sql_hash": "3f14101988128b08f41d0476f2b74bd609642399c8dfce12b96040c774e82aae",
+          "sql_snapshot": "UPDATE \"public\" . \"load_counters\" SET \"value\" = \"value\" + $1 WHERE \"id\" = ANY ( $2 :: bigint [ ] ) ;",
+          "status": "succeeded",
+          "trace_id": "362c98d1b0a496eaa5922ce12efd600f"
+        },
+        "values": [
+          [
+            "1795789447193085365",
+            "worker.finished"
+          ]
+        ]
+      },
+      {
+        "stream": {
+          "__stream_shard__": "0",
+          "actor_id": "1",
+          "attempt": "1",
+          "committed_batches": "10",
+          "committed_rows": "1000",
+          "correlation_id": "3258fc67beb93004ed629eb263661438",
+          "database_id": "2",
+          "definition_id": "12",
+          "detected_level": "info",
+          "event": "worker.finished",
+          "execution_id": "33aa82a8-cf3c-444d-b384-b771b2303026",
+          "flags": "1",
+          "job_id": "3238792a-f8e5-4356-ba93-4651c5ea944f",
+          "job_status": "succeeded",
+          "migration_id": "12",
+          "observed_timestamp": "1795789454911872667",
+          "review_id": "12",
+          "revision": "1",
+          "revision_id": "12",
+          "scope_name": "schakker-load-fixture",
+          "service_name": "schakker-load-fixture",
+          "severity_number": "9",
+          "severity_text": "INFO",
+          "span_id": "a73e53e515b310d7",
+          "sql_hash": "3f14101988128b08f41d0476f2b74bd609642399c8dfce12b96040c774e82aae",
+          "sql_snapshot": "UPDATE \"public\" . \"load_counters\" SET \"value\" = \"value\" + $1 WHERE \"id\" = ANY ( $2 :: bigint [ ] ) ;",
+          "status": "succeeded",
+          "trace_id": "8aacad823ecb3ce0c1abbdff64ee0abc"
+        },
+        "values": [
+          [
+            "1795789454911553811",
+            "worker.finished"
+          ]
+        ]
+      },
+      {
+        "stream": {
+          "__stream_shard__": "0",
+          "actor_id": "1",
+          "attempt": "1",
+          "committed_batches": "10",
+          "committed_rows": "1000",
+          "correlation_id": "4ed61abadc61dfc1de13a8ef4eb40b3c",
+          "database_id": "3",
+          "definition_id": "33",
+          "detected_level": "info",
+          "event": "worker.finished",
+          "execution_id": "93056066-962b-4de9-80c7-abac15fa9456",
+          "flags": "1",
+          "job_id": "175203ca-29f6-47e9-b388-2a61b7e5a262",
+          "job_status": "succeeded",
+          "migration_id": "33",
+          "observed_timestamp": "1795789494307058320",
+          "review_id": "33",
+          "revision": "1",
+          "revision_id": "33",
+          "scope_name": "schakker-load-fixture",
+          "service_name": "schakker-load-fixture",
+          "severity_number": "9",
+          "severity_text": "INFO",
+          "span_id": "cefe9ecdae348e8a",
+          "sql_hash": "3f14101988128b08f41d0476f2b74bd609642399c8dfce12b96040c774e82aae",
+          "sql_snapshot": "UPDATE \"public\" . \"load_counters\" SET \"value\" = \"value\" + $1 WHERE \"id\" = ANY ( $2 :: bigint [ ] ) ;",
+          "status": "succeeded",
+          "trace_id": "63e53b498d42b005615178a7143959c2"
+        },
+        "values": [
+          [
+            "1795789494306802014",
+            "worker.finished"
+          ]
+        ]
+      },
+      {
+        "stream": {
+          "__stream_shard__": "0",
+          "actor_id": "1",
+          "attempt": "1",
+          "committed_batches": "10",
+          "committed_rows": "1000",
+          "correlation_id": "8da4f9e28a056c4cdf4db17a7ca68fd0",
+          "database_id": "3",
+          "definition_id": "42",
+          "detected_level": "info",
+          "event": "worker.finished",
+          "execution_id": "e9803352-8bda-433e-933f-50e7a4e418bd",
+          "flags": "1",
+          "job_id": "1a3aba1d-11a7-470a-8ef4-d90f7208e769",
+          "job_status": "succeeded",
+          "migration_id": "42",
+          "observed_timestamp": "1795789507673498306",
+          "review_id": "42",
+          "revision": "1",
+          "revision_id": "42",
+          "scope_name": "schakker-load-fixture",
+          "service_name": "schakker-load-fixture",
+          "severity_number": "9",
+          "severity_text": "INFO",
+          "span_id": "1ccfec38460d1378",
+          "sql_hash": "3f14101988128b08f41d0476f2b74bd609642399c8dfce12b96040c774e82aae",
+          "sql_snapshot": "UPDATE \"public\" . \"load_counters\" SET \"value\" = \"value\" + $1 WHERE \"id\" = ANY ( $2 :: bigint [ ] ) ;",
+          "status": "succeeded",
+          "trace_id": "27b0d044c582563ea0464b92a9475ba9"
+        },
+        "values": [
+          [
+            "1795789507673171074",
+            "worker.finished"
+          ]
+        ]
+      },
+      {
+        "stream": {
+          "__stream_shard__": "0",
+          "actor_id": "1",
+          "attempt": "1",
+          "committed_batches": "10",
+          "committed_rows": "1000",
+          "correlation_id": "caa33d37041932d6817d4c1cc92ddee8",
+          "database_id": "2",
+          "definition_id": "45",
+          "detected_level": "info",
+          "event": "worker.finished",
+          "execution_id": "22d2f3db-23e7-4af1-99b9-674f0ac628b5",
+          "flags": "1",
+          "job_id": "c21012ca-8556-4ef2-8467-987771658b81",
+          "job_status": "succeeded",
+          "migration_id": "45",
+          "observed_timestamp": "1795789511088968166",
+          "review_id": "45",
+          "revision": "1",
+          "revision_id": "45",
+          "scope_name": "schakker-load-fixture",
+          "service_name": "schakker-load-fixture",
+          "severity_number": "9",
+          "severity_text": "INFO",
+          "span_id": "b9385892c8f55935",
+          "sql_hash": "3f14101988128b08f41d0476f2b74bd609642399c8dfce12b96040c774e82aae",
+          "sql_snapshot": "UPDATE \"public\" . \"load_counters\" SET \"value\" = \"value\" + $1 WHERE \"id\" = ANY ( $2 :: bigint [ ] ) ;",
+          "status": "succeeded",
+          "trace_id": "6cde1110bc0128973de9f7644f05e96b"
+        },
+        "values": [
+          [
+            "1795789511088673837",
+            "worker.finished"
+          ]
+        ]
+      },
+      {
+        "stream": {
+          "__stream_shard__": "1",
+          "actor_id": "1",
+          "attempt": "1",
+          "committed_batches": "0",
+          "committed_rows": "0",
+          "correlation_id": "2e19b16ffc37622c6f19483164128949",
+          "database_id": "1",
+          "definition_id": "44",
+          "detected_level": "info",
+          "event": "worker.finished",
+          "execution_id": "b1379618-216d-4e41-8f24-a9fe5023b1db",
+          "flags": "1",
+          "job_id": "fdc2a2f3-1a05-4d5a-a8ff-e7bd5ce5ec8e",
+          "job_status": "succeeded",
+          "migration_id": "44",
+          "observed_timestamp": "1795789504948859316",
+          "review_id": "44",
+          "revision": "1",
+          "revision_id": "44",
+          "scope_name": "schakker-load-fixture",
+          "service_name": "schakker-load-fixture",
+          "severity_number": "9",
+          "severity_text": "INFO",
+          "span_id": "aae4dac1b0db0422",
+          "sql_hash": "aabaf370410831744f49ab57cd5496bd5e01f61e6a7d6d5434827ce8eaec7952",
+          "sql_snapshot": "CREATE TABLE public . load_44 ( id bigint )",
+          "status": "succeeded",
+          "trace_id": "3639fcac914dc002ceb07672774b019c"
+        },
+        "values": [
+          [
+            "1795789504948402428",
+            "worker.finished"
+          ]
+        ]
+      },
+      {
+        "stream": {
+          "__stream_shard__": "1",
+          "actor_id": "1",
+          "attempt": "1",
+          "committed_batches": "0",
+          "committed_rows": "0",
+          "correlation_id": "3095b4c4c7709bb993c708c081a8ddcf",
+          "database_id": "3",
+          "definition_id": "13",
+          "detected_level": "info",
+          "event": "worker.finished",
+          "execution_id": "d046121c-283d-4a69-8183-565843f208e7",
+          "flags": "1",
+          "job_id": "bacb48e0-8bb2-4464-ba15-305cfd7e692a",
+          "job_status": "succeeded",
+          "migration_id": "13",
+          "observed_timestamp": "1795789453540320844",
+          "review_id": "13",
+          "revision": "1",
+          "revision_id": "13",
+          "scope_name": "schakker-load-fixture",
+          "service_name": "schakker-load-fixture",
+          "severity_number": "9",
+          "severity_text": "INFO",
+          "span_id": "1fdca6a7978cf472",
+          "sql_hash": "31d681a6c7469e811da9db4f0cb64c01633d903cd4ef331d2548a96ee6d2ef0f",
+          "sql_snapshot": "CREATE TABLE public . load_13 ( id bigint )",
+          "status": "succeeded",
+          "trace_id": "2bf03933bbab521c62ceda51d99f4152"
+        },
+        "values": [
+          [
+            "1795789453540060500",
+            "worker.finished"
+          ]
+        ]
+      },
+      {
+        "stream": {
+          "__stream_shard__": "1",
+          "actor_id": "1",
+          "attempt": "1",
+          "committed_batches": "0",
+          "committed_rows": "0",
+          "correlation_id": "3e347641e947d55eec876d40350633e2",
+          "database_id": "2",
+          "definition_id": "43",
+          "detected_level": "info",
+          "event": "worker.finished",
+          "execution_id": "150e29bd-5939-45dc-bffa-8dc2e445f49e",
+          "flags": "1",
+          "job_id": "c4fd899a-4069-4ab7-ae66-8a7d206c185f",
+          "job_status": "succeeded",
+          "migration_id": "43",
+          "observed_timestamp": "1795789503831371981",
+          "review_id": "43",
+          "revision": "1",
+          "revision_id": "43",
+          "scope_name": "schakker-load-fixture",
+          "service_name": "schakker-load-fixture",
+          "severity_number": "9",
+          "severity_text": "INFO",
+          "span_id": "4f6cb607b7b94927",
+          "sql_hash": "80a07fbeebe5673ce3a0775a55882b09f67cab53d4223f1f57b129000b3d924a",
+          "sql_snapshot": "CREATE TABLE public . load_43 ( id bigint )",
+          "status": "succeeded",
+          "trace_id": "1cde22595ba98e14a6d9eebb490f7786"
+        },
+        "values": [
+          [
+            "1795789503831089565",
+            "worker.finished"
+          ]
+        ]
+      },
+      {
+        "stream": {
+          "__stream_shard__": "1",
+          "actor_id": "1",
+          "attempt": "1",
+          "committed_batches": "0",
+          "committed_rows": "0",
+          "correlation_id": "4d2f521e75ceac0194a2d897081377d0",
+          "database_id": "2",
+          "definition_id": "10",
+          "detected_level": "info",
+          "event": "worker.finished",
+          "execution_id": "62a34f79-d9e8-45b6-a121-b19784065c60",
+          "flags": "1",
+          "job_id": "085d370e-6dbd-43eb-9e7f-45f6f08a887d",
+          "job_status": "succeeded",
+          "migration_id": "10",
+          "observed_timestamp": "1795789450182254962",
+          "review_id": "10",
+          "revision": "1",
+          "revision_id": "10",
+          "scope_name": "schakker-load-fixture",
+          "service_name": "schakker-load-fixture",
+          "severity_number": "9",
+          "severity_text": "INFO",
+          "span_id": "bf94d83d57e60ab7",
+          "sql_hash": "4100417efe27572d72d168530885569a640f993609a71f88a2f36e9d69f26480",
+          "sql_snapshot": "CREATE TABLE public . load_10 ( id bigint )",
+          "status": "succeeded",
+          "trace_id": "7ad44b31d8d27fae93a341e354fd7e34"
+        },
+        "values": [
+          [
+            "1795789450182043570",
+            "worker.finished"
+          ]
+        ]
+      },
+      {
+        "stream": {
+          "__stream_shard__": "1",
+          "actor_id": "1",
+          "attempt": "1",
+          "committed_batches": "0",
+          "committed_rows": "0",
+          "correlation_id": "85c42e2fef8c99202982408d2d1cd033",
+          "database_id": "2",
+          "definition_id": "17",
+          "detected_level": "info",
+          "event": "worker.finished",
+          "execution_id": "dec24ff7-08de-4576-b327-9740f309b888",
+          "flags": "1",
+          "job_id": "7f378e7f-cb6c-4d4a-9126-68efde548860",
+          "job_status": "succeeded",
+          "migration_id": "17",
+          "observed_timestamp": "1795789456730257767",
+          "review_id": "17",
+          "revision": "1",
+          "revision_id": "17",
+          "scope_name": "schakker-load-fixture",
+          "service_name": "schakker-load-fixture",
+          "severity_number": "9",
+          "severity_text": "INFO",
+          "span_id": "d57af30ded6698ad",
+          "sql_hash": "f009b515a2bad738806ea366907bb4096a840a1beb871a1e639dbff9f5a6f74f",
+          "sql_snapshot": "CREATE TABLE public . load_17 ( id bigint )",
+          "status": "succeeded",
+          "trace_id": "5ceaddb24f02d868890733f4da771c22"
+        },
+        "values": [
+          [
+            "1795789456729967686",
+            "worker.finished"
+          ]
+        ]
+      },
+      {
+        "stream": {
+          "__stream_shard__": "1",
+          "actor_id": "1",
+          "attempt": "1",
+          "committed_batches": "0",
+          "committed_rows": "0",
+          "correlation_id": "8d9fc0a4f8b5e13f941c28686f4ac790",
+          "database_id": "2",
+          "definition_id": "34",
+          "detected_level": "info",
+          "event": "worker.finished",
+          "execution_id": "46cf7717-2654-45b1-98b4-a1808a8b2e0c",
+          "flags": "1",
+          "job_id": "270f6156-c8c0-499d-8c17-f3f13afca47f",
+          "job_status": "succeeded",
+          "migration_id": "34",
+          "observed_timestamp": "1795789489892859727",
+          "review_id": "34",
+          "revision": "1",
+          "revision_id": "34",
+          "scope_name": "schakker-load-fixture",
+          "service_name": "schakker-load-fixture",
+          "severity_number": "9",
+          "severity_text": "INFO",
+          "span_id": "04cb745bb56c3f3f",
+          "sql_hash": "7acec411fdac21c853087e9d54f32611571ad67b9811f0230678b3c80b177180",
+          "sql_snapshot": "CREATE TABLE public . load_34 ( id bigint )",
+          "status": "succeeded",
+          "trace_id": "6085ab03b5f1fc9f78d20259bf80fad8"
+        },
+        "values": [
+          [
+            "1795789489892516595",
+            "worker.finished"
+          ]
+        ]
+      },
+      {
+        "stream": {
+          "__stream_shard__": "1",
+          "actor_id": "1",
+          "attempt": "1",
+          "committed_batches": "0",
+          "committed_rows": "0",
+          "correlation_id": "9ed365b68366ea726e818b568b9a9614",
+          "database_id": "1",
+          "definition_id": "26",
+          "detected_level": "info",
+          "event": "worker.finished",
+          "execution_id": "6260adb7-8127-4d5d-823d-381c6f55b1a9",
+          "flags": "1",
+          "job_id": "4b1c8414-013c-4d90-9bfa-ae34061e7482",
+          "job_status": "succeeded",
+          "migration_id": "26",
+          "observed_timestamp": "1795789469984244755",
+          "review_id": "26",
+          "revision": "1",
+          "revision_id": "26",
+          "scope_name": "schakker-load-fixture",
+          "service_name": "schakker-load-fixture",
+          "severity_number": "9",
+          "severity_text": "INFO",
+          "span_id": "ed70d2f828566b99",
+          "sql_hash": "be7073f321172c85f85fc51821c2b374bdcf29ffb88f153ca3b90d267f051535",
+          "sql_snapshot": "CREATE TABLE public . load_26 ( id bigint )",
+          "status": "succeeded",
+          "trace_id": "a2e58e1fd21c84719058b5725c07ee90"
+        },
+        "values": [
+          [
+            "1795789469983498638",
+            "worker.finished"
+          ]
+        ]
+      },
+      {
+        "stream": {
+          "__stream_shard__": "1",
+          "actor_id": "1",
+          "attempt": "1",
+          "committed_batches": "0",
+          "committed_rows": "0",
+          "correlation_id": "d503b1a4b93f0e0966ac174263af6c44",
+          "database_id": "3",
+          "definition_id": "22",
+          "detected_level": "info",
+          "event": "worker.finished",
+          "execution_id": "37b743c6-d73b-4916-80b6-7037bf8ccb52",
+          "flags": "1",
+          "job_id": "a51ad19c-f0e9-409e-90aa-5ccdedd36a80",
+          "job_status": "succeeded",
+          "migration_id": "22",
+          "observed_timestamp": "1795789463862227742",
+          "review_id": "22",
+          "revision": "1",
+          "revision_id": "22",
+          "scope_name": "schakker-load-fixture",
+          "service_name": "schakker-load-fixture",
+          "severity_number": "9",
+          "severity_text": "INFO",
+          "span_id": "d64378e73e57ea78",
+          "sql_hash": "82c3d22706ddb844d455868ea7911fdb7a23da4297c75773223c1003f115ed72",
+          "sql_snapshot": "CREATE TABLE public . load_22 ( id bigint )",
+          "status": "succeeded",
+          "trace_id": "0a5b0998dc0bd77ba8da387ec5450eb7"
+        },
+        "values": [
+          [
+            "1795789463861962568",
+            "worker.finished"
+          ]
+        ]
+      },
+      {
+        "stream": {
+          "__stream_shard__": "1",
+          "actor_id": "1",
+          "attempt": "1",
+          "committed_batches": "0",
+          "committed_rows": "0",
+          "correlation_id": "d7861b6b9c6c506eb4ec869d2055a459",
+          "database_id": "1",
+          "definition_id": "28",
+          "detected_level": "info",
+          "event": "worker.finished",
+          "execution_id": "0ff4ee86-feba-43d8-919d-e812a7ab9563",
+          "flags": "1",
+          "job_id": "4e6a3ff7-ac27-4305-b86a-0225e89693f8",
+          "job_status": "succeeded",
+          "migration_id": "28",
+          "observed_timestamp": "1795789473989477349",
+          "review_id": "28",
+          "revision": "1",
+          "revision_id": "28",
+          "scope_name": "schakker-load-fixture",
+          "service_name": "schakker-load-fixture",
+          "severity_number": "9",
+          "severity_text": "INFO",
+          "span_id": "293a31af9868d3b2",
+          "sql_hash": "17f3fbac7a21bfa1d16ef1e699b7669701f2eea2673eae2ac26d0607e31f6301",
+          "sql_snapshot": "CREATE TABLE public . load_28 ( id bigint )",
+          "status": "succeeded",
+          "trace_id": "a1f6378f8ea6d363e4e908f2fe30bac6"
+        },
+        "values": [
+          [
+            "1795789473989246972",
+            "worker.finished"
+          ]
+        ]
+      },
+      {
+        "stream": {
+          "__stream_shard__": "1",
+          "actor_id": "1",
+          "attempt": "1",
+          "committed_batches": "0",
+          "committed_rows": "0",
+          "correlation_id": "e8cb299f16009ce608b6971747d56d31",
+          "database_id": "1",
+          "definition_id": "46",
+          "detected_level": "info",
+          "event": "worker.finished",
+          "execution_id": "2ba21a8e-d00b-4c6f-8764-3e7108178cd9",
+          "flags": "1",
+          "job_id": "5b329f3a-1001-4608-b8dd-e26e576d5967",
+          "job_status": "succeeded",
+          "migration_id": "46",
+          "observed_timestamp": "1795789507563757041",
+          "review_id": "46",
+          "revision": "1",
+          "revision_id": "46",
+          "scope_name": "schakker-load-fixture",
+          "service_name": "schakker-load-fixture",
+          "severity_number": "9",
+          "severity_text": "INFO",
+          "span_id": "60147d5d1c64979e",
+          "sql_hash": "28acb9fe309bbdc9936ce8e94a0c4d9de66da62e2f20c983e5b1f8b9ecaf5382",
+          "sql_snapshot": "CREATE TABLE public . load_46 ( id bigint )",
+          "status": "succeeded",
+          "trace_id": "4e7ca504ed412ce484240662bad52ced"
+        },
+        "values": [
+          [
+            "1795789507563434949",
+            "worker.finished"
+          ]
+        ]
+      },
+      {
+        "stream": {
+          "__stream_shard__": "1",
+          "actor_id": "1",
+          "attempt": "1",
+          "committed_batches": "10",
+          "committed_rows": "1000",
+          "correlation_id": "02449b4b7dc34df776338a78ee05ddd5",
+          "database_id": "2",
+          "definition_id": "21",
+          "detected_level": "info",
+          "event": "worker.finished",
+          "execution_id": "b9a32623-df4d-4ca8-abff-1c9000042244",
+          "flags": "1",
+          "job_id": "db1e2271-f340-4407-b4ea-240cd7e1a825",
+          "job_status": "succeeded",
+          "migration_id": "21",
+          "observed_timestamp": "1795789466298994795",
+          "review_id": "21",
+          "revision": "1",
+          "revision_id": "21",
+          "scope_name": "schakker-load-fixture",
+          "service_name": "schakker-load-fixture",
+          "severity_number": "9",
+          "severity_text": "INFO",
+          "span_id": "c173919ce24fe5d5",
+          "sql_hash": "3f14101988128b08f41d0476f2b74bd609642399c8dfce12b96040c774e82aae",
+          "sql_snapshot": "UPDATE \"public\" . \"load_counters\" SET \"value\" = \"value\" + $1 WHERE \"id\" = ANY ( $2 :: bigint [ ] ) ;",
+          "status": "succeeded",
+          "trace_id": "39cd3411fa8e350baa02938a44259fa6"
+        },
+        "values": [
+          [
+            "1795789466298148668",
+            "worker.finished"
+          ]
+        ]
+      },
+      {
+        "stream": {
+          "__stream_shard__": "1",
+          "actor_id": "1",
+          "attempt": "1",
+          "committed_batches": "10",
+          "committed_rows": "1000",
+          "correlation_id": "13bb6a08253bef333fd7ade1dbfc5325",
+          "database_id": "1",
+          "definition_id": "39",
+          "detected_level": "info",
+          "event": "worker.finished",
+          "execution_id": "f4c4e86e-20e0-407a-81a2-344835e3cd2b",
+          "flags": "1",
+          "job_id": "8130d2cc-a3e0-4df9-a16e-bd3a53e02656",
+          "job_status": "succeeded",
+          "migration_id": "39",
+          "observed_timestamp": "1795789502583641890",
+          "review_id": "39",
+          "revision": "1",
+          "revision_id": "39",
+          "scope_name": "schakker-load-fixture",
+          "service_name": "schakker-load-fixture",
+          "severity_number": "9",
+          "severity_text": "INFO",
+          "span_id": "752c021242f44db3",
+          "sql_hash": "3f14101988128b08f41d0476f2b74bd609642399c8dfce12b96040c774e82aae",
+          "sql_snapshot": "UPDATE \"public\" . \"load_counters\" SET \"value\" = \"value\" + $1 WHERE \"id\" = ANY ( $2 :: bigint [ ] ) ;",
+          "status": "succeeded",
+          "trace_id": "b287504f87f4c5c628c2fecafe9eed01"
+        },
+        "values": [
+          [
+            "1795789502583303677",
+            "worker.finished"
+          ]
+        ]
+      },
+      {
+        "stream": {
+          "__stream_shard__": "1",
+          "actor_id": "1",
+          "attempt": "1",
+          "committed_batches": "10",
+          "committed_rows": "1000",
+          "correlation_id": "22e855f2909e384dcaa635eb2ff622e4",
+          "database_id": "3",
+          "definition_id": "6",
+          "detected_level": "info",
+          "event": "worker.finished",
+          "execution_id": "5ca2ee34-da96-484f-95af-bf0a533e3b42",
+          "flags": "1",
+          "job_id": "0acfcd8c-da36-4f3a-8ded-550772e51b56",
+          "job_status": "succeeded",
+          "migration_id": "6",
+          "observed_timestamp": "1795789450109415674",
+          "review_id": "6",
+          "revision": "1",
+          "revision_id": "6",
+          "scope_name": "schakker-load-fixture",
+          "service_name": "schakker-load-fixture",
+          "severity_number": "9",
+          "severity_text": "INFO",
+          "span_id": "0f200cfcbc95f578",
+          "sql_hash": "3f14101988128b08f41d0476f2b74bd609642399c8dfce12b96040c774e82aae",
+          "sql_snapshot": "UPDATE \"public\" . \"load_counters\" SET \"value\" = \"value\" + $1 WHERE \"id\" = ANY ( $2 :: bigint [ ] ) ;",
+          "status": "succeeded",
+          "trace_id": "8180009b49f253e40d278e835422c4df"
+        },
+        "values": [
+          [
+            "1795789450108378011",
+            "worker.finished"
+          ]
+        ]
+      },
+      {
+        "stream": {
+          "__stream_shard__": "1",
+          "actor_id": "1",
+          "attempt": "1",
+          "committed_batches": "10",
+          "committed_rows": "1000",
+          "correlation_id": "3e9c055bfb967ab31aec87432a5cba31",
+          "database_id": "1",
+          "definition_id": "9",
+          "detected_level": "info",
+          "event": "worker.finished",
+          "execution_id": "b20c24d9-b6c0-489e-8e0a-a3c54f202828",
+          "flags": "1",
+          "job_id": "6d9bb6ee-87a2-4f17-803e-2e0383c9a0ae",
+          "job_status": "succeeded",
+          "migration_id": "9",
+          "observed_timestamp": "1795789452112406919",
+          "review_id": "9",
+          "revision": "1",
+          "revision_id": "9",
+          "scope_name": "schakker-load-fixture",
+          "service_name": "schakker-load-fixture",
+          "severity_number": "9",
+          "severity_text": "INFO",
+          "span_id": "c818c4f81a169137",
+          "sql_hash": "3f14101988128b08f41d0476f2b74bd609642399c8dfce12b96040c774e82aae",
+          "sql_snapshot": "UPDATE \"public\" . \"load_counters\" SET \"value\" = \"value\" + $1 WHERE \"id\" = ANY ( $2 :: bigint [ ] ) ;",
+          "status": "succeeded",
+          "trace_id": "0ca3ef78ad914a75f88521cf0f2e9fd4"
+        },
+        "values": [
+          [
+            "1795789452112089316",
+            "worker.finished"
+          ]
+        ]
+      },
+      {
+        "stream": {
+          "__stream_shard__": "1",
+          "actor_id": "1",
+          "attempt": "1",
+          "committed_batches": "10",
+          "committed_rows": "1000",
+          "correlation_id": "57c520f817d8af44f94b6c046997fbbf",
+          "database_id": "1",
+          "definition_id": "18",
+          "detected_level": "info",
+          "event": "worker.finished",
+          "execution_id": "d5015dac-779e-4373-b318-c04918a4c7a6",
+          "flags": "1",
+          "job_id": "ef826852-d4a3-4e2c-9f8e-776163b4d43f",
+          "job_status": "succeeded",
+          "migration_id": "18",
+          "observed_timestamp": "1795789463322865908",
+          "review_id": "18",
+          "revision": "1",
+          "revision_id": "18",
+          "scope_name": "schakker-load-fixture",
+          "service_name": "schakker-load-fixture",
+          "severity_number": "9",
+          "severity_text": "INFO",
+          "span_id": "a96be9ad8bbc7fc8",
+          "sql_hash": "3f14101988128b08f41d0476f2b74bd609642399c8dfce12b96040c774e82aae",
+          "sql_snapshot": "UPDATE \"public\" . \"load_counters\" SET \"value\" = \"value\" + $1 WHERE \"id\" = ANY ( $2 :: bigint [ ] ) ;",
+          "status": "succeeded",
+          "trace_id": "d8b5069be61bd1abbfccc607a59cce76"
+        },
+        "values": [
+          [
+            "1795789463322450258",
+            "worker.finished"
+          ]
+        ]
+      },
+      {
+        "stream": {
+          "__stream_shard__": "1",
+          "actor_id": "1",
+          "attempt": "1",
+          "committed_batches": "10",
+          "committed_rows": "1000",
+          "correlation_id": "91acf643fb390cf7e271d8b910bbf333",
+          "database_id": "3",
+          "definition_id": "15",
+          "detected_level": "info",
+          "event": "worker.finished",
+          "execution_id": "b491ee88-1207-4ceb-8908-a4e39dbbb90b",
+          "flags": "1",
+          "job_id": "5fb3147c-6629-4f27-a5fd-1eef43817caf",
+          "job_status": "succeeded",
+          "migration_id": "15",
+          "observed_timestamp": "1795789458648078520",
+          "review_id": "15",
+          "revision": "1",
+          "revision_id": "15",
+          "scope_name": "schakker-load-fixture",
+          "service_name": "schakker-load-fixture",
+          "severity_number": "9",
+          "severity_text": "INFO",
+          "span_id": "734e8881bada1a90",
+          "sql_hash": "3f14101988128b08f41d0476f2b74bd609642399c8dfce12b96040c774e82aae",
+          "sql_snapshot": "UPDATE \"public\" . \"load_counters\" SET \"value\" = \"value\" + $1 WHERE \"id\" = ANY ( $2 :: bigint [ ] ) ;",
+          "status": "succeeded",
+          "trace_id": "cf0396ec79cca14ebbf68ade2edee0b2"
+        },
+        "values": [
+          [
+            "1795789458645502685",
+            "worker.finished"
+          ]
+        ]
+      },
+      {
+        "stream": {
+          "__stream_shard__": "1",
+          "actor_id": "1",
+          "attempt": "1",
+          "committed_batches": "10",
+          "committed_rows": "1000",
+          "correlation_id": "f128949a1cde515168765f992a9cad5d",
+          "database_id": "3",
+          "definition_id": "24",
+          "detected_level": "info",
+          "event": "worker.finished",
+          "execution_id": "860dbf4e-b1a0-487e-ac86-61e386c55d26",
+          "flags": "1",
+          "job_id": "c2ae2467-dda8-41d6-b3eb-dd10217c898a",
+          "job_status": "succeeded",
+          "migration_id": "24",
+          "observed_timestamp": "1795789474021946783",
+          "review_id": "24",
+          "revision": "1",
+          "revision_id": "24",
+          "scope_name": "schakker-load-fixture",
+          "service_name": "schakker-load-fixture",
+          "severity_number": "9",
+          "severity_text": "INFO",
+          "span_id": "648cf193da1a1de0",
+          "sql_hash": "3f14101988128b08f41d0476f2b74bd609642399c8dfce12b96040c774e82aae",
+          "sql_snapshot": "UPDATE \"public\" . \"load_counters\" SET \"value\" = \"value\" + $1 WHERE \"id\" = ANY ( $2 :: bigint [ ] ) ;",
+          "status": "succeeded",
+          "trace_id": "369ef495581d58d9d0e14185ad3ccd26"
+        },
+        "values": [
+          [
+            "1795789474021636604",
+            "worker.finished"
+          ]
+        ]
+      },
+      {
+        "stream": {
+          "actor_id": "1",
+          "attempt": "1",
+          "committed_batches": "0",
+          "committed_rows": "0",
+          "correlation_id": "1a5272d2b2112eaed64ee40eff713010",
+          "database_id": "3",
+          "definition_id": "2",
+          "detected_level": "info",
+          "event": "worker.finished",
+          "execution_id": "a3461f4b-d048-4714-850f-ebac56b48445",
+          "flags": "1",
+          "job_id": "b875d5d7-79ca-48dc-9506-c0b44675dac2",
+          "job_status": "succeeded",
+          "migration_id": "2",
+          "observed_timestamp": "1795789443436736604",
+          "review_id": "1",
+          "revision": "1",
+          "revision_id": "2",
+          "scope_name": "schakker-load-fixture",
+          "service_name": "schakker-load-fixture",
+          "severity_number": "9",
+          "severity_text": "INFO",
+          "span_id": "b687a3834470b911",
+          "sql_hash": "7a5c411f89189a15d7ca7547030953e9624e08bcf65fa8c7c9f9ac5605aba03a",
+          "sql_snapshot": "CREATE TABLE public . load_2 ( id bigint )",
+          "status": "succeeded",
+          "trace_id": "2282eb5786be2ae2e51cba4b113378da"
+        },
+        "values": [
+          [
+            "1795789443436399633",
+            "worker.finished"
+          ]
+        ]
+      },
+      {
+        "stream": {
+          "actor_id": "1",
+          "attempt": "1",
+          "committed_batches": "0",
+          "committed_rows": "0",
+          "correlation_id": "464d9203a9ab34e92117e66ab4a1fe65",
+          "database_id": "1",
+          "definition_id": "49",
+          "detected_level": "info",
+          "event": "worker.finished",
+          "execution_id": "6bddaae2-5edf-43b4-aa34-a7098ce78690",
+          "flags": "1",
+          "job_id": "087d6e43-0266-489e-b865-bf46d18ee49c",
+          "job_status": "succeeded",
+          "migration_id": "49",
+          "observed_timestamp": "1795789514359937627",
+          "review_id": "49",
+          "revision": "1",
+          "revision_id": "49",
+          "scope_name": "schakker-load-fixture",
+          "service_name": "schakker-load-fixture",
+          "severity_number": "9",
+          "severity_text": "INFO",
+          "span_id": "1930e011691c7e17",
+          "sql_hash": "94c878c66565076d77b5c5060029281d875ef254e5b1cffa73b79ca6e134e039",
+          "sql_snapshot": "CREATE TABLE public . load_49 ( id bigint )",
+          "status": "succeeded",
+          "trace_id": "49e20ad69a1c16a47abbcae68ef44cf6"
+        },
+        "values": [
+          [
+            "1795789514359639050",
+            "worker.finished"
+          ]
+        ]
+      },
+      {
+        "stream": {
+          "actor_id": "1",
+          "attempt": "1",
+          "committed_batches": "0",
+          "committed_rows": "0",
+          "correlation_id": "5466128792e66c5a9eec7b7eb5984186",
+          "database_id": "1",
+          "definition_id": "47",
+          "detected_level": "info",
+          "event": "worker.finished",
+          "execution_id": "e245f842-5b98-4f20-bfc8-35220e5c048b",
+          "flags": "1",
+          "job_id": "19386b25-bfd6-476d-b589-09a273eddc87",
+          "job_status": "succeeded",
+          "migration_id": "47",
+          "observed_timestamp": "1795789510728927424",
+          "review_id": "47",
+          "revision": "1",
+          "revision_id": "47",
+          "scope_name": "schakker-load-fixture",
+          "service_name": "schakker-load-fixture",
+          "severity_number": "9",
+          "severity_text": "INFO",
+          "span_id": "c38eae869d3f35b9",
+          "sql_hash": "5b9663429872052a2bd00ded6d755046b6003fe5b96b2097ad0a1ac284ffcb48",
+          "sql_snapshot": "CREATE TABLE public . load_47 ( id bigint )",
+          "status": "succeeded",
+          "trace_id": "d7f2e3d741c46406594b3cf44ca82a03"
+        },
+        "values": [
+          [
+            "1795789510728567069",
+            "worker.finished"
+          ]
+        ]
+      },
+      {
+        "stream": {
+          "actor_id": "1",
+          "attempt": "1",
+          "committed_batches": "0",
+          "committed_rows": "0",
+          "correlation_id": "54f6800b3fa7446b7e04182b2274e71c",
+          "database_id": "2",
+          "definition_id": "1",
+          "detected_level": "info",
+          "event": "worker.finished",
+          "execution_id": "840aa000-d7df-4b20-b91a-18c241516e10",
+          "flags": "1",
+          "job_id": "0a2f596d-a6d3-4f1e-a528-87420fa24547",
+          "job_status": "succeeded",
+          "migration_id": "1",
+          "observed_timestamp": "1795789443663283415",
+          "review_id": "2",
+          "revision": "1",
+          "revision_id": "1",
+          "scope_name": "schakker-load-fixture",
+          "service_name": "schakker-load-fixture",
+          "severity_number": "9",
+          "severity_text": "INFO",
+          "span_id": "ba8b5e443474f69e",
+          "sql_hash": "1de206ad3bfb2fe44113003ae3fa8746b1d271209e02a71aea8407d460d705cc",
+          "sql_snapshot": "CREATE TABLE public . load_1 ( id bigint )",
+          "status": "succeeded",
+          "trace_id": "cf91f02ddcee356c9f938669249cf4f8"
+        },
+        "values": [
+          [
+            "1795789443662968857",
+            "worker.finished"
+          ]
+        ]
+      },
+      {
+        "stream": {
+          "actor_id": "1",
+          "attempt": "1",
+          "committed_batches": "0",
+          "committed_rows": "0",
+          "correlation_id": "87ba02f636bbdfa8bb2f014725524a1c",
+          "database_id": "3",
+          "definition_id": "31",
+          "detected_level": "info",
+          "event": "worker.finished",
+          "execution_id": "078f3611-7497-4606-8472-edb036199951",
+          "flags": "1",
+          "job_id": "47bbf65c-1455-4750-8c61-79f93d58b4e0",
+          "job_status": "succeeded",
+          "migration_id": "31",
+          "observed_timestamp": "1795789482879485735",
+          "review_id": "31",
+          "revision": "1",
+          "revision_id": "31",
+          "scope_name": "schakker-load-fixture",
+          "service_name": "schakker-load-fixture",
+          "severity_number": "9",
+          "severity_text": "INFO",
+          "span_id": "95d44421ec65660f",
+          "sql_hash": "55694db5acb9104d9834746f4bcea54a93aed24943b91a353c2001e52738db17",
+          "sql_snapshot": "CREATE TABLE public . load_31 ( id bigint )",
+          "status": "succeeded",
+          "trace_id": "61f1fa6091719c3a8953285321f58534"
+        },
+        "values": [
+          [
+            "1795789482879237263",
+            "worker.finished"
+          ]
+        ]
+      },
+      {
+        "stream": {
+          "actor_id": "1",
+          "attempt": "1",
+          "committed_batches": "0",
+          "committed_rows": "0",
+          "correlation_id": "a6c89dc6cf189c73d6e2315e74521b53",
+          "database_id": "3",
+          "definition_id": "38",
+          "detected_level": "info",
+          "event": "worker.finished",
+          "execution_id": "9fbcf499-3e00-4029-9311-261c38801885",
+          "flags": "1",
+          "job_id": "081b58c9-4558-4631-981b-83d94ee09182",
+          "job_status": "succeeded",
+          "migration_id": "38",
+          "observed_timestamp": "1795789497543406004",
+          "review_id": "38",
+          "revision": "1",
+          "revision_id": "38",
+          "scope_name": "schakker-load-fixture",
+          "service_name": "schakker-load-fixture",
+          "severity_number": "9",
+          "severity_text": "INFO",
+          "span_id": "c1ae468779ed5554",
+          "sql_hash": "e4447a54b4cfa351ab94fa71bf7c429ab32db758a3d450b1d5b451b59cea9047",
+          "sql_snapshot": "CREATE TABLE public . load_38 ( id bigint )",
+          "status": "succeeded",
+          "trace_id": "61058cdd53ae9f97c6978f4419c9d57f"
+        },
+        "values": [
+          [
+            "1795789497543161830",
+            "worker.finished"
+          ]
+        ]
+      },
+      {
+        "stream": {
+          "actor_id": "1",
+          "attempt": "1",
+          "committed_batches": "0",
+          "committed_rows": "0",
+          "correlation_id": "b1cd79ffbb6847e2d0ba77ef3a8ffdef",
+          "database_id": "1",
+          "definition_id": "37",
+          "detected_level": "info",
+          "event": "worker.finished",
+          "execution_id": "fe0bc4c0-3afb-4e14-ab9e-e547f5bdc897",
+          "flags": "1",
+          "job_id": "a58f461b-dc32-4cf3-86fd-c924bc931ba1",
+          "job_status": "succeeded",
+          "migration_id": "37",
+          "observed_timestamp": "1795789495231128349",
+          "review_id": "37",
+          "revision": "1",
+          "revision_id": "37",
+          "scope_name": "schakker-load-fixture",
+          "service_name": "schakker-load-fixture",
+          "severity_number": "9",
+          "severity_text": "INFO",
+          "span_id": "8ef0efb66cdc2b00",
+          "sql_hash": "8e7e4436ecab8440b9b5c93cb4c767ebd39cc80e3203e10118fc400b4033ab97",
+          "sql_snapshot": "CREATE TABLE public . load_37 ( id bigint )",
+          "status": "succeeded",
+          "trace_id": "8bfb1b9c06f94b7299ea6b241b879d55"
+        },
+        "values": [
+          [
+            "1795789495230852946",
+            "worker.finished"
+          ]
+        ]
+      },
+      {
+        "stream": {
+          "actor_id": "1",
+          "attempt": "1",
+          "committed_batches": "0",
+          "committed_rows": "0",
+          "correlation_id": "b29ca46476908831297ce63932a0ab67",
+          "database_id": "3",
+          "definition_id": "4",
+          "detected_level": "info",
+          "event": "worker.finished",
+          "execution_id": "1f719108-c775-43a7-98a1-4176aac3ac30",
+          "flags": "1",
+          "job_id": "d7feb765-a58a-4051-a36a-a36af9c4bd55",
+          "job_status": "succeeded",
+          "migration_id": "4",
+          "observed_timestamp": "1795789445327040849",
+          "review_id": "4",
+          "revision": "1",
+          "revision_id": "4",
+          "scope_name": "schakker-load-fixture",
+          "service_name": "schakker-load-fixture",
+          "severity_number": "9",
+          "severity_text": "INFO",
+          "span_id": "bfddb3564590e9fa",
+          "sql_hash": "ef502124754fe52af5982dc41bd3496cabfbd248b7179a296de4bcea2a6e0b30",
+          "sql_snapshot": "CREATE TABLE public . load_4 ( id bigint )",
+          "status": "succeeded",
+          "trace_id": "24ca9121dfff365ea8b851dbf9682d68"
+        },
+        "values": [
+          [
+            "1795789445326781025",
+            "worker.finished"
+          ]
+        ]
+      },
+      {
+        "stream": {
+          "actor_id": "1",
+          "attempt": "1",
+          "committed_batches": "0",
+          "committed_rows": "0",
+          "correlation_id": "bda87e8c03a2a54d002bfa24334d4c36",
+          "database_id": "2",
+          "definition_id": "50",
+          "detected_level": "info",
+          "event": "worker.finished",
+          "execution_id": "b762c408-35a8-454e-b365-6ad35c44a22e",
+          "flags": "1",
+          "job_id": "5b4253e9-b88c-4557-98fd-4f203aada325",
+          "job_status": "succeeded",
+          "migration_id": "50",
+          "observed_timestamp": "1795789514731805554",
+          "review_id": "50",
+          "revision": "1",
+          "revision_id": "50",
+          "scope_name": "schakker-load-fixture",
+          "service_name": "schakker-load-fixture",
+          "severity_number": "9",
+          "severity_text": "INFO",
+          "span_id": "19922476c5fb6a8f",
+          "sql_hash": "f70fd46d583c33ee089c7b4d56b4ddf7797b5304e18d23259c0f6dca7462ea09",
+          "sql_snapshot": "CREATE TABLE public . load_50 ( id bigint )",
+          "status": "succeeded",
+          "trace_id": "81b103a2aac8eaa86ee029a0c206810e"
+        },
+        "values": [
+          [
+            "1795789514731327295",
+            "worker.finished"
+          ]
+        ]
+      },
+      {
+        "stream": {
+          "actor_id": "1",
+          "attempt": "1",
+          "committed_batches": "0",
+          "committed_rows": "0",
+          "correlation_id": "cb0d8d54ee27eb726be596fcc2ffac61",
+          "database_id": "2",
+          "definition_id": "52",
+          "detected_level": "info",
+          "event": "worker.finished",
+          "execution_id": "9fd93b19-8036-481d-b53e-d117cda4d4fd",
+          "flags": "1",
+          "job_id": "2c4faf83-8290-478f-99ff-92640362184e",
+          "job_status": "succeeded",
+          "migration_id": "52",
+          "observed_timestamp": "1795789518023484696",
+          "review_id": "52",
+          "revision": "1",
+          "revision_id": "52",
+          "scope_name": "schakker-load-fixture",
+          "service_name": "schakker-load-fixture",
+          "severity_number": "9",
+          "severity_text": "INFO",
+          "span_id": "39f2c90894fe801c",
+          "sql_hash": "2f551afed71e8f265a589f69088a658a44b2061d45c427b7884cfaaa8793b70f",
+          "sql_snapshot": "CREATE TABLE public . load_52 ( id bigint )",
+          "status": "succeeded",
+          "trace_id": "cf6af1653856bb22ee9019263e526ea9"
+        },
+        "values": [
+          [
+            "1795789518023273274",
+            "worker.finished"
+          ]
+        ]
+      },
+      {
+        "stream": {
+          "actor_id": "1",
+          "attempt": "1",
+          "committed_batches": "0",
+          "committed_rows": "0",
+          "correlation_id": "d5f47fcde8686927961b9df04064557f",
+          "database_id": "2",
+          "definition_id": "5",
+          "detected_level": "info",
+          "event": "worker.finished",
+          "execution_id": "e5c647e2-b2dc-44c9-825e-3554b74ff723",
+          "flags": "1",
+          "job_id": "0016df33-0d22-4805-95c2-77d44e87f256",
+          "job_status": "succeeded",
+          "migration_id": "5",
+          "observed_timestamp": "1795789445416326110",
+          "review_id": "5",
+          "revision": "1",
+          "revision_id": "5",
+          "scope_name": "schakker-load-fixture",
+          "service_name": "schakker-load-fixture",
+          "severity_number": "9",
+          "severity_text": "INFO",
+          "span_id": "524f42a0e5cb9d29",
+          "sql_hash": "71665e5b60dbb7af69bb8dbabc912c8aa153e195950cbea85f77b7f66530452b",
+          "sql_snapshot": "CREATE TABLE public . load_5 ( id bigint )",
+          "status": "succeeded",
+          "trace_id": "8421c3ec16d719b73c0876b87b0ced05"
+        },
+        "values": [
+          [
+            "1795789445416186645",
+            "worker.finished"
+          ]
+        ]
+      },
+      {
+        "stream": {
+          "actor_id": "1",
+          "attempt": "1",
+          "committed_batches": "0",
+          "committed_rows": "0",
+          "correlation_id": "e05fff32215fee5dccda1972f1b1005f",
+          "database_id": "3",
+          "definition_id": "29",
+          "detected_level": "info",
+          "event": "worker.finished",
+          "execution_id": "efdf295d-58a1-422e-ae6b-f39983acddd7",
+          "flags": "1",
+          "job_id": "5177132b-d991-4aac-9ca9-25d4b1c18715",
+          "job_status": "succeeded",
+          "migration_id": "29",
+          "observed_timestamp": "1795789478247114877",
+          "review_id": "29",
+          "revision": "1",
+          "revision_id": "29",
+          "scope_name": "schakker-load-fixture",
+          "service_name": "schakker-load-fixture",
+          "severity_number": "9",
+          "severity_text": "INFO",
+          "span_id": "3693cd66b2df6443",
+          "sql_hash": "cd5b928435a1915713097b3d9466169039f4d7413e1fdb6d7322b3deab00bf27",
+          "sql_snapshot": "CREATE TABLE public . load_29 ( id bigint )",
+          "status": "succeeded",
+          "trace_id": "4d38c41a808f8ab92a72494f8c412e5a"
+        },
+        "values": [
+          [
+            "1795789478246847930",
+            "worker.finished"
+          ]
+        ]
+      },
+      {
+        "stream": {
+          "actor_id": "1",
+          "attempt": "1",
+          "committed_batches": "10",
+          "committed_rows": "1000",
+          "correlation_id": "1f729e1c64c9848577e948cac68962fe",
+          "database_id": "2",
+          "definition_id": "36",
+          "detected_level": "info",
+          "event": "worker.finished",
+          "execution_id": "c0b64b4d-af2a-4ae6-8f0e-fae2ed328be4",
+          "flags": "1",
+          "job_id": "58e68850-f611-48ba-b9c4-36353345beec",
+          "job_status": "succeeded",
+          "migration_id": "36",
+          "observed_timestamp": "1795789498894244376",
+          "review_id": "36",
+          "revision": "1",
+          "revision_id": "36",
+          "scope_name": "schakker-load-fixture",
+          "service_name": "schakker-load-fixture",
+          "severity_number": "9",
+          "severity_text": "INFO",
+          "span_id": "d0f719bd115c499c",
+          "sql_hash": "3f14101988128b08f41d0476f2b74bd609642399c8dfce12b96040c774e82aae",
+          "sql_snapshot": "UPDATE \"public\" . \"load_counters\" SET \"value\" = \"value\" + $1 WHERE \"id\" = ANY ( $2 :: bigint [ ] ) ;",
+          "status": "succeeded",
+          "trace_id": "30e39b95d9e8f7b771a43facabf610f3"
+        },
+        "values": [
+          [
+            "1795789498893983781",
+            "worker.finished"
+          ]
+        ]
+      },
+      {
+        "stream": {
+          "actor_id": "1",
+          "attempt": "1",
+          "committed_batches": "10",
+          "committed_rows": "1000",
+          "correlation_id": "2a851dfb4bbc6b96446729f7bd92765b",
+          "database_id": "1",
+          "definition_id": "51",
+          "detected_level": "info",
+          "event": "worker.finished",
+          "execution_id": "8e1c7dfa-6ca8-4cfb-b920-70b8f7b16616",
+          "flags": "1",
+          "job_id": "16a5965e-f1ce-4de0-814d-bd290decbcf1",
+          "job_status": "succeeded",
+          "migration_id": "51",
+          "observed_timestamp": "1795789520102866157",
+          "review_id": "51",
+          "revision": "1",
+          "revision_id": "51",
+          "scope_name": "schakker-load-fixture",
+          "service_name": "schakker-load-fixture",
+          "severity_number": "9",
+          "severity_text": "INFO",
+          "span_id": "f9137b8492db501d",
+          "sql_hash": "3f14101988128b08f41d0476f2b74bd609642399c8dfce12b96040c774e82aae",
+          "sql_snapshot": "UPDATE \"public\" . \"load_counters\" SET \"value\" = \"value\" + $1 WHERE \"id\" = ANY ( $2 :: bigint [ ] ) ;",
+          "status": "succeeded",
+          "trace_id": "fa480fd984c4e37d40c534c4b7bcb4da"
+        },
+        "values": [
+          [
+            "1795789520102687057",
+            "worker.finished"
+          ]
+        ]
+      },
+      {
+        "stream": {
+          "actor_id": "1",
+          "attempt": "1",
+          "committed_batches": "10",
+          "committed_rows": "1000",
+          "correlation_id": "2d714a9bac6b665d904c74e25f1a2f65",
+          "database_id": "3",
+          "definition_id": "48",
+          "detected_level": "info",
+          "event": "worker.finished",
+          "execution_id": "312d53e4-0aaf-4892-a002-4b8529a76772",
+          "flags": "1",
+          "job_id": "acbdf6b7-ff37-4bef-99c9-09465613fb81",
+          "job_status": "succeeded",
+          "migration_id": "48",
+          "observed_timestamp": "1795789518117681407",
+          "review_id": "48",
+          "revision": "1",
+          "revision_id": "48",
+          "scope_name": "schakker-load-fixture",
+          "service_name": "schakker-load-fixture",
+          "severity_number": "9",
+          "severity_text": "INFO",
+          "span_id": "46bb67bf8131e97a",
+          "sql_hash": "3f14101988128b08f41d0476f2b74bd609642399c8dfce12b96040c774e82aae",
+          "sql_snapshot": "UPDATE \"public\" . \"load_counters\" SET \"value\" = \"value\" + $1 WHERE \"id\" = ANY ( $2 :: bigint [ ] ) ;",
+          "status": "succeeded",
+          "trace_id": "3aad5fa70ce980d7024b149541107fb1"
+        },
+        "values": [
+          [
+            "1795789518117284403",
+            "worker.finished"
+          ]
+        ]
+      },
+      {
+        "stream": {
+          "actor_id": "1",
+          "attempt": "1",
+          "committed_batches": "10",
+          "committed_rows": "1000",
+          "correlation_id": "c9bc1704fe5fc666ac9595d76cc855c4",
+          "database_id": "2",
+          "definition_id": "27",
+          "detected_level": "info",
+          "event": "worker.finished",
+          "execution_id": "2d02184e-6753-4aee-b85f-9be5d6aa3030",
+          "flags": "1",
+          "job_id": "d1598b33-dd5d-4b11-9f37-71f8e48b1332",
+          "job_status": "succeeded",
+          "migration_id": "27",
+          "observed_timestamp": "1795789481416443661",
+          "review_id": "27",
+          "revision": "1",
+          "revision_id": "27",
+          "scope_name": "schakker-load-fixture",
+          "service_name": "schakker-load-fixture",
+          "severity_number": "9",
+          "severity_text": "INFO",
+          "span_id": "8291f695f7f9d5ff",
+          "sql_hash": "3f14101988128b08f41d0476f2b74bd609642399c8dfce12b96040c774e82aae",
+          "sql_snapshot": "UPDATE \"public\" . \"load_counters\" SET \"value\" = \"value\" + $1 WHERE \"id\" = ANY ( $2 :: bigint [ ] ) ;",
+          "status": "succeeded",
+          "trace_id": "b16ac10045112da8ab30c807092b947c"
+        },
+        "values": [
+          [
+            "1795789481415939052",
+            "worker.finished"
+          ]
+        ]
+      }
+    ],
+    "stats": {
+      "summary": {
+        "bytesProcessedPerSecond": 70071269,
+        "linesProcessedPerSecond": 170507,
+        "totalBytesProcessed": 100262232,
+        "totalLinesProcessed": 243972,
+        "execTime": 1.430861,
+        "queueTime": 0.000337,
+        "subqueries": 0,
+        "totalEntriesReturned": 52,
+        "splits": 0,
+        "shards": 1,
+        "totalPostFilterLines": 69,
+        "totalStructuredMetadataBytesProcessed": 92922334
+      },
+      "querier": {
+        "store": {
+          "totalChunksRef": 0,
+          "totalChunksDownloaded": 0,
+          "chunksDownloadTime": 0,
+          "queryReferencedStructuredMetadata": false,
+          "queryUsedV2Engine": false,
+          "chunk": {
+            "headChunkBytes": 0,
+            "headChunkLines": 0,
+            "decompressedBytes": 0,
+            "decompressedLines": 0,
+            "compressedBytes": 0,
+            "totalDuplicates": 0,
+            "postFilterLines": 0,
+            "headChunkStructuredMetadataBytes": 0,
+            "decompressedStructuredMetadataBytes": 0
+          },
+          "chunkRefsFetchTime": 0,
+          "congestionControlLatency": 0,
+          "pipelineWrapperFilteredLines": 0,
+          "dataobj": {
+            "prePredicateDecompressedRows": 0,
+            "prePredicateDecompressedBytes": 0,
+            "prePredicateDecompressedStructuredMetadataBytes": 0,
+            "postPredicateRows": 0,
+            "postPredicateDecompressedBytes": 0,
+            "postPredicateStructuredMetadataBytes": 0,
+            "postFilterRows": 0,
+            "pagesScanned": 0,
+            "pagesDownloaded": 0,
+            "pagesDownloadedBytes": 0,
+            "pageBatches": 0,
+            "totalRowsAvailable": 0,
+            "totalPageDownloadTime": 0
+          }
+        },
+        "querierExecTime": 2.831652
+      },
+      "ingester": {
+        "totalReached": 1,
+        "totalChunksMatched": 6,
+        "totalBatches": 2,
+        "totalLinesSent": 52,
+        "store": {
+          "totalChunksRef": 5,
+          "totalChunksDownloaded": 5,
+          "chunksDownloadTime": 57057031,
+          "queryReferencedStructuredMetadata": false,
+          "queryUsedV2Engine": false,
+          "chunk": {
+            "headChunkBytes": 391702,
+            "headChunkLines": 2397,
+            "decompressedBytes": 99870530,
+            "decompressedLines": 241575,
+            "compressedBytes": 5196020,
+            "totalDuplicates": 17,
+            "postFilterLines": 69,
+            "headChunkStructuredMetadataBytes": 367064,
+            "decompressedStructuredMetadataBytes": 92555270
+          },
+          "chunkRefsFetchTime": 435658,
+          "congestionControlLatency": 0,
+          "pipelineWrapperFilteredLines": 0,
+          "dataobj": {
+            "prePredicateDecompressedRows": 0,
+            "prePredicateDecompressedBytes": 0,
+            "prePredicateDecompressedStructuredMetadataBytes": 0,
+            "postPredicateRows": 0,
+            "postPredicateDecompressedBytes": 0,
+            "postPredicateStructuredMetadataBytes": 0,
+            "postFilterRows": 0,
+            "pagesScanned": 0,
+            "pagesDownloaded": 0,
+            "pagesDownloadedBytes": 0,
+            "pageBatches": 0,
+            "totalRowsAvailable": 0,
+            "totalPageDownloadTime": 0
+          }
+        },
+        "recvWaitTime": 1.40822
+      },
+      "cache": {
+        "chunk": {
+          "entriesFound": 0,
+          "entriesRequested": 0,
+          "entriesStored": 0,
+          "bytesReceived": 0,
+          "bytesSent": 0,
+          "requests": 0,
+          "downloadTime": 0,
+          "queryLengthServed": 0
+        },
+        "index": {
+          "entriesFound": 0,
+          "entriesRequested": 0,
+          "entriesStored": 0,
+          "bytesReceived": 0,
+          "bytesSent": 0,
+          "requests": 0,
+          "downloadTime": 0,
+          "queryLengthServed": 0
+        },
+        "result": {
+          "entriesFound": 0,
+          "entriesRequested": 0,
+          "entriesStored": 0,
+          "bytesReceived": 0,
+          "bytesSent": 0,
+          "requests": 0,
+          "downloadTime": 0,
+          "queryLengthServed": 0
+        },
+        "statsResult": {
+          "entriesFound": 0,
+          "entriesRequested": 0,
+          "entriesStored": 0,
+          "bytesReceived": 0,
+          "bytesSent": 0,
+          "requests": 0,
+          "downloadTime": 0,
+          "queryLengthServed": 0
+        },
+        "volumeResult": {
+          "entriesFound": 0,
+          "entriesRequested": 0,
+          "entriesStored": 0,
+          "bytesReceived": 0,
+          "bytesSent": 0,
+          "requests": 0,
+          "downloadTime": 0,
+          "queryLengthServed": 0
+        },
+        "seriesResult": {
+          "entriesFound": 0,
+          "entriesRequested": 0,
+          "entriesStored": 0,
+          "bytesReceived": 0,
+          "bytesSent": 0,
+          "requests": 0,
+          "downloadTime": 0,
+          "queryLengthServed": 0
+        },
+        "labelResult": {
+          "entriesFound": 0,
+          "entriesRequested": 0,
+          "entriesStored": 0,
+          "bytesReceived": 0,
+          "bytesSent": 0,
+          "requests": 0,
+          "downloadTime": 0,
+          "queryLengthServed": 0
+        },
+        "instantMetricResult": {
+          "entriesFound": 0,
+          "entriesRequested": 0,
+          "entriesStored": 0,
+          "bytesReceived": 0,
+          "bytesSent": 0,
+          "requests": 0,
+          "downloadTime": 0,
+          "queryLengthServed": 0
+        }
+      },
+      "index": {
+        "totalChunks": 0,
+        "postFilterChunks": 0,
+        "shardsDuration": 0,
+        "usedBloomFilters": false,
+        "totalStreams": 0,
+        "chunkRefsLookupTime": 0,
+        "bloomFilterTime": 0
+      }
+    }
+  }
+}
