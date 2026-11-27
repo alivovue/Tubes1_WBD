@@ -11,12 +11,11 @@ import { useSession } from "./session";
 export type LoginContent = {
   eyebrow: string;
   title: string;
-  description: string;
-  features: readonly string[];
+  description?: string;
+  features?: readonly string[];
   portal: string;
   icon: string;
   submitLabel: string;
-  securityNote: string;
   people?: boolean;
 };
 
@@ -79,27 +78,29 @@ export function LoginPage({
   }
   return (
     <main className="auth-shell">
-      <section className="auth-showcase" aria-labelledby="showcase-title">
+      <section
+        className={`auth-showcase${content.people ? " auth-showcase--centered" : ""}`}
+        aria-labelledby="showcase-title"
+      >
         <WorkspaceBrand home={home} />
         <div className="auth-showcase__copy">
           <p className="eyebrow">{content.eyebrow}</p>
           <h1 id="showcase-title">{content.title}</h1>
-          <p>{content.description}</p>
-          <ul className="feature-list">
-            {content.features.map((feature) => (
-              <li key={feature}>
-                <span>
-                  <Icon name="check" />
-                </span>
-                {feature}
-              </li>
-            ))}
-          </ul>
+          {content.description && <p>{content.description}</p>}
+          {!!content.features?.length && (
+            <ul className="feature-list">
+              {content.features.map((feature) => (
+                <li key={feature}>
+                  <span>
+                    <Icon name="check" />
+                  </span>
+                  {feature}
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
         <AeroScene people={content.people} />
-        <p className="auth-showcase__footer">
-          Schakker Technologies · Internal systems
-        </p>
       </section>
       <section className="auth-panel" aria-labelledby="login-title">
         <div className="auth-card">
@@ -111,9 +112,6 @@ export function LoginPage({
           </div>
           <p className="eyebrow">{content.portal}</p>
           <h2 id="login-title">Welcome back</h2>
-          <p className="auth-card__lead">
-            Masuk menggunakan akun internal Schakker Anda.
-          </p>
           {error && <Notice error>{error}</Notice>}
           {!session.CSRF && error && (
             <Button
@@ -148,10 +146,6 @@ export function LoginPage({
               {busy ? "Signing in…" : content.submitLabel}
             </Button>
           </form>
-          <p className="security-note">{content.securityNote}</p>
-          <p className="auth-help">
-            Kesulitan masuk? Hubungi Platform Admin Anda.
-          </p>
         </div>
       </section>
     </main>

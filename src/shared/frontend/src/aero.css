@@ -337,6 +337,7 @@ option, .permission-select option { background: #f3fbff; color: #234a63; }
 .eyebrow { color: #066b95; letter-spacing: .12em; }
 
 .aero-scene { position: relative; isolation: isolate; width: min(460px, 100%); height: 230px; margin: 15px auto 22px; }
+.auth-showcase--centered .aero-scene { position: absolute; top: 50%; left: 50%; width: min(460px, calc(100% - 60px)); margin: 0; transform: translate(-50%, -50%); }
 .aero-scene__orbit { position: absolute; border: 1px solid #ffffffb0; border-radius: 50%; box-shadow: 0 1px 0 #66bfc655; transform: rotate(-15deg); }
 .aero-scene__orbit--outer { width: 96%; height: 125px; left: 2%; top: 65px; }
 .aero-scene__orbit--inner { width: 78%; height: 180px; left: 11%; top: 30px; transform: rotate(20deg); }

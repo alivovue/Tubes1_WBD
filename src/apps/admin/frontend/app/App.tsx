@@ -19,16 +19,9 @@ const home = "/admin/users";
 const loginContent: LoginContent = {
   eyebrow: "Platform access administration.",
   title: "Manage platform access with confidence.",
-  description: "Kelola akun, keanggotaan grup, dan konfigurasi akses database dari satu ruang administrasi.",
-  features: [
-    "Permission berbasis grup",
-    "Kelola akun dan keanggotaan grup",
-    "Konfigurasi koneksi tanpa mengakses data",
-  ],
   portal: "Administration portal",
   icon: "users",
   submitLabel: "Masuk ke administrasi",
-  securityNote: "Akses terbatas untuk platform administrator. Aplikasi ini hanya mengelola akses dan konfigurasi.",
   people: true,
 };
 

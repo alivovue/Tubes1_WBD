@@ -31,7 +31,6 @@ const loginContent: LoginContent = {
   portal: "Employee portal",
   icon: "database",
   submitLabel: "Masuk ke workspace",
-  securityNote: "Akses terbatas untuk karyawan. Gunakan akun yang dibuat oleh admin.",
 };
 
 export function App() {
