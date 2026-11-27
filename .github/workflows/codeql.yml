@@ -36,6 +36,8 @@ jobs:
         run: |
           rm -rf output/codeql
           mkdir -p output/codeql
+      - name: Test CodeQL report generation
+        run: python3 -m unittest discover -s src/tests/unit/tools -p 'test_*.py'
       - name: Set up Go
         uses: actions/setup-go@v5
         if: matrix.language == 'go'
