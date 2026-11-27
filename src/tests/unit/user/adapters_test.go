@@ -77,3 +77,19 @@ func TestMariaDBExplorerRejectsOtherDatabase(t *testing.T) {
 	_, err := mariadb.New().Tables(context.Background(), db, "forbidden")
 	wantError(t, err, adapters.ErrInvalid)
 }
+
+func TestSQLLogTextUsesTheTargetQuotingRules(t *testing.T) {
+	for _, query := range []string{
+		"SELECT \"private-log-value\" FROM `employees` # private-comment",
+		"SELECT 'private-log-value',987654321 FROM `employees`",
+		"SELECT 0xDEADBEEF,1e987654321,0b11011011 FROM `employees`",
+	} {
+		text := adapters.SQLLogText(query, "mariadb")
+		if !strings.Contains(text, "SELECT") || !strings.Contains(text, "employees") {
+			t.Fatalf("SQL structure lost: %s", text)
+		}
+		if strings.Contains(text, "private-log-value") || strings.Contains(text, "private-comment") || strings.Contains(text, "987654321") || strings.Contains(text, "DEADBEEF") || strings.Contains(text, "11011011") {
+			t.Fatal("MariaDB data leaked into logs")
+		}
+	}
+}

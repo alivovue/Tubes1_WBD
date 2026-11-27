@@ -60,6 +60,13 @@ func (w *Workflow) RecordCommittedExecution(ctx context.Context, proof VerifiedC
 		if proof.ActualSQL != plan.SQL {
 			return ErrWorkflowConflict
 		}
+		job, err := tx.Job(ctx, proof.JobID)
+		if err != nil {
+			return err
+		}
+		if job.ReviewID != r.ID || job.DatabaseID != r.DatabaseID || job.Operation != r.Action {
+			return ErrWorkflowConflict
+		}
 		// Persist committed facts even if authority changed AFTER target commit.
 		// No network lookups or target SQL occur during this metadata transaction.
 		if err = w.checkPosition(ctx, tx, r, revision, state); err != nil {
@@ -87,7 +94,7 @@ func (w *Workflow) RecordCommittedExecution(ctx context.Context, proof VerifiedC
 			state.BlockedReason = ""
 		}
 		state.Generation++
-		out = dao.CommittedExecution{ExecutionID: proof.ExecutionID, JobID: proof.JobID, ReviewID: &r.ID, DefinitionID: revision.DefinitionID, RevisionID: revision.ID, DatabaseID: r.DatabaseID, LogicalVersion: version, ActorID: r.SubmittedBy, Operation: r.Action, SQL: proof.ActualSQL, CommittedAt: proof.CommittedAt, TargetExecutionID: r.TargetExecutionID, TargetReceipt: proof.TargetReceipt, Status: "succeeded"}
+		out = dao.CommittedExecution{ExecutionID: proof.ExecutionID, JobID: proof.JobID, ReviewID: &r.ID, DefinitionID: revision.DefinitionID, RevisionID: revision.ID, DatabaseID: r.DatabaseID, LogicalVersion: version, ActorID: job.ActorID, Operation: r.Action, SQL: proof.ActualSQL, CommittedAt: proof.CommittedAt, TargetExecutionID: r.TargetExecutionID, TargetReceipt: proof.TargetReceipt, Status: "succeeded"}
 		if r.Action == "rollback" {
 			out.ReversesExecutionID = r.TargetExecutionID
 		}

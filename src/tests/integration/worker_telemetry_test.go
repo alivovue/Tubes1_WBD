@@ -80,8 +80,11 @@ func TestWorkerTelemetryCrossesDurableQueueAndRedactsSQL(t *testing.T) {
 	flush, stop := context.WithTimeout(context.Background(), 5*time.Second)
 	defer stop()
 	must(t, shutdown(flush))
-	if strings.Contains(logs.String(), "private-migration-value") || strings.Contains(logs.String(), "CREATE TABLE telemetry_probe") {
-		t.Fatal("SQL or row values leaked into operational logs")
+	if strings.Contains(logs.String(), "private-migration-value") {
+		t.Fatal("row values leaked into operational logs")
+	}
+	if !strings.Contains(logs.String(), "CREATE TABLE telemetry_probe") {
+		t.Fatal("SQL structure was omitted from operational logs")
 	}
 	foundWorkerLog := false
 	for _, line := range strings.Split(strings.TrimSpace(logs.String()), "\n") {

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5/pgconn"
+	"schakker_shared/sqltext"
 
 	"tubes1_wbd/backend/dbmanagement/adapters"
 	"tubes1_wbd/backend/migration/engines"
@@ -67,6 +68,9 @@ func (Engine) Parse(query string) ([]adapters.Statement, error) {
 				return nil, engines.ErrUnsafeSQL
 			}
 		}
+	}
+	if err := sqltext.ValidatePostgres(query); err != nil {
+		return nil, adapters.ErrInvalid
 	}
 	return statements, nil
 }

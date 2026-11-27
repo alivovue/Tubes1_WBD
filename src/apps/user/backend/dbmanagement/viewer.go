@@ -53,6 +53,7 @@ func (s *Service) ReadQuery(ctx context.Context, actor, database int64, query st
 	if err != nil {
 		return result, err
 	}
+	ctx = observability.WithSQLFormatter(ctx, func(query string) string { return adapters.SQLLogText(query, dbms) })
 	statement, err := adapters.ValidateReadQuery(query, dbms)
 	if err != nil {
 		return result, err

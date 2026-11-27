@@ -137,14 +137,14 @@ func TestChangeSetCreatesAndDropsTables(t *testing.T) {
 		})
 	}
 }
-func TestChangeSetOrdersSchemaBeforeRowsAndSeparatesSummaries(t *testing.T) {
+func TestChangeSetKeepsOrderedRowsAndSeparateSummaries(t *testing.T) {
 	for _, dbms := range []string{"postgresql", "mariadb"} {
 		t.Run(dbms, func(t *testing.T) {
 			current := peopleSnapshot(dbms)
 			schema := current.Schemas[0].Name
 			result, err := diff.Build(current, []diff.Operation{
-				{Kind: "insert_row", Schema: schema, Table: "people", Values: map[string]any{"id": 1, "age": 23}},
 				{Kind: "add_column", Schema: schema, Table: "people", Column: adapters.Column{Name: "age", DataType: "integer", Nullable: true}},
+				{Kind: "insert_row", Schema: schema, Table: "people", Values: map[string]any{"id": 1, "age": 23}},
 			})
 			if err != nil {
 				t.Fatal(err)
@@ -155,6 +155,33 @@ func TestChangeSetOrdersSchemaBeforeRowsAndSeparatesSummaries(t *testing.T) {
 			if result.Changes[0].Kind == "insert_row" {
 				t.Fatal("row insertion appeared as a schema diff")
 			}
+		})
+	}
+}
+
+func TestChangeSetValidatesRowsAgainstTheirPosition(t *testing.T) {
+	for _, dbms := range []string{"postgresql", "mariadb"} {
+		t.Run(dbms, func(t *testing.T) {
+			current := peopleSnapshot(dbms)
+			schema := current.Schemas[0].Name
+			update := diff.Operation{Kind: "update_row", Schema: schema, Table: "people", Values: map[string]any{"id": 2}, Where: map[string]any{"name": "Alice"}}
+			drop := diff.Operation{Kind: "drop_column", Schema: schema, Table: "people", Column: adapters.Column{Name: "name"}}
+			result, err := diff.Build(current, []diff.Operation{update, drop})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if strings.Index(result.SQL, "UPDATE") > strings.Index(result.SQL, "DROP COLUMN") {
+				t.Fatal("row operation crossed its schema operation")
+			}
+			if len(result.DataChanges) != 1 || len(result.Desired.Tables[0].Columns) != 1 {
+				t.Fatal("ordered summaries lost the final state")
+			}
+			_, err = diff.Build(current, []diff.Operation{drop, update})
+			wantError(t, err, diff.ErrInvalid)
+			insert := diff.Operation{Kind: "insert_row", Schema: schema, Table: "people", Values: map[string]any{"age": 23}}
+			add := diff.Operation{Kind: "add_column", Schema: schema, Table: "people", Column: adapters.Column{Name: "age", DataType: "integer", Nullable: true}}
+			_, err = diff.Build(current, []diff.Operation{insert, add})
+			wantError(t, err, diff.ErrInvalid)
 		})
 	}
 }

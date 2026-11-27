@@ -82,6 +82,8 @@ func (r *Runner) RunOnce(ctx context.Context) (claimed bool, err error) {
 	started := time.Now()
 	ctx = observability.Extract(ctx, j.TraceContext)
 	ctx = observability.WithActor(ctx, j.ActorID, j.DatabaseID)
+	identity := observability.MigrationIdentity{JobID: j.ID, ExecutionID: j.ExecutionID, ReviewID: j.ReviewID, Attempt: j.Attempt}
+	ctx = observability.WithMigration(ctx, identity)
 	ctx, span := observability.Start(ctx, "worker.execute")
 	defer span.End()
 	if j.Attempt == 1 {
@@ -116,6 +118,7 @@ func (r *Runner) RunOnce(ctx context.Context) (claimed bool, err error) {
 	defer func() { close(stopHeartbeat); <-heartbeatDone }()
 	observability.Event(ctx, "worker.claimed", nil, "job_id", j.ID, "database_id", j.DatabaseID, "actor_id", j.ActorID, "attempt", j.Attempt)
 	var progress engines.JobProgress
+	var attemptSQL string
 	targetReconciled := false
 	lockCtx, lockSpan := observability.Start(ctx, "worker.database_lock")
 	err = r.Store.WithDatabaseLock(lockCtx, j.DatabaseID, func(locked *dao.Store) error {
@@ -124,6 +127,10 @@ func (r *Runner) RunOnce(ctx context.Context) (claimed bool, err error) {
 		if err != nil {
 			return err
 		}
+		identity.DefinitionID, identity.RevisionID, identity.Revision = request.DefinitionID, request.RevisionID, request.Revision
+		ctx := observability.WithMigration(ctx, identity)
+		attemptSQL = request.SQL
+		observability.Event(ctx, "migration.attempt.start", nil, "operation", j.Operation, "sql_snapshot", observability.SQLText(attemptSQL), "sql_hash", j.SQLHash)
 		previous, err := locked.BatchProgress(ctx, j.ID)
 		if err != nil {
 			return err
@@ -223,7 +230,8 @@ func (r *Runner) RunOnce(ctx context.Context) (claimed bool, err error) {
 		}
 	}
 	finishErr := r.Store.FinishJob(cleanup, j, status, class, queue.RetryDelay(j.Attempt))
-	observability.Event(ctx, "worker.finished", err, "job_id", j.ID, "execution_id", j.ExecutionID, "database_id", j.DatabaseID, "attempt", j.Attempt, "job_status", status, "error_class", class, "committed_batches", progress.Batches, "committed_rows", progress.Rows)
+	finishCtx := observability.WithMigration(ctx, identity)
+	observability.Event(finishCtx, "worker.finished", err, "job_id", j.ID, "execution_id", j.ExecutionID, "database_id", j.DatabaseID, "attempt", j.Attempt, "job_status", status, "error_class", class, "sql_snapshot", observability.SQLText(attemptSQL), "sql_hash", j.SQLHash, "committed_batches", progress.Batches, "committed_rows", progress.Rows)
 	if finishErr != nil {
 		return true, finishErr
 	}
@@ -243,7 +251,7 @@ func loadRequest(ctx context.Context, store *dao.Store, j dao.MigrationJob) (eng
 	if j.Operation == "rollback" || j.Operation == "batch_cancel" {
 		sql = revision.DownSQL
 	}
-	if review.QueuedJobID == nil || *review.QueuedJobID != j.ID || review.DatabaseID != j.DatabaseID || review.SubmittedBy != j.ActorID || review.Action != j.Operation || review.ActionHash != j.ActionHash || engines.SQLDigest(sql) != j.SQLHash {
+	if review.QueuedJobID == nil || *review.QueuedJobID != j.ID || review.DatabaseID != j.DatabaseID || review.Action != j.Operation || review.ActionHash != j.ActionHash || engines.SQLDigest(sql) != j.SQLHash {
 		return engines.JobRequest{}, migration.ErrWorkflowConflict
 	}
 	batch, err := engines.ParseBatch(revision.UpSQL, revision.DownSQL)
@@ -259,6 +267,7 @@ func loadRequest(ctx context.Context, store *dao.Store, j dao.MigrationJob) (eng
 		return engines.JobRequest{}, err
 	}
 	out := engines.JobRequest{Namespace: namespace, JobID: j.ID, ExecutionID: j.ExecutionID, Operation: j.Operation, SQL: sql, DownSQL: revision.DownSQL, SQLHash: j.SQLHash, ActionHash: j.ActionHash, Batch: batch}
+	out.DefinitionID, out.RevisionID, out.Revision = revision.DefinitionID, revision.ID, revision.RevisionNo
 	if review.TargetJobID != nil {
 		out.OriginalJobID = *review.TargetJobID
 	}

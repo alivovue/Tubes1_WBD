@@ -25,6 +25,9 @@ func TestDefinitionValidationRequiresAnExplicitSafeDirection(t *testing.T) {
 		{"protected metadata", func(i *migration.DefinitionInput) { i.DownSQL = "DROP SCHEMA _schakker CASCADE" }},
 		{"procedural SQL", func(i *migration.DefinitionInput) { i.UpSQL = "DO $$ BEGIN RAISE NOTICE 'unsafe'; END $$" }},
 		{"blank title", func(i *migration.DefinitionInput) { i.Title = " " }},
+		{"malformed up grammar", func(i *migration.DefinitionInput) { i.UpSQL = "CREATE TABLE broken(id integer,,,)" }},
+		{"malformed down grammar", func(i *migration.DefinitionInput) { i.DownSQL = "DROP TABLE ;" }},
+		{"unbalanced grammar", func(i *migration.DefinitionInput) { i.UpSQL = "SELECT (1 + 2" }},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			input := valid

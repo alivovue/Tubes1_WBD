@@ -40,7 +40,18 @@ func (Adapter) Connect(ctx context.Context, in adapters.Connection) (*sql.DB, er
 	check, cancel := context.WithTimeout(ctx, in.ConnectTimeout)
 	defer cancel()
 	var platform bool
-	err = db.QueryRowContext(check, `SELECT to_regclass('public.users') IS NOT NULL AND to_regclass('public.sessions') IS NOT NULL AND to_regclass('public.session_tokens') IS NOT NULL AND to_regclass('public.group_database_permissions') IS NOT NULL AND to_regclass('public.managed_databases') IS NOT NULL`).Scan(&platform)
+	// The two application databases have separate authentication schemas. Neither
+	// may be exposed through an attached target, regardless of the supplied role.
+	err = db.QueryRowContext(check, `SELECT
+ (to_regclass('public.users') IS NOT NULL
+  AND to_regclass('public.sessions') IS NOT NULL
+  AND to_regclass('public.session_tokens') IS NOT NULL
+  AND to_regclass('public.managed_databases') IS NOT NULL)
+ OR
+ (to_regclass('public.admin_users') IS NOT NULL
+  AND to_regclass('public.admin_sessions') IS NOT NULL
+  AND to_regclass('public.admin_session_tokens') IS NOT NULL
+  AND to_regclass('public.managed_databases') IS NOT NULL)`).Scan(&platform)
 	if err != nil {
 		db.Close()
 		return nil, ErrConnection

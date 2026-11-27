@@ -32,18 +32,25 @@ export function LoginPage({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [challengeRevision, setChallengeRevision] = useState(0);
+  const [challengeLoading, setChallengeLoading] = useState(false);
   useEffect(() => {
     if (session.CSRF) return;
     const controller = new AbortController();
+    setChallengeLoading(true);
+    setError("");
     request("/session", undefined, undefined, controller.signal)
       .then((result) => {
         if (!controller.signal.aborted) update(result);
       })
       .catch((problem: Error) => {
         if (!controller.signal.aborted) setError(problem.message);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setChallengeLoading(false);
       });
     return () => controller.abort();
-  }, [session.CSRF, request, update]);
+  }, [session.CSRF, request, update, challengeRevision]);
   async function login(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (busy || !session.CSRF) return;
@@ -108,6 +115,14 @@ export function LoginPage({
             Masuk menggunakan akun internal Schakker Anda.
           </p>
           {error && <Notice error>{error}</Notice>}
+          {!session.CSRF && error && (
+            <Button
+              disabled={challengeLoading}
+              onClick={() => setChallengeRevision((value) => value + 1)}
+            >
+              Retry
+            </Button>
+          )}
           <form className="form-stack" onSubmit={login}>
             <Field label="Username">
               <input name="username" autoComplete="username" required />

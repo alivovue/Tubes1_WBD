@@ -17,6 +17,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	adminschema "schakker_schemas/admin"
+	"schakker_shared/sqltext"
 	fixtures "schakker_tests/fixtures/setup"
 	"tubes1_wbd/backend/access"
 	"tubes1_wbd/backend/controlplane"
@@ -54,6 +55,12 @@ type fixture struct {
 
 func TestMain(m *testing.M) { os.Exit(runIntegration(m)) }
 func runIntegration(m *testing.M) int {
+	// Dependency initialization is outside each fixture's database deadline,
+	// including the slower first compilation under the race detector.
+	if err := sqltext.ValidatePostgres("SELECT 1"); err != nil {
+		fmt.Fprintln(os.Stderr, "Cannot initialize PostgreSQL grammar:", err)
+		return 1
+	}
 	directory := os.Getenv("SCHAKKER_TEST_STATE")
 	if directory == "" {
 		var err error

@@ -30,6 +30,9 @@ func (w *Workflow) SubmitReview(ctx context.Context, actor int64, in ReviewInput
 	if err = w.auth.RequirePermission(ctx, actor, revision.DatabaseID, access.ViewEdit); err != nil {
 		return out, err
 	}
+	if err = ValidateDefinition(DefinitionInput{Title: revision.Title, UpSQL: revision.UpSQL, DownSQL: revision.DownSQL, Irreversible: revision.Irreversible, IrreversibleReason: revision.IrreversibleReason}); err != nil {
+		return out, err
+	}
 	if in.Action != "up" && in.Action != "rollback" && in.Action != "forward" && in.Action != "batch_cancel" {
 		return out, ErrInvalid
 	}
@@ -163,6 +166,7 @@ func (w *Workflow) PrepareApprovedAction(ctx context.Context, actor, id int64) (
 			return ErrWorkflowConflict
 		}
 		out = planFor(r, revision)
+		out.ActorID = actor
 		return nil
 	})
 	return out, err
@@ -178,7 +182,14 @@ func (w *Workflow) ValidateApprovedExecution(ctx context.Context, reviewID int64
 	if r.QueuedJobID == nil || *r.QueuedJobID != jobID {
 		return out, ErrWorkflowConflict
 	}
-	return w.PrepareApprovedAction(ctx, r.SubmittedBy, reviewID)
+	job, err := w.store.Job(ctx, jobID)
+	if err != nil {
+		return out, err
+	}
+	if job.ReviewID != reviewID || job.DatabaseID != r.DatabaseID {
+		return out, ErrWorkflowConflict
+	}
+	return w.PrepareApprovedAction(ctx, job.ActorID, reviewID)
 }
 func (w *Workflow) Enqueue(ctx context.Context, actor, id int64, key string) (job string, err error) {
 	ctx, end := w.observe(ctx, "migration.review.enqueue", actor, 0)
@@ -215,7 +226,9 @@ func (w *Workflow) Enqueue(ctx context.Context, actor, id int64, key string) (jo
 			return nil
 		}
 		var err error
-		job, err = w.options.Dispatcher.Enqueue(ctx, tx, planFor(r, revision), key)
+		plan := planFor(r, revision)
+		plan.ActorID = actor
+		job, err = w.options.Dispatcher.Enqueue(ctx, tx, plan, key)
 		if err != nil {
 			if errors.Is(err, dao.ErrConflict) {
 				return ErrWorkflowConflict

@@ -8,6 +8,8 @@ import (
 	"errors"
 	"time"
 
+	"schakker_shared/observability"
+
 	"tubes1_wbd/backend/access"
 	"tubes1_wbd/backend/dbmanagement"
 	"tubes1_wbd/backend/dbmanagement/adapters"
@@ -112,6 +114,7 @@ func (s *Service) Analyze(ctx context.Context, actor, database int64, query stri
 		return Analysis{}, err
 	}
 	defer target.DB.Close()
+	ctx = observability.WithSQLFormatter(ctx, func(query string) string { return adapters.SQLLogText(query, target.Adapter.Name()) })
 	tx, err := target.DB.BeginTx(ctx, &sql.TxOptions{ReadOnly: true, Isolation: sql.LevelRepeatableRead})
 	if err != nil {
 		return Analysis{}, dbmanagement.ErrConnection

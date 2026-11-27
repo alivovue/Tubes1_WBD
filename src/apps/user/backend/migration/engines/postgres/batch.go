@@ -268,14 +268,19 @@ func batchTransaction(ctx context.Context, conn *sql.Conn, a adapters.Adapter, r
 			return false, err
 		}
 	}
+	versions, err := captureBatchVersions(ctx, tx, a, r.Namespace, &s, ids)
+	if err != nil {
+		return false, err
+	}
+	ctx = observability.WithBatch(ctx, batch)
 	started := time.Now()
-	observability.Event(ctx, "sql.start", nil, "job_id", r.JobID, "batch_no", batch, "query", "[redacted]")
+	observability.Event(ctx, "sql.start", nil, "job_id", r.JobID, "batch_no", batch, "query", observability.SQLText(r.SQL))
 	result, err := tx.ExecContext(ctx, r.SQL, s.Delta, ids)
 	var changed int64
 	if err == nil {
 		changed, err = result.RowsAffected()
 	}
-	observability.SQL(ctx, r.SQL, 2, changed, started, err)
+	observability.SQL(ctx, r.SQL, 2, changed, started, err, s.Delta, ids)
 	if err != nil {
 		return false, err
 	}
@@ -312,6 +317,9 @@ func batchTransaction(ctx context.Context, conn *sql.Conn, a adapters.Adapter, r
 		return false, err
 	}
 	if err = h.Guard(ctx); err != nil {
+		return false, err
+	}
+	if err = refreshBatchVersions(ctx, tx, a, versions); err != nil {
 		return false, err
 	}
 	if err = observability.Commit(ctx, tx.Commit); err != nil {

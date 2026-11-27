@@ -55,6 +55,10 @@ func rollbackCompletedBatch(ctx context.Context, conn *sql.Conn, a adapters.Adap
 	if err = h.Guard(ctx); err != nil {
 		return out, err
 	}
+	versions, err := captureBatchVersions(ctx, tx, a, r.Namespace, &spec, nil)
+	if err != nil {
+		return out, err
+	}
 	started := time.Now()
 	var changed int64
 	err = observability.WrapSQL(tx).QueryRowContext(ctx, `SELECT _schakker.execute_batch_down($1,$2,ARRAY(SELECT row_id FROM _schakker.batch_undo WHERE namespace=$3 AND job_id=$4 AND batch_no IS NOT NULL ORDER BY row_id))`, r.SQL, spec.Delta, r.Namespace, r.OriginalJobID).Scan(&changed)
@@ -80,6 +84,9 @@ func rollbackCompletedBatch(ctx context.Context, conn *sql.Conn, a adapters.Adap
 		return out, err
 	}
 	if err = writeJobReceipt(ctx, tx, r, &out); err != nil {
+		return out, err
+	}
+	if err = refreshBatchVersions(ctx, tx, a, versions); err != nil {
 		return out, err
 	}
 	if err = observability.Commit(ctx, tx.Commit); err != nil {

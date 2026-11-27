@@ -103,6 +103,10 @@ func RunJob(ctx context.Context, db *sql.DB, adapter adapters.Adapter, r engines
 			observability.Event(ctx, event, rollbackErr, "job_id", r.JobID)
 		}
 	}()
+	versions, err := captureBatchVersions(ctx, tx, adapter, r.Namespace, nil, nil)
+	if err != nil {
+		return out, err
+	}
 	s := &session{tx: tx}
 	if err = s.prepare(ctx); err != nil {
 		return out, err
@@ -113,7 +117,7 @@ func RunJob(ctx context.Context, db *sql.DB, adapter adapters.Adapter, r engines
 		}
 		queryCtx, querySpan := observability.Start(ctx, "migration.query")
 		started := time.Now()
-		observability.Event(queryCtx, "sql.start", nil, "job_id", r.JobID, "query", "[redacted]")
+		observability.Event(queryCtx, "sql.start", nil, "job_id", r.JobID, "query", observability.SQLText(statement.SQL))
 		err = s.execute(queryCtx, statement)
 		observability.SQL(queryCtx, statement.SQL, 0, s.lastRows, started, err)
 		querySpan.End()
@@ -143,6 +147,9 @@ func RunJob(ctx context.Context, db *sql.DB, adapter adapters.Adapter, r engines
 	var confirmed engines.JobReceipt
 	if found, err = ReadJobReceipt(ctx, tx, r, &confirmed); err != nil || !found || confirmed.Proof() != out.Proof() {
 		return out, engines.ErrProtectedMetadata
+	}
+	if err = refreshBatchVersions(ctx, tx, adapter, versions); err != nil {
+		return out, err
 	}
 	if err = observability.Commit(ctx, tx.Commit); err != nil {
 		return out, engines.ErrJobUncertain

@@ -110,3 +110,9 @@ Build frontend terpisah memakai `npm run build:user` / `npm run build:admin`. Un
 Executable server berada di `src/apps/user/cmd/server` dan `src/apps/admin/cmd/server`; worker di `src/apps/user/cmd/worker`. Launcher mengatur direktori kerja ke root aplikasi agar frontend dan path relatif tetap ditemukan. Perintah provisioning development berada di [devserver](src/tools/cmd/devserver/main.go). Laporan launcher rutin ada di `src/tests/output/`, yang diabaikan Git.
 
 Execution history mencatat seluruh attempt yang selesai, termasuk gagal; hanya commit terverifikasi yang mengubah active/forward stack. SQL analysis dan visual builder tetap tersedia; draf PostgreSQL disimpan melalui definitions/revisions M2.
+
+Validasi PostgreSQL memakai grammar PostgreSQL tanpa menjalankan SQL atau mewajibkan objeknya sudah ada. SQL up dan down diperiksa saat menyimpan dan mengajukan review. Visual builder mempertahankan posisi perubahan row terhadap perubahan schema; dependency antarperubahan schema yang berurutan tetap diurutkan otomatis.
+
+Job dan execution history mencatat pengguna yang menekan Execute, sementara review tetap menyimpan pengajunya. Rollback batch mempertahankan deteksi perubahan eksternal, termasuk UPDATE tanpa perubahan nilai, sambil mendukung rollback berurutan setelah migration berikutnya mengubah row yang sama. Database metadata platform dan admin ditolak sebagai target Explorer, SQL Viewer maupun migration. Role PostgreSQL target memerlukan izin TEMPORARY pada database target untuk verifikasi row selama transaction migration.
+
+Log SQL menyertakan struktur query, hash SQL asli, jumlah/tipe parameter, durasi dan SQLSTATE. Literal, komentar dan nilai parameter disamarkan. Log worker menyertakan salinan SQL yang disamarkan serta migration/definition, revision, job, execution, attempt dan batch ID jika relevan; salinan SQL asli tetap tersimpan pada execution history.

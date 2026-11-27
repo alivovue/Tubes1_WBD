@@ -27,6 +27,13 @@ UNION ALL SELECT pg_catalog.json_build_array('rule',r.oid,pg_catalog.pg_get_rule
 UNION ALL SELECT pg_catalog.json_build_array('routine',p.oid,pg_catalog.pg_get_functiondef(p.oid))::text FROM pg_catalog.pg_proc p JOIN pg_catalog.pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='_schakker'
 UNION ALL SELECT pg_catalog.json_build_array('type',pg_catalog.to_jsonb(t))::text FROM pg_catalog.pg_type t JOIN pg_catalog.pg_namespace n ON n.oid=t.typnamespace WHERE n.nspname='_schakker'
 UNION ALL SELECT pg_catalog.json_build_array('setting',name,setting)::text FROM pg_catalog.pg_settings
+UNION ALL SELECT pg_catalog.json_build_array('version_relation',pg_catalog.to_jsonb(c))::text FROM pg_catalog.pg_class c WHERE c.oid=to_regclass('pg_temp._schakker')
+UNION ALL SELECT pg_catalog.json_build_array('version_column',pg_catalog.to_jsonb(a))::text FROM pg_catalog.pg_attribute a WHERE a.attrelid=to_regclass('pg_temp._schakker')
+UNION ALL SELECT pg_catalog.json_build_array('version_default',pg_catalog.to_jsonb(d))::text FROM pg_catalog.pg_attrdef d WHERE d.adrelid=to_regclass('pg_temp._schakker')
+UNION ALL SELECT pg_catalog.json_build_array('version_constraint',pg_catalog.to_jsonb(k))::text FROM pg_catalog.pg_constraint k WHERE k.conrelid=to_regclass('pg_temp._schakker')
+UNION ALL SELECT pg_catalog.json_build_array('version_index',pg_catalog.to_jsonb(i))::text FROM pg_catalog.pg_index i WHERE i.indrelid=to_regclass('pg_temp._schakker')
+UNION ALL SELECT pg_catalog.json_build_array('version_trigger',pg_catalog.to_jsonb(t),pg_catalog.pg_get_functiondef(t.tgfoid))::text FROM pg_catalog.pg_trigger t WHERE t.tgrelid=to_regclass('pg_temp._schakker')
+UNION ALL SELECT pg_catalog.json_build_array('version_rule',r.oid,pg_catalog.pg_get_ruledef(r.oid))::text FROM pg_catalog.pg_rewrite r WHERE r.ev_class=to_regclass('pg_temp._schakker')
 ) protected`
 
 func (s *session) captureProtectedMetadata(ctx context.Context) (*protectedMetadata, error) {
@@ -74,6 +81,30 @@ func (s *session) hashJobMetadata(ctx context.Context) (string, error) {
 		for rows.Next() {
 			var raw string
 			if err = rows.Scan(&raw); err != nil {
+				rows.Close()
+				return "", err
+			}
+			hash.Write([]byte(raw))
+			hash.Write([]byte{0})
+		}
+		err = rows.Err()
+		rows.Close()
+		if err != nil {
+			return "", err
+		}
+	}
+	var snapshot bool
+	if err := observability.WrapSQL(s.tx).QueryRowContext(ctx, `SELECT to_regclass('pg_temp._schakker') IS NOT NULL`).Scan(&snapshot); err != nil {
+		return "", err
+	}
+	if snapshot {
+		rows, err := observability.WrapSQL(s.tx).QueryContext(ctx, `SELECT row_to_json(v)::text FROM pg_temp._schakker v ORDER BY namespace,job_id,row_id`)
+		if err != nil {
+			return "", err
+		}
+		for rows.Next() {
+			var raw string
+			if err := rows.Scan(&raw); err != nil {
 				rows.Close()
 				return "", err
 			}

@@ -10,8 +10,11 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"reflect"
 	"strings"
 	"time"
+
+	"schakker_shared/sqltext"
 
 	"go.opentelemetry.io/contrib/bridges/otelslog"
 	"go.opentelemetry.io/otel"
@@ -43,6 +46,11 @@ func WithActor(ctx context.Context, actor, database int64) context.Context {
 }
 
 func Configure(service string, logs, spans io.Writer) (func(context.Context) error, error) {
+	// Compile the embedded grammar before request, startup-check or job lease
+	// deadlines begin. Later SQL validation and redaction reuse this runtime.
+	if err := sqltext.ValidatePostgres("SELECT 1"); err != nil {
+		return nil, err
+	}
 	if logs == nil {
 		logs = os.Stdout
 	}
@@ -215,16 +223,33 @@ func Event(ctx context.Context, event string, err error, fields ...any) {
 	if who, ok := ctx.Value(identityKey{}).(identity); ok {
 		args = append(args, "actor_id", who.actor, "database_id", who.database)
 	}
+	args = append(args, migrationFields(ctx)...)
 	slog.Default().Log(ctx, level, event, append(args, fields...)...)
 }
-func SQL(ctx context.Context, query string, parameters int, rows int64, started time.Time, err error) {
+func SQLText(query string) string { return sqltext.ForLog(query) }
+
+func SQL(ctx context.Context, query string, parameters int, rows int64, started time.Time, err error, values ...any) {
 	hash := sha256.Sum256([]byte(query))
 	state := ""
 	var pg interface{ SQLState() string }
 	if errors.As(err, &pg) {
 		state = pg.SQLState()
 	}
-	Event(ctx, "sql.result", err, "query", "[redacted]", "sql_hash", hex.EncodeToString(hash[:]), "parameter_count", parameters, "parameters", "[redacted]", "affected_rows", rows, "sqlstate", state, "duration_ms", float64(time.Since(started).Microseconds())/1000)
+	parameters = max(0, parameters)
+	types := make([]string, 0, min(parameters, 256))
+	for i := 0; i < min(parameters, 256); i++ {
+		kind := "unknown"
+		if i < len(values) {
+			kind = "null"
+			if value := reflect.TypeOf(values[i]); value != nil {
+				kind = value.String()
+			}
+		}
+		types = append(types, kind)
+	}
+	Event(ctx, "sql.result", err, "query", sqlText(ctx, query), "sql_hash", hex.EncodeToString(hash[:]), "parameter_count", parameters,
+		"parameters", map[string]any{"count": parameters, "types": types, "values": "[redacted]"},
+		"affected_rows", rows, "sqlstate", state, "duration_ms", float64(time.Since(started).Microseconds())/1000)
 }
 
 type Observer struct{}

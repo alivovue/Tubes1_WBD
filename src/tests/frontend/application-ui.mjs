@@ -733,6 +733,7 @@ try {
   };
   let featureSuite = false;
   async function test(name, action) {
+    if (process.env.SCHAKKER_QA_TEST && !name.includes(process.env.SCHAKKER_QA_TEST)) return;
     if (process.env.SCHAKKER_QA_SUITE === "features" && !featureSuite && !name.startsWith("No browser runtime")) return;
     await action();
     results.push({ name, passed: true });
@@ -1307,6 +1308,35 @@ try {
     } finally {
       sessionFixtures.clear();
     }
+  });
+  await test("Expired sessions retry a failed login challenge in both applications", async () => {
+    if (!secondaryServer) {
+      secondaryServer = createServer(serve);
+      await new Promise((done) => secondaryServer.listen(0, "127.0.0.1", done));
+    }
+    const adminOrigin = `http://127.0.0.1:${secondaryServer.address().port}`;
+    try {
+      for (const app of [
+        { origin, admin: false, name: "Recovered user", home: "/dashboard", next: "My Databases" },
+        { origin: adminOrigin, admin: true, name: "Recovered admin", home: "/admin/users", next: "Groups" },
+      ]) {
+        const fixture = { ...app, csrf: "recovery-csrf", loggedIn: true, sessionFailures: 0, rejectLogin: false };
+        sessionFixtures.set(new URL(app.origin).host, fixture);
+        await navigate(app.origin + app.home, app.name);
+        fixture.loggedIn = false;
+        fixture.sessionFailures = 1;
+        await click(app.next);
+        await wait(text("Session unavailable"));
+        assert.equal(await evaluate("document.querySelector('form button[type=submit]').disabled"), true);
+        await click("Retry");
+        await wait("!!document.querySelector('form button[type=submit]') && !document.querySelector('form button[type=submit]').disabled");
+        await field("Username", "demo.leader");
+        await field("Password", "SyntheticPassword123!");
+        await evaluate("document.querySelector('form').requestSubmit()");
+        await wait(text(app.name));
+        assert.equal(fixture.loggedIn, true);
+      }
+    } finally { sessionFixtures.clear(); }
   });
   featureSuite = true;
   await runPaginationChecks({ test, state, requests, definition, makeReview, makeJob, navigate, evaluate, wait, text, click, field, check, viewport });

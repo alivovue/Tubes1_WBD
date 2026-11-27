@@ -11,6 +11,51 @@ func Build(current Snapshot, operations []Operation) (Result, error) {
 	if len(operations) == 0 || len(operations) > 500 {
 		return Result{}, ErrInvalid
 	}
+	result, err := Compare(current, current)
+	if err != nil {
+		return Result{}, err
+	}
+	// Data operations are ordering barriers. Consecutive schema operations can
+	// still be sorted for foreign-key dependencies, but never cross a row change.
+	appendStage := func(ops []Operation) error {
+		stage, err := buildStage(result.Desired, ops)
+		if err != nil {
+			return err
+		}
+		result.Desired = stage.Desired
+		result.Changes = append(result.Changes, stage.Changes...)
+		result.DataChanges = append(result.DataChanges, stage.DataChanges...)
+		result.Statements = append(result.Statements, stage.Statements...)
+		result.Destructive = result.Destructive || stage.Destructive
+		return nil
+	}
+	start := 0
+	for i, op := range operations {
+		if op.Kind != "insert_row" && op.Kind != "update_row" {
+			continue
+		}
+		if start < i {
+			if err := appendStage(operations[start:i]); err != nil {
+				return Result{}, err
+			}
+		}
+		if err := appendStage(operations[i : i+1]); err != nil {
+			return Result{}, err
+		}
+		start = i + 1
+	}
+	if start < len(operations) {
+		if err := appendStage(operations[start:]); err != nil {
+			return Result{}, err
+		}
+	}
+	if len(result.Statements) > 0 {
+		result.SQL = strings.Join(result.Statements, ";\n") + ";"
+	}
+	return result, nil
+}
+
+func buildStage(current Snapshot, operations []Operation) (Result, error) {
 	desired, err := clone(current)
 	if err != nil {
 		return Result{}, err
