@@ -111,7 +111,7 @@ export function LoginPage({
             <Icon name={content.icon} />
           </div>
           <p className="eyebrow">{content.portal}</p>
-          <h2 id="login-title">Welcome back</h2>
+          <h2 id="login-title">Welcome Back</h2>
           {error && <Notice error>{error}</Notice>}
           {!session.CSRF && error && (
             <Button
