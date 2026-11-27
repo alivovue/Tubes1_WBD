@@ -21,6 +21,8 @@ Jalankan `run.bat -Check` atau `bash run.sh --check` untuk memeriksa login, dua 
 ## Struktur repositori
 
 ```text
+.github/
+  workflows/codeql.yml  # CodeQL otomatis di GitHub Actions
 src/
   apps/
     user/               # Backend pengguna, cmd/server, cmd/worker, frontend
@@ -37,7 +39,7 @@ src/
     frontend/
     fixtures/           # Cluster disposable dan sample data target
     k6/
-  tools/                # Devserver, load fixture, CodeQL dan CI templates nonaktif
+  tools/                # Devserver, load fixture, CodeQL dan konfigurasi scan
     launchers/          # Implementasi development dan launcher layanan individual
   ops/
     observability/      # Collector, Loki, Tempo, Prometheus dan Grafana
@@ -49,7 +51,7 @@ package-lock.json
 run.sh / run.bat / run.ps1  # Satu perintah utama untuk seluruh development
 ```
 
-Seluruh kode aplikasi, library, schema, test, tooling dan operasional berada di `src/`. Masing-masing aplikasi memiliki `backend/`, `database/`, `frontend/`, `go.mod` dan `.env.example`. Go dan npm workspace berada di root repositori. Hanya launcher utama `run` untuk setiap platform yang berada di root; implementasi dan launcher layanan individual berada di `src/tools/launchers/`.
+Seluruh kode aplikasi, library, schema, test, tooling dan operasional berada di `src/`. Konfigurasi GitHub Actions berada di `.github/workflows/` agar ditemukan GitHub. Masing-masing aplikasi memiliki `backend/`, `database/`, `frontend/`, `go.mod` dan `.env.example`. Go dan npm workspace berada di root repositori. Hanya launcher utama `run` untuk setiap platform yang berada di root; implementasi dan launcher layanan individual berada di `src/tools/launchers/`.
 
 ## Database tim dan konfigurasi aplikasi
 
@@ -395,4 +397,8 @@ Berikut seluruh **13 temuan baru**, tanpa suppression. ID pada tabel sama dengan
 
 Review run ini memutuskan sembilan false positive dan empat risiko yang diterima pada batas penggunaan tersebut; tidak ada temuan baru yang diputuskan perlu perubahan source. Karena itu tidak ada commit perbaikan atau klaim before/after baru untuk run ini. Semua 13 alert tetap tampak pada SARIF, bersama alasan individual dalam review JSON. Perubahan input, logger, permission atau penggunaan tool sebagai service publik memerlukan review ulang.
 
-SAST dapat dijalankan ulang melalui runner repo dengan `--stage codeql`. [Workflow template](src/tools/ci-templates/workflows/codeql.yml) mempunyai path konfigurasi yang sudah diperbarui, tetapi tetap **nonaktif** di luar `.github/workflows`; bukti ini adalah scan CLI lokal, bukan hosted GitHub Actions. Untuk otomatisasi push/PR, template perlu dipasang pada lokasi workflow GitHub. Tidak ada hasil hosted run yang diklaim.
+[Workflow CodeQL](.github/workflows/codeql.yml) sekarang ditempatkan pada lokasi aktif GitHub Actions. Setelah perubahan ini di-push, workflow berjalan pada push, pull request, jadwal Senin pukul 03:17 UTC, dan trigger manual. Untuk menjalankan manual, setelah workflow berada di default branch, buka **Actions → CodeQL security scanning → Run workflow**. Gunakan advanced setup CodeQL untuk workflow kustom ini; jika default setup sebelumnya aktif, beralih ke advanced setup sesuai [panduan GitHub](https://docs.github.com/en/code-security/how-tos/find-and-fix-code-vulnerabilities/configure-code-scanning/configuring-advanced-setup-for-code-scanning).
+
+Dua job matrix memindai Go melalui manual build seluruh modul, termasuk worker, serta JavaScript/TypeScript tanpa build frontend. Keduanya memakai suite `security-extended` dan [konfigurasi bersama](src/tools/ci-templates/codeql/config.yml). Build Go hanya mengompilasi test; tidak menjalankan fixture database. Hasil dipublikasikan pada **Security → Code scanning**, dan SARIF serta inventaris temuan disimpan selama 30 hari sebagai artifact `codeql-<language>-<commit SHA>` pada halaman run Actions. Setiap job membersihkan `output/codeql/` di workspace runner terlebih dahulu agar artifact tidak memuat bukti lokal yang ikut checkout. Workflow tidak membuat commit atau mengubah proof pada branch secara otomatis.
+
+Inventaris hasil workflow masih memerlukan review manusia untuk dampak, keputusan, alasan dan commit perbaikan bila relevan; script tidak otomatis menganggap temuan baru aman. Bukti pada `output/codeql/` yang tercatat di README ini tetap berasal dari scan CLI lokal tanggal 27 November 2026, pada snapshot source di manifestnya. Hasil hosted baru tersedia setelah workflow benar-benar berjalan di GitHub. SAST lokal tetap dapat dijalankan melalui runner repo dengan `--stage codeql`.

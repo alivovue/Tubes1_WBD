@@ -1,4 +1,4 @@
-# Shared by local scans and the inactive workflow template.
+# Shared by local CLI scans and .github/workflows/codeql.yml.
 name: Schakker Go and React security coverage
 paths:
   - src/apps/user

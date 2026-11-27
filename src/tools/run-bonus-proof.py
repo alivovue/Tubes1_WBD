@@ -161,7 +161,8 @@ def codeql():
         if not matches:
             raise RuntimeError("Source changed after CodeQL extraction; rerun the scan before publishing evidence")
         scans.append({"language": language, "sarif": "output/codeql/" + destination.name, "sha256": hashlib.sha256(destination.read_bytes()).hexdigest(), "findings": sum(len(run.get("results", [])) for run in data["runs"]), "extracted_sources": archived, "archived_source_sha256": archive_hashes, "current_source_matches_archive": matches, "language_source_count": len(analyzed), "expected_language_sources": len(expected), "excluded_language_sources": sorted(expected - analyzed), "execution_successful": all(inv.get("executionSuccessful", True) for run in data["runs"] for inv in run.get("invocations", []))})
-    save(OUTPUT / "codeql/manifest.json", {"generated_at_utc": now(), "query_suite": "security-extended", "fresh_databases": True, "automatic_github_workflow_active": False, "scans": scans})
+    workflow = ".github/workflows/codeql.yml"
+    save(OUTPUT / "codeql/manifest.json", {"generated_at_utc": now(), "query_suite": "security-extended", "fresh_databases": True, "execution": "local CLI", "github_actions_workflow": workflow, "github_actions_workflow_configured": (ROOT / workflow).is_file(), "scans": scans})
     command([sys.executable, "src/tools/codeql-report.py", "output/codeql/go.sarif", "output/codeql/javascript.sarif", "--output", "output/codeql/review.json"], "codeql-inventory")
     report["stages"]["codeql"] = {"status": "scanned; findings require review", "scans": [{k: v for k, v in scan.items() if k not in {"extracted_sources", "archived_source_sha256", "excluded_language_sources"}} for scan in scans]}
 

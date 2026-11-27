@@ -1,0 +1,76 @@
+name: CodeQL security scanning
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 3 * * 1'
+permissions:
+  contents: read
+concurrency:
+  group: codeql-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  analyze:
+    name: Analyze ${{ matrix.language }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      actions: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: go
+            build-mode: manual
+          - language: javascript-typescript
+            build-mode: none
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Prepare fresh scan output
+        # The checkout contains local proof; hosted artifacts must use this run only.
+        shell: bash
+        run: |
+          rm -rf output/codeql
+          mkdir -p output/codeql
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        if: matrix.language == 'go'
+        with:
+          go-version-file: go.work
+          # Keep extraction independent of restored compiler build outputs.
+          cache: false
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+          queries: security-extended
+          config-file: ./src/tools/ci-templates/codeql/config.yml
+      - name: Build every Go workspace module, including the worker
+        if: matrix.language == 'go'
+        shell: bash
+        run: bash src/tools/codeql-build.sh
+      - name: Analyze and publish security findings
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: /language:${{ matrix.language }}
+          output: output/codeql
+          upload: always
+      - name: Generate findings inventory for review
+        if: ${{ always() && !cancelled() && hashFiles('output/codeql/*.sarif') != '' }}
+        shell: bash
+        run: python3 src/tools/codeql-report.py output/codeql/*.sarif --output output/codeql/review.json
+      - name: Save scan evidence
+        uses: actions/upload-artifact@v4
+        if: ${{ always() && !cancelled() }}
+        with:
+          name: codeql-${{ matrix.language }}-${{ github.sha }}
+          path: |
+            output/codeql/*.sarif
+            output/codeql/review.json
+          if-no-files-found: warn
+          retention-days: 30
