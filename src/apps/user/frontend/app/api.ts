@@ -139,6 +139,12 @@ export const migrationsAPI = {
       csrf,
       idempotencyKey: key,
     }),
+  resumeReview: (job: MigrationJob, csrf: string) =>
+    requestResource<ReviewResponse>(`/api${migrationPaths.job(job.job_id)}/resume-reviews`, {
+      method: "POST",
+      body: { expected_generation: job.expected_generation },
+      csrf,
+    }),
   cancelReview: (job: MigrationJob, csrf: string) =>
     requestResource<ReviewResponse>(
       `/api${migrationPaths.job(job.job_id)}/cancel-reviews`,

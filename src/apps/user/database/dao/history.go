@@ -75,8 +75,9 @@ func (d *Store) SetDefinitionVersion(ctx context.Context, id, version int64) err
 }
 func (d *Store) BlockingWorkflowJob(ctx context.Context, database int64, own *string) (bool, error) {
 	var blocked bool
-	err := d.q.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM migration_jobs WHERE database_id=$1
- AND status IN('running','partial','uncertain','reverting','partially_reverted')
+	err := d.q.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM migration_jobs j WHERE database_id=$1
+ AND recovery_job_id IS NULL AND (status IN('running','partial','uncertain','reverting','partially_reverted')
+ OR (status='pending' AND EXISTS(SELECT 1 FROM migration_jobs source WHERE source.recovery_job_id=j.id)))
  AND ($2::uuid IS NULL OR id<>$2::uuid))`, database, own).Scan(&blocked)
 	return blocked, sqldb.Classify(err)
 }

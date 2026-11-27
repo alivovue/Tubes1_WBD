@@ -13,6 +13,7 @@ import (
 	admindao "tubes1_wbd_admin/database/dao"
 
 	"tubes1_wbd/backend"
+	"tubes1_wbd/backend/access"
 	"tubes1_wbd/backend/api"
 	"tubes1_wbd/backend/dbmanagement"
 	"tubes1_wbd/backend/migration"
@@ -393,7 +394,8 @@ func TestFreshCancellationCanReplaceAnInvalidatedReview(t *testing.T) {
 	old = f.approve(t, old)
 	oldJob, err := f.workflow.Enqueue(f.ctx, f.editor, old.ID, "stale-cancel-old")
 	must(t, err)
-	f.user(t, "authority.changed")
+	must(t, f.access.SetGrant(f.ctx, f.admin, f.readers.ID, f.database, access.NoAccess))
+	must(t, f.access.SetGrant(f.ctx, f.admin, f.readers.ID, f.database, access.ViewOnly))
 	r.Execute = nil
 	_, err = r.RunOnce(f.ctx)
 	if err == nil {

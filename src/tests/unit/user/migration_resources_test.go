@@ -63,18 +63,19 @@ func TestDefinitionResourceCapabilitiesReflectPermissionAndImmutableLifecycle(t 
 }
 func TestReviewResourceRequiresAllValidLeadersAndPreservesReadOnlyLeaderDecision(t *testing.T) {
 	for _, tc := range []struct {
-		name                                      string
-		permission                                dao.Permission
-		state                                     string
-		blocked, invalid, missingDecision, queued bool
-		action                                    string
-		enqueue, resubmit, decide                 bool
+		name                                              string
+		permission                                        dao.Permission
+		state                                             string
+		blocked, invalid, missingDecision, queued, resume bool
+		action                                            string
+		enqueue, resubmit, decide                         bool
 	}{
 		{name: "approved", permission: dao.ViewEdit, state: "approved", enqueue: true},
 		{name: "reader leader", permission: dao.ViewOnly, state: "pending_review", missingDecision: true, decide: true},
 		{name: "invalid leader", permission: dao.ViewEdit, state: "approved", invalid: true},
 		{name: "missing decision", permission: dao.ViewEdit, state: "approved", missingDecision: true},
 		{name: "blocked", permission: dao.ViewEdit, state: "approved", blocked: true},
+		{name: "resume", permission: dao.ViewEdit, state: "approved", blocked: true, resume: true, enqueue: true},
 		{name: "cancellation", permission: dao.ViewEdit, state: "approved", blocked: true, action: "batch_cancel", enqueue: true},
 		{name: "already queued", permission: dao.ViewEdit, state: "approved", queued: true},
 		{name: "rejected", permission: dao.ViewEdit, state: "rejected", resubmit: true},
@@ -85,6 +86,10 @@ func TestReviewResourceRequiresAllValidLeadersAndPreservesReadOnlyLeaderDecision
 			r := resourceRevision()
 			stub.append(resourceJSON(t, "migration_revisions", r), resourceActor())
 			review := dao.MigrationReview{ID: 22, RevisionID: r.ID, DatabaseID: 9, Action: "up", State: tc.state, SubmittedBy: 7, AuthorityRevision: 9007199254740993, AuthoritySnapshot: authority.Snapshot{Groups: []authority.Group{{ID: 2, Name: "Auditors", LeaderID: 7, LeaderName: "Editor", Permission: "view_only", Valid: !tc.invalid}}}}
+			if tc.resume {
+				source := "paused-job"
+				review.TargetJobID = &source
+			}
 			if tc.action != "" {
 				review.Action = tc.action
 			}
@@ -138,7 +143,7 @@ func TestJobResourceRetryAndCompensationCapabilitiesUseOwnershipProgressAndPermi
 			j := dao.MigrationJob{ID: "job", ReviewID: 22, ActorID: tc.actor, Operation: "up", Status: tc.status, Attempt: max(1, tc.attempt), MaxAttempts: 3}
 			if tc.reserved {
 				reserved := "cancellation-job"
-				j.CancellationJobID = &reserved
+				j.RecoveryJobID = &reserved
 			}
 			progress := dao.BatchProgress{Batches: 2, Rows: 100, Cursor: "100"}
 			if tc.allReverted {
@@ -147,6 +152,10 @@ func TestJobResourceRetryAndCompensationCapabilitiesUseOwnershipProgressAndPermi
 			body, err := v.Job(j, progress)
 			if err != nil {
 				t.Fatal(err)
+			}
+			resume := tc.permission == dao.ViewEdit && tc.status == "partial" && !tc.reserved && !tc.allReverted && !tc.irreversible
+			if body["can_resume"] != resume {
+				t.Fatalf("wrong fresh approval resume capability: %#v", body)
 			}
 			if body["retryable"] != tc.retry || body["can_cancel"] != tc.cancel || body["operation"] != "up_batch" || body["committed_rows"] != int64(100) {
 				t.Fatalf("wrong job capabilities: %#v", body)

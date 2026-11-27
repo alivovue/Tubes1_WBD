@@ -5,6 +5,7 @@ import (
 	"database/sql"
 
 	"schakker_shared/observability"
+	"schakker_shared/sqltext"
 	"tubes1_wbd/backend/dbmanagement/adapters"
 	"tubes1_wbd/backend/migration/engines"
 )
@@ -21,18 +22,41 @@ func (r batchRelation) available(ctx context.Context, tx *sql.Tx, table string) 
 }
 
 // Keep expectations in the database rather than loading tracked row IDs into Go.
-// Only tuples whose expected version still matches are locked and captured. An
+// Only tuples whose expected version still matches are captured. Ordinary jobs
+// use a repeatable-read snapshot without row locks; concurrent writes to rows
+// they actually change cause a serialization failure instead of being rebased. An
 // external edit, including a no-op update, therefore cannot be legitimized by a
 // later platform migration. The temporary snapshot is protected like receipts.
-func captureBatchVersions(ctx context.Context, tx *sql.Tx, a adapters.Adapter, namespace string, scope *engines.BatchSpec, ids []int64) ([]batchRelation, error) {
+func captureBatchVersions(ctx context.Context, tx *sql.Tx, a adapters.Adapter, namespace string, scope *engines.BatchSpec, ids []int64, sql ...string) ([]batchRelation, error) {
 	q := observability.WrapSQL(tx)
 	if _, err := q.ExecContext(ctx, `CREATE TEMP TABLE _schakker (
  namespace text, job_id uuid, row_id bigint, before_xmin text,
  PRIMARY KEY(namespace,job_id,row_id)) ON COMMIT DROP`); err != nil {
 		return nil, err
 	}
-	rows, err := q.QueryContext(ctx, `SELECT DISTINCT spec->>'schema',spec->>'table',spec->>'key'
- FROM _schakker.batch_jobs WHERE namespace=$1 AND state<>'reverted'`, namespace)
+	query := `SELECT DISTINCT spec->>'schema',spec->>'table',spec->>'key'
+ FROM _schakker.batch_jobs WHERE namespace=$1 AND state<>'reverted'`
+	args := []any{namespace}
+	if scope == nil {
+		var isolation string
+		if err := q.QueryRowContext(ctx, `SHOW transaction_isolation`).Scan(&isolation); err != nil {
+			return nil, err
+		}
+		if isolation != "repeatable read" {
+			return nil, engines.ErrUnsafeSQL
+		}
+		if len(sql) > 0 {
+			oids, all, err := batchSnapshotScope(ctx, tx, a, sql[0])
+			if err != nil {
+				return nil, err
+			}
+			if !all {
+				query += ` AND to_regclass(format('%I.%I',spec->>'schema',spec->>'table'))::bigint=ANY($2::bigint[])`
+				args = append(args, oids)
+			}
+		}
+	}
+	rows, err := q.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +103,10 @@ func captureBatchVersions(ctx context.Context, tx *sql.Tx, a adapters.Adapter, n
 			query += ` AND u.row_id=ANY($5::bigint[])`
 			args = append(args, ids)
 		}
-		if _, err := q.ExecContext(ctx, query+` FOR UPDATE OF t`, args...); err != nil {
+		if scope != nil {
+			query += ` FOR UPDATE OF t`
+		}
+		if _, err := q.ExecContext(ctx, query, args...); err != nil {
 			return nil, err
 		}
 	}
@@ -112,10 +139,64 @@ func refreshBatchVersions(ctx context.Context, tx *sql.Tx, a adapters.Adapter, r
  WHERE u.namespace=v.namespace AND u.job_id=v.job_id AND u.row_id=v.row_id
  AND b.namespace=u.namespace AND b.job_id=u.job_id
  AND b.spec->>'schema'=$1 AND b.spec->>'table'=$2 AND b.spec->>'key'=$3
- AND NOT u.reverted AND u.after_xmin=v.before_xmin`, relation.schema, relation.table, relation.key)
+ AND NOT u.reverted AND u.after_xmin=v.before_xmin AND t.xmin::text<>v.before_xmin`, relation.schema, relation.table, relation.key)
 		if err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// Catalog effects such as triggers, rules, defaults, domains and foreign keys can
+// touch relations absent from the SQL text. Fall back to a nonlocking snapshot
+// for these cases rather than assume a direct table reference is the full scope.
+func batchSnapshotScope(ctx context.Context, tx *sql.Tx, a adapters.Adapter, query string) ([]int64, bool, error) {
+	refs, all, err := sqltext.PostgresRelations(query)
+	if err != nil || all {
+		return nil, all, err
+	}
+	var eventTriggers bool
+	if err := observability.WrapSQL(tx).QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM pg_event_trigger WHERE evtenabled<>'D')`).Scan(&eventTriggers); err != nil {
+		return nil, false, err
+	}
+	if eventTriggers {
+		return nil, true, nil
+	}
+	names := make([]string, 0, len(refs))
+	for _, ref := range refs {
+		parts := []string{ref.Name}
+		if ref.Schema != "" {
+			parts = []string{ref.Schema, ref.Name}
+		}
+		name, err := a.QuoteIdentifier(parts...)
+		if err != nil {
+			return nil, false, err
+		}
+		names = append(names, name)
+	}
+	rows, err := observability.WrapSQL(tx).QueryContext(ctx, `SELECT c.oid::bigint,
+ c.relkind<>'r' OR c.relrowsecurity OR c.relforcerowsecurity
+ OR EXISTS(SELECT 1 FROM pg_trigger WHERE tgrelid=c.oid)
+ OR EXISTS(SELECT 1 FROM pg_rewrite WHERE ev_class=c.oid)
+ OR EXISTS(SELECT 1 FROM pg_inherits WHERE inhrelid=c.oid OR inhparent=c.oid)
+ OR EXISTS(SELECT 1 FROM pg_attrdef WHERE adrelid=c.oid)
+ OR EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid=c.oid AND contype NOT IN('p','u','n'))
+ OR EXISTS(SELECT 1 FROM pg_attribute a JOIN pg_type t ON t.oid=a.atttypid JOIN pg_namespace n ON n.oid=t.typnamespace
+ WHERE a.attrelid=c.oid AND a.attnum>0 AND NOT a.attisdropped AND n.nspname<>'pg_catalog')
+ FROM pg_class c WHERE c.oid=ANY(ARRAY(SELECT to_regclass(name) FROM unnest($1::text[])name))`, names)
+	if err != nil {
+		return nil, false, err
+	}
+	defer rows.Close()
+	oids := []int64{}
+	for rows.Next() {
+		var oid int64
+		var effects bool
+		if err = rows.Scan(&oid, &effects); err != nil {
+			return nil, false, err
+		}
+		oids = append(oids, oid)
+		all = all || effects
+	}
+	return oids, all, rows.Err()
 }

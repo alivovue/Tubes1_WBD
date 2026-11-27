@@ -114,6 +114,11 @@ func runBatch(ctx context.Context, conn *sql.Conn, a adapters.Adapter, r engines
 		if source == "" {
 			return out, adapters.ErrInvalid
 		}
+	} else if r.OriginalJobID != "" {
+		source = r.OriginalJobID
+		if r.SourceActionHash == "" {
+			return out, adapters.ErrInvalid
+		}
 	} else {
 		if err := initBatch(ctx, conn, a, r, h); err != nil {
 			return out, err
@@ -125,7 +130,11 @@ func runBatch(ctx context.Context, conn *sql.Conn, a adapters.Adapter, r engines
 		if err != nil {
 			return out, err
 		}
-		if spec != *r.Batch || (r.Operation != "batch_cancel" && hash != r.ActionHash) {
+		expectedHash := r.ActionHash
+		if r.OriginalJobID != "" {
+			expectedHash = r.SourceActionHash
+		}
+		if spec != *r.Batch || (r.Operation != "batch_cancel" && hash != expectedHash) {
 			return out, engines.ErrJobUncertain
 		}
 		if err = h.Progress(ctx, p); err != nil {
@@ -354,5 +363,5 @@ func BatchRecovery(ctx context.Context, q adapters.Querier, a adapters.Adapter, 
 		return p, "", false, err
 	}
 	fingerprint := engines.SQLDigest(fmt.Sprintf("%s\x00%s\x00%s\x00%d\x00%d\x00%s\x00%d", namespace, job, hash, p.Batches, p.Rows, p.Cursor, p.Total))
-	return p, fingerprint, !completed && !unsafe && p.Batches > 0, nil
+	return p, fingerprint, !completed && !unsafe && p.Batches > 0 && p.State != "completed", nil
 }

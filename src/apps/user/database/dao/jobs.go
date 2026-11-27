@@ -12,25 +12,25 @@ import (
 var ErrJobLeaseLost = errors.New("migration job lease lost")
 
 type MigrationJob struct {
-	ID                string            `json:"job_id"`
-	ExecutionID       string            `json:"execution_id"`
-	ReviewID          int64             `json:"review_id"`
-	DatabaseID        int64             `json:"database_id"`
-	Operation         string            `json:"operation"`
-	Status            string            `json:"status"`
-	ActorID           int64             `json:"requested_by"`
-	Attempt           int               `json:"attempt"`
-	MaxAttempts       int               `json:"max_attempts"`
-	ErrorClass        string            `json:"error_class"`
-	CreatedAt         time.Time         `json:"created_at"`
-	UpdatedAt         time.Time         `json:"updated_at"`
-	NextAttemptAt     time.Time         `json:"next_attempt_at"`
-	LeaseOwner        string            `json:"-"`
-	LeaseUntil        *time.Time        `json:"-"`
-	ActionHash        string            `json:"-"`
-	SQLHash           string            `json:"-"`
-	TraceContext      map[string]string `json:"-"`
-	CancellationJobID *string           `json:"-"`
+	ID            string            `json:"job_id"`
+	ExecutionID   string            `json:"execution_id"`
+	ReviewID      int64             `json:"review_id"`
+	DatabaseID    int64             `json:"database_id"`
+	Operation     string            `json:"operation"`
+	Status        string            `json:"status"`
+	ActorID       int64             `json:"requested_by"`
+	Attempt       int               `json:"attempt"`
+	MaxAttempts   int               `json:"max_attempts"`
+	ErrorClass    string            `json:"error_class"`
+	CreatedAt     time.Time         `json:"created_at"`
+	UpdatedAt     time.Time         `json:"updated_at"`
+	NextAttemptAt time.Time         `json:"next_attempt_at"`
+	LeaseOwner    string            `json:"-"`
+	LeaseUntil    *time.Time        `json:"-"`
+	ActionHash    string            `json:"-"`
+	SQLHash       string            `json:"-"`
+	TraceContext  map[string]string `json:"-"`
+	RecoveryJobID *string           `json:"-"`
 }
 type BatchProgress struct {
 	Batches         int64  `json:"committed_batches"`
@@ -74,7 +74,7 @@ func (d *Store) Job(ctx context.Context, id string) (MigrationJob, error) {
 	err := d.workflowOne(ctx, &j, `SELECT row_to_json(x) FROM (SELECT j.*,j.id AS job_id FROM migration_jobs j WHERE id=$1) x`, id)
 	if err == nil {
 		var raw []byte
-		err = d.q.QueryRowContext(ctx, `SELECT COALESCE(lease_owner,''),lease_until,action_hash,sql_hash,trace_context,cancellation_job_id::text FROM migration_jobs WHERE id=$1`, id).Scan(&j.LeaseOwner, &j.LeaseUntil, &j.ActionHash, &j.SQLHash, &raw, &j.CancellationJobID)
+		err = d.q.QueryRowContext(ctx, `SELECT COALESCE(lease_owner,''),lease_until,action_hash,sql_hash,trace_context,recovery_job_id::text FROM migration_jobs WHERE id=$1`, id).Scan(&j.LeaseOwner, &j.LeaseUntil, &j.ActionHash, &j.SQLHash, &raw, &j.RecoveryJobID)
 		if err == nil {
 			err = json.Unmarshal(raw, &j.TraceContext)
 		}
@@ -94,12 +94,12 @@ func (d *Store) InsertJob(ctx context.Context, review, database, actor int64, op
 	err = q.QueryRowContext(ctx, `INSERT INTO migration_jobs(review_id,database_id,requested_by,operation,idempotency_key,action_hash,sql_hash,trace_context) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`, review, database, actor, operation, key, actionHash, sqlHash, string(raw)).Scan(&id)
 	return id, sqldb.Classify(err)
 }
-func (d *Store) ReserveCancellation(ctx context.Context, original, cancelJob string) error {
+func (d *Store) ReserveRecovery(ctx context.Context, original, recoveryJob string) error {
 	if !d.inTx {
 		return ErrInvalid
 	}
 	var previous *string
-	err := d.q.QueryRowContext(ctx, `SELECT cancellation_job_id::text FROM migration_jobs WHERE id=$1 AND status IN('partial','uncertain','partially_reverted') AND lease_owner IS NULL FOR UPDATE`, original).Scan(&previous)
+	err := d.q.QueryRowContext(ctx, `SELECT recovery_job_id::text FROM migration_jobs WHERE id=$1 AND status IN('partial','uncertain','partially_reverted') AND lease_owner IS NULL FOR UPDATE`, original).Scan(&previous)
 	if err != nil {
 		if errors.Is(sqldb.Classify(err), ErrNotFound) {
 			return ErrConflict
@@ -122,7 +122,7 @@ func (d *Store) ReserveCancellation(ctx context.Context, original, cancelJob str
 			return err
 		}
 	}
-	return sqldb.Affected(d.q.ExecContext(ctx, `UPDATE migration_jobs SET cancellation_job_id=$2 WHERE id=$1`, original, cancelJob))
+	return sqldb.Affected(d.q.ExecContext(ctx, `UPDATE migration_jobs SET recovery_job_id=$2 WHERE id=$1`, original, recoveryJob))
 }
 func (d *Store) ClaimJob(ctx context.Context, owner string, lease time.Duration) (out MigrationJob, err error) {
 	if owner == "" || lease < 3*time.Second {
@@ -133,13 +133,15 @@ func (d *Store) ClaimJob(ctx context.Context, owner string, lease time.Duration)
 		err := tx.q.QueryRowContext(ctx, `SELECT j.id FROM migration_jobs j WHERE
  (((j.status='pending' OR (j.status IN('partial','partially_reverted') AND j.error_class='temporary_failure')) AND j.next_attempt_at<=clock_timestamp() AND (j.attempt<j.max_attempts OR j.error_class='reconcile_only'))
  OR (j.status IN('running','reverting') AND j.lease_until<clock_timestamp()))
- AND j.cancellation_job_id IS NULL
+ AND j.recovery_job_id IS NULL
  AND NOT EXISTS(SELECT 1 FROM migration_jobs b WHERE b.database_id=j.database_id AND b.id<>j.id
- AND b.status IN('running','reverting','partial','uncertain','partially_reverted')
- AND NOT(j.operation='batch_cancel' AND b.cancellation_job_id=j.id)
+ AND b.recovery_job_id IS NULL
+ AND (b.status IN('running','reverting','partial','uncertain','partially_reverted')
+ OR (b.status='pending' AND EXISTS(SELECT 1 FROM migration_jobs source WHERE source.recovery_job_id=b.id)))
  AND (b.status NOT IN('running','reverting') OR b.lease_until>=clock_timestamp() OR (b.created_at,b.id)<(j.created_at,j.id)))
- AND NOT EXISTS(SELECT 1 FROM migration_jobs p WHERE p.database_id=j.database_id AND p.status='pending'
- AND (p.created_at,p.id)<(j.created_at,j.id))
+ AND (EXISTS(SELECT 1 FROM migration_jobs source WHERE source.recovery_job_id=j.id)
+ OR NOT EXISTS(SELECT 1 FROM migration_jobs p WHERE p.database_id=j.database_id AND p.status='pending'
+ AND (p.created_at,p.id)<(j.created_at,j.id)))
  ORDER BY j.created_at,j.id FOR UPDATE OF j SKIP LOCKED LIMIT 1`).Scan(&id)
 		if err != nil {
 			return sqldb.Classify(err)
@@ -227,8 +229,23 @@ func (d *Store) FinishJob(ctx context.Context, j MigrationJob, status, errorClas
 			outcome = "partial"
 		}
 		_, err = tx.q.ExecContext(ctx, `UPDATE migration_job_attempts SET finished_at=clock_timestamp(),outcome=$3,error_class=$4 WHERE job_id=$1 AND attempt_no=$2`, j.ID, j.Attempt, outcome, errorClass)
-		if err == nil && status == "reverted" {
-			_, err = tx.q.ExecContext(ctx, `UPDATE migration_jobs SET status='reverted',updated_at=clock_timestamp() WHERE cancellation_job_id=$1`, j.ID)
+		if err == nil && (status == "reverted" || status == "succeeded") {
+			_, err = tx.q.ExecContext(ctx, `WITH RECURSIVE parents AS (
+    SELECT id,ARRAY[id] AS path FROM migration_jobs WHERE recovery_job_id=$1
+    UNION ALL SELECT p.id,c.path||p.id FROM migration_jobs p JOIN parents c ON p.recovery_job_id=c.id
+    WHERE NOT p.id=ANY(c.path) AND cardinality(c.path)<128
+   ) UPDATE migration_jobs SET status=$2,error_class='',updated_at=clock_timestamp()
+   WHERE id IN(SELECT id FROM parents) AND status IN('partial','uncertain','partially_reverted')`, j.ID, status)
+			if err == nil {
+				_, err = tx.q.ExecContext(ctx, `WITH RECURSIVE parents AS (
+    SELECT id,ARRAY[id] AS path FROM migration_jobs WHERE recovery_job_id=$1
+    UNION ALL SELECT p.id,c.path||p.id FROM migration_jobs p JOIN parents c ON p.recovery_job_id=c.id
+    WHERE NOT p.id=ANY(c.path) AND cardinality(c.path)<128
+   ) UPDATE migration_batch_progress p SET committed_batches=c.committed_batches,committed_rows=c.committed_rows,
+   reverted_batches=c.reverted_batches,reverted_rows=c.reverted_rows,last_cursor=c.last_cursor,
+   total_rows_estimate=c.total_rows_estimate,partial_state=c.partial_state,updated_at=clock_timestamp()
+   FROM migration_batch_progress c WHERE c.job_id=$1 AND p.job_id IN(SELECT id FROM parents)`, j.ID)
+			}
 		}
 		return sqldb.Classify(err)
 	})
@@ -242,9 +259,28 @@ func (d *Store) RetryJob(ctx context.Context, id string, recoveryActor ...int64)
 	if actor > 0 {
 		class = "reconcile_only"
 	}
-	err := sqldb.Affected(d.q.ExecContext(ctx, `UPDATE migration_jobs SET status='pending',error_class=$2,trace_context=CASE WHEN $3::bigint>0 THEN trace_context||jsonb_build_object('recovery_actor_id',$3::text) ELSE trace_context-'recovery_actor_id' END,next_attempt_at=clock_timestamp(),updated_at=clock_timestamp() WHERE id=$1 AND status IN('failed','partial','uncertain','partially_reverted') AND (attempt<max_attempts OR (status='uncertain' AND $2='reconcile_only')) AND cancellation_job_id IS NULL AND lease_owner IS NULL`, id, class, actor))
+	err := sqldb.Affected(d.q.ExecContext(ctx, `UPDATE migration_jobs SET status='pending',error_class=$2,trace_context=CASE WHEN $3::bigint>0 THEN trace_context||jsonb_build_object('recovery_actor_id',$3::text) ELSE trace_context-'recovery_actor_id' END,next_attempt_at=clock_timestamp(),updated_at=clock_timestamp() WHERE id=$1 AND status IN('failed','partial','uncertain','partially_reverted') AND (attempt<max_attempts OR (status='uncertain' AND $2='reconcile_only')) AND recovery_job_id IS NULL AND lease_owner IS NULL`, id, class, actor))
 	if errors.Is(err, ErrNotFound) {
 		return ErrConflict
 	}
 	return err
+}
+
+// BatchOrigin follows immutable review targets to the original scope/checkpoint.
+// A fresh approval gets a new job/attempt identity, never a fresh row scope.
+func (d *Store) BatchOrigin(ctx context.Context, id string) (MigrationJob, error) {
+	var root string
+	err := d.q.QueryRowContext(ctx, `WITH RECURSIVE chain AS (
+ SELECT j.id,j.review_id,j.database_id,j.operation,ARRAY[j.id] AS path FROM migration_jobs j WHERE j.id=$1
+ UNION ALL SELECT p.id,p.review_id,p.database_id,p.operation,c.path||p.id FROM chain c
+ JOIN migration_reviews r ON r.id=c.review_id JOIN migration_jobs p ON p.id=r.target_job_id
+ JOIN migration_reviews pr ON pr.id=p.review_id
+ WHERE c.operation IN('up','forward') AND p.operation=c.operation AND p.database_id=c.database_id
+ AND pr.revision_id=r.revision_id AND NOT p.id=ANY(c.path) AND cardinality(c.path)<128
+ ) SELECT c.id FROM chain c JOIN migration_reviews r ON r.id=c.review_id
+ WHERE r.target_job_id IS NULL AND c.operation IN('up','forward')`, id).Scan(&root)
+	if err != nil {
+		return MigrationJob{}, sqldb.Classify(err)
+	}
+	return d.Job(ctx, root)
 }

@@ -28,7 +28,7 @@ func (s *Service) Options(recovery migration.RecoveryProvider) migration.Workflo
 func (s *Service) Enqueue(ctx context.Context, tx *dao.Store, plan migration.ApprovedPlan, key string) (string, error) {
 	ctx, span := observability.Start(ctx, "queue.publish")
 	defer span.End()
-	if plan.SQLHash != migration.SQLHash(plan.SQL) || plan.ActionHash == "" {
+	if plan.SQLHash != migration.SQLHash(plan.SQL) || plan.ActionHash == "" || (plan.Operation == "batch_cancel" && plan.TargetJobID == nil) {
 		return "", dao.ErrInvalid
 	}
 	revision, err := tx.Revision(ctx, plan.RevisionID)
@@ -39,11 +39,8 @@ func (s *Service) Enqueue(ctx context.Context, tx *dao.Store, plan migration.App
 		return "", err
 	}
 	id, err := tx.InsertJob(ctx, plan.ReviewID, plan.DatabaseID, plan.ActorID, plan.Operation, key, plan.ActionHash, plan.SQLHash, observability.Inject(ctx))
-	if err == nil && plan.Operation == "batch_cancel" {
-		if plan.TargetJobID == nil {
-			return "", dao.ErrInvalid
-		}
-		err = tx.ReserveCancellation(ctx, *plan.TargetJobID, id)
+	if err == nil && plan.TargetJobID != nil {
+		err = tx.ReserveRecovery(ctx, *plan.TargetJobID, id)
 	}
 	observability.Event(ctx, "queue.published", err, "job_id", id, "review_id", plan.ReviewID, "actor_id", plan.ActorID, "database_id", plan.DatabaseID)
 	return id, err

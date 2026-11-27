@@ -101,7 +101,7 @@ Integration test backend menjalankan PostgreSQL disposable (perlu `initdb`, `pg_
 | Explorer dan SQL Viewer | Adapter/parser/query builder, display response; frontend results/API | PostgreSQL/MariaDB reads, validation, pagination/sorting; browser explorer/filters/results |
 | Visual migration, schema diff dan query plan | Diff/SQL generation/plan parsers; frontend query-plan states | Non-executing analysis API; browser operation builder/diff/tree/clipboard |
 | Draft, immutable revision dan approval | Definition validation/hash; frontend API/recovery payloads | Workflow/resources/concurrent approvals; browser draft/review capability checks |
-| Queue, worker, batch, retry dan compensation | Queue guards/backoff/worker outcomes; frontend batch SQL/progress | Real worker loop, leases/checkpoints/recovery; browser polling/retry/cancel |
+| Queue, worker, batch, retry dan compensation | Queue guards/backoff/worker outcomes; frontend batch SQL/progress | Real worker loop, leases/checkpoints/recovery; browser polling/retry/resume/cancel |
 | Execution history, rollback dan forward | Schema dependencies; frontend history/status/recovery | Attempt history, committed ledger, rollback/forward; browser execution selection |
 | Startup, schemas dan observability | Config/startup/metrics/tracing | Schema/role provisioning dan startup checks; durable queue → worker trace correlation dan SQL redaction |
 
@@ -114,5 +114,11 @@ Execution history mencatat seluruh attempt yang selesai, termasuk gagal; hanya c
 Validasi PostgreSQL memakai grammar PostgreSQL tanpa menjalankan SQL atau mewajibkan objeknya sudah ada. SQL up dan down diperiksa saat menyimpan dan mengajukan review. Visual builder mempertahankan posisi perubahan row terhadap perubahan schema; dependency antarperubahan schema yang berurutan tetap diurutkan otomatis.
 
 Job dan execution history mencatat pengguna yang menekan Execute, sementara review tetap menyimpan pengajunya. Rollback batch mempertahankan deteksi perubahan eksternal, termasuk UPDATE tanpa perubahan nilai, sambil mendukung rollback berurutan setelah migration berikutnya mengubah row yang sama. Database metadata platform dan admin ditolak sebagai target Explorer, SQL Viewer maupun migration. Role PostgreSQL target memerlukan izin TEMPORARY pada database target untuk verifikasi row selama transaction migration.
+
+Approval mengikuti perubahan authority pada database yang dituju. Pembuatan akun atau perubahan permission pada database lain tidak membatalkan approval. Perubahan leader, membership atau permission yang relevan tetap membatalkannya, termasuk perubahan yang kemudian dikembalikan ke nilai semula.
+
+Untuk batch berstatus partial yang memerlukan approval baru, buka Jobs dan pilih **Request fresh approval to resume**. Semua leader yang diwajibkan saat ini harus menyetujui review baru sebelum job baru dapat diantrekan. Resume memakai scope row dan checkpoint asli, mempertahankan riwayat attempt sebelumnya, dan mencatat pengguna yang mengeksekusi resume. Batch yang sudah mulai dikompensasi tidak dapat dilanjutkan melalui resume.
+
+Statement timeout koneksi worker mengikuti sisa deadline job, terpisah dari timeout SQL Viewer. Migration biasa memakai transaction repeatable read dan snapshot versi row tanpa row lock; scope dipersempit ke tabel yang dirujuk bila aman. SQL dengan efek tidak langsung memakai snapshot konservatif. Perubahan eksternal yang bersamaan tetap menyebabkan konflik atau penolakan rollback.
 
 Log SQL menyertakan struktur query, hash SQL asli, jumlah/tipe parameter, durasi dan SQLSTATE. Literal, komentar dan nilai parameter disamarkan. Log worker menyertakan salinan SQL yang disamarkan serta migration/definition, revision, job, execution, attempt dan batch ID jika relevan; salinan SQL asli tetap tersimpan pada execution history.

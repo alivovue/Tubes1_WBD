@@ -58,13 +58,19 @@ func (r Recovery) CancellationSourceFor(ctx context.Context, actor int64, id str
 	if err != nil {
 		return source, err
 	}
-	progress, fingerprint, safe, err := pgengine.BatchRecovery(ctx, target.DB, target.Adapter, namespace, id)
+	origin, err := r.Store.BatchOrigin(ctx, id)
+	if err != nil {
+		return source, err
+	}
+	progress, fingerprint, safe, err := pgengine.BatchRecovery(ctx, target.DB, target.Adapter, namespace, origin.ID)
 	if err != nil {
 		return source, err
 	}
 	source.Fingerprint = fingerprint
 	source.PartiallyCommitted = progress.Batches > 0
 	source.SafeCompensation = safe
+	// The last data batch may have committed before the completion receipt.
+	source.CanResume = j.Status == "partial" && progress.RevertedBatches == 0 && progress.Rows <= progress.Total && progress.State == "running"
 	return source, nil
 }
 

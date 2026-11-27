@@ -18,7 +18,7 @@ func ValidateSchema(ctx context.Context, db *sql.DB) error {
 	if err := rows.Close(); err != nil {
 		return err
 	}
-	workflow, err := db.QueryContext(ctx, `SELECT g.leader_user_id,c.revision FROM access_groups g CROSS JOIN migration_authority_clock c LIMIT 0`)
+	workflow, err := db.QueryContext(ctx, `SELECT g.leader_user_id,c.database_id,c.revision FROM access_groups g CROSS JOIN migration_authority_clock c LIMIT 0`)
 	if err != nil {
 		return errors.New("admin database schema is incomplete; provision the current schema outside the application")
 	}

@@ -62,7 +62,11 @@ func TestQueueRejectsMalformedIdentifiersAndUnsignedWorkBeforeStorage(t *testing
 			t.Fatalf("invalid job identifier %q: %v", id, err)
 		}
 	}
-	for _, plan := range []migration.ApprovedPlan{{SQL: "SELECT 1", SQLHash: "tampered", ActionHash: "approved"}, {SQL: "SELECT 1", SQLHash: migration.SQLHash("SELECT 1")}} {
+	for _, plan := range []migration.ApprovedPlan{
+		{SQL: "SELECT 1", SQLHash: "tampered", ActionHash: "approved"},
+		{SQL: "SELECT 1", SQLHash: migration.SQLHash("SELECT 1")},
+		{SQL: "SELECT 1", SQLHash: migration.SQLHash("SELECT 1"), ActionHash: "approved", Operation: "batch_cancel"},
+	} {
 		_, err := s.Enqueue(context.Background(), nil, plan, "key")
 		if !errors.Is(err, dao.ErrInvalid) {
 			t.Fatalf("unsigned work reached storage: %v", err)

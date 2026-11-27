@@ -38,7 +38,7 @@ type JobProgress struct {
 type JobRequest struct {
 	DefinitionID, RevisionID, Revision                                          int64
 	JobID, ExecutionID, Namespace, Operation, SQL, DownSQL, SQLHash, ActionHash string
-	OriginalJobID                                                               string
+	OriginalJobID, SourceActionHash                                             string
 	Batch                                                                       *BatchSpec
 }
 type JobReceipt struct {

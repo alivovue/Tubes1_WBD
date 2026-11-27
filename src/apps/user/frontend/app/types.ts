@@ -241,6 +241,7 @@ export type MigrationReview = {
   action: MigrationAction;
   target_execution_id: string | null;
   target_job_id: string | null;
+  resumes_job_id?: string | null;
   status: ReviewStatus;
   requested_by: string;
   requested_at: string;
@@ -282,6 +283,9 @@ export type MigrationJob = {
   last_cursor: string | null;
   retryable: boolean;
   can_cancel: boolean;
+  can_resume?: boolean;
+  resumes_job_id?: string | null;
+  recovery_job_id?: string | null;
   blocked_reason: string | null;
   error: string | null;
 };

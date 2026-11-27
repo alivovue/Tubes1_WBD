@@ -137,6 +137,11 @@ function JobDetail({ id, reloadList }: { id: string; reloadList: () => void }) {
         migrationURL("reviews", data.Database.ID, { review: result.review.id }),
       );
   }
+  async function requestResume() {
+    if (!job) return;
+    const result = await action.run((csrf) => migrationsAPI.resumeReview(job, csrf));
+    if (result) navigate(migrationURL("reviews", data.Database.ID, { review: result.review.id }));
+  }
   return (
     <Panel title="Job details" text={id}>
       <div className="integration-form">
@@ -191,6 +196,12 @@ function JobDetail({ id, reloadList }: { id: string; reloadList: () => void }) {
             job.committed_batches > 0 ? (
               <BatchProgress job={job} />
             ) : null}
+            {job.resumes_job_id && <Notice>
+              Continues job {job.resumes_job_id} from its saved checkpoint and original row scope.
+            </Notice>}
+            {job.recovery_job_id && <Link to={migrationURL("jobs", data.Database.ID, { job: job.recovery_job_id })}>
+              View recovery job
+            </Link>}
             {job.error && <Notice error>{job.error}</Notice>}
             {job.blocked_reason && (
               <Notice error>Database blocked: {job.blocked_reason}</Notice>
@@ -222,6 +233,16 @@ function JobDetail({ id, reloadList }: { id: string; reloadList: () => void }) {
                 </Button>
               )}
             </div>
+            {data.CanEdit && job.can_resume && <div className="migration-decision form-stack">
+              <Notice>
+                If approvals or leaders changed, request a fresh review to resume this job.
+                Every current group leader must approve the unchanged SQL. The worker continues
+                only the uncommitted batches using the original row scope.
+              </Notice>
+              <Button secondary onClick={requestResume} disabled={action.busy || !!resource.error || !!job.blocked_reason}>
+                Request fresh approval to resume
+              </Button>
+            </div>}
             {data.CanEdit && job.can_cancel && (
               <div className="migration-decision form-stack">
                 <Notice>

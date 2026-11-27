@@ -15,7 +15,7 @@ import (
 type JobsHandler struct{ Jobs *queue.Service }
 
 func IsJobRoute(path string) bool {
-	return path == "/migration-jobs" || strings.HasPrefix(path, "/migration-jobs/") && !strings.HasSuffix(path, "/cancel-reviews")
+	return path == "/migration-jobs" || strings.HasPrefix(path, "/migration-jobs/") && !strings.HasSuffix(path, "/cancel-reviews") && !strings.HasSuffix(path, "/resume-reviews")
 }
 func (h JobsHandler) Serve(w http.ResponseWriter, r *http.Request, actor int64) {
 	if h.Jobs == nil {

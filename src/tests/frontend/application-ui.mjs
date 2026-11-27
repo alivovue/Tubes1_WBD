@@ -909,6 +909,34 @@ try {
     await delay(2300);
     assert.equal(jobReads.length, count);
   });
+  await test("Partial jobs can request fresh approvals to resume the original checkpoint", async () => {
+    const previous = { jobs: state.jobs, reviews: state.reviews, respond: state.respond, permission: state.permission };
+    try {
+      const job = { ...makeJob(), status: "partial", committed_batches: 1, committed_rows: 2,
+        total_rows: 6, retryable: false, can_resume: true, expected_generation: 4 };
+      state.jobs = [job];
+      state.respond = (req, url) => {
+        if (req.method === "POST" && url.pathname.endsWith("/resume-reviews")) {
+          const review = { ...makeReview(81, definition), target_job_id: job.job_id, resumes_job_id: job.job_id };
+          state.reviews = [review];
+          return { status: 201, body: { review } };
+        }
+      };
+      await navigate(`/migrations?db=7&view=jobs&job=${job.job_id}`, "Request fresh approval to resume");
+      const start = requests.length;
+      await click("Request fresh approval to resume");
+      await wait("new URLSearchParams(location.search).get('review') === '81'");
+      await wait(text(`Resume job ${job.job_id} from its saved checkpoint`));
+      const request = requests.slice(start).find(item => item.path.endsWith("/resume-reviews"));
+      assert(request, "fresh resume review request missing");
+      assert.deepEqual(request.body, { expected_generation: 4 });
+      assert.equal(await evaluate(text("Queue approved migration")), false);
+      assert.equal(requests.slice(start).some(item => item.method === "POST" && item.path.endsWith("/retry")), false);
+      state.permission = "view_only";
+      await navigate(`/migrations?db=7&view=jobs&job=${job.job_id}`, "Job details");
+      assert.equal(await evaluate(text("Request fresh approval to resume")), false);
+    } finally { Object.assign(state, previous); }
+  });
   await test("Batch cancellation requests a fresh review", async () => {
     Object.assign(state.jobs[0], { status: "partial", can_cancel: true });
     await navigate(

@@ -163,7 +163,7 @@ func (r *Runner) RunOnce(ctx context.Context) (claimed bool, err error) {
 			}
 			connectionActor = value
 		}
-		target, err := r.Databases.OpenMigrationTarget(ctx, connectionActor, j.DatabaseID)
+		target, err := r.Databases.OpenWorkerTarget(ctx, connectionActor, j.DatabaseID)
 		if err != nil {
 			return err
 		}
@@ -269,7 +269,11 @@ func loadRequest(ctx context.Context, store *dao.Store, j dao.MigrationJob) (eng
 	out := engines.JobRequest{Namespace: namespace, JobID: j.ID, ExecutionID: j.ExecutionID, Operation: j.Operation, SQL: sql, DownSQL: revision.DownSQL, SQLHash: j.SQLHash, ActionHash: j.ActionHash, Batch: batch}
 	out.DefinitionID, out.RevisionID, out.Revision = revision.DefinitionID, revision.ID, revision.RevisionNo
 	if review.TargetJobID != nil {
-		out.OriginalJobID = *review.TargetJobID
+		original, err := store.BatchOrigin(ctx, *review.TargetJobID)
+		if err != nil {
+			return out, err
+		}
+		out.OriginalJobID, out.SourceActionHash = original.ID, original.ActionHash
 	}
 	if batch != nil && j.Operation == "rollback" {
 		if review.TargetExecutionID == nil {
@@ -279,7 +283,11 @@ func loadRequest(ctx context.Context, store *dao.Store, j dao.MigrationJob) (eng
 		if err != nil {
 			return out, err
 		}
-		out.OriginalJobID = original.JobID
+		root, err := store.BatchOrigin(ctx, original.JobID)
+		if err != nil {
+			return out, err
+		}
+		out.OriginalJobID = root.ID
 	}
 	return out, nil
 }

@@ -36,7 +36,7 @@ func (w *Workflow) SubmitReview(ctx context.Context, actor int64, in ReviewInput
 	if in.Action != "up" && in.Action != "rollback" && in.Action != "forward" && in.Action != "batch_cancel" {
 		return out, ErrInvalid
 	}
-	if ((in.Action == "rollback" || in.Action == "forward") != (in.TargetExecutionID != nil)) || ((in.Action == "batch_cancel") != (in.TargetJobID != nil)) {
+	if ((in.Action == "rollback" || in.Action == "forward") != (in.TargetExecutionID != nil)) || (in.Action == "batch_cancel" && in.TargetJobID == nil) || (in.Action == "rollback" && in.TargetJobID != nil) {
 		return out, ErrInvalid
 	}
 	if (in.TargetExecutionID != nil && !uuidPattern.MatchString(*in.TargetExecutionID)) || (in.TargetJobID != nil && !uuidPattern.MatchString(*in.TargetJobID)) {
@@ -65,8 +65,14 @@ func (w *Workflow) SubmitReview(ctx context.Context, actor int64, in ReviewInput
 			return ErrWorkflowConflict
 		}
 		r := dao.MigrationReview{RevisionID: revision.ID, DatabaseID: revision.DatabaseID, Action: in.Action, TargetExecutionID: in.TargetExecutionID, TargetJobID: in.TargetJobID, ExpectedGeneration: state.Generation, ExpectedActiveVersion: state.ActiveVersion, AuthorityRevision: snapshot.Revision, AuthoritySnapshot: snapshot, ConnectionFingerprint: snapshot.ConnectionFingerprint, SubmittedBy: actor}
-		if in.Action == "batch_cancel" {
-			source, err := w.cancellation(ctx, tx, r, revision)
+		if in.TargetJobID != nil {
+			var source RecoverySource
+			var err error
+			if in.Action == "batch_cancel" {
+				source, err = w.cancellation(ctx, tx, r, revision)
+			} else {
+				source, err = w.resumption(ctx, tx, r, revision)
+			}
 			if err != nil {
 				return err
 			}

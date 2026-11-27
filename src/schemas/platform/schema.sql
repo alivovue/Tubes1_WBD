@@ -90,7 +90,7 @@ CREATE TABLE public.migration_reviews (
  submitted_by BIGINT NOT NULL REFERENCES public.users(id), submitted_at TIMESTAMPTZ NOT NULL DEFAULT now(),
  queued_job_id UUID UNIQUE, idempotency_key TEXT,
  CHECK((action IN('rollback','forward'))=(target_execution_id IS NOT NULL)),
- CHECK((action='batch_cancel')=(target_job_id IS NOT NULL)),
+ CHECK((action='batch_cancel' AND target_job_id IS NOT NULL) OR (action IN('up','forward')) OR (action='rollback' AND target_job_id IS NULL)),
  CHECK((queued_job_id IS NULL)=(idempotency_key IS NULL))
 );
 CREATE UNIQUE INDEX migration_review_live_action ON public.migration_reviews(revision_id,action,
@@ -125,7 +125,7 @@ CREATE TABLE public.migration_jobs (
  attempt INTEGER NOT NULL DEFAULT 0 CHECK(attempt>=0),
  max_attempts INTEGER NOT NULL DEFAULT 5 CHECK(max_attempts BETWEEN 1 AND 20),
  action_hash TEXT NOT NULL DEFAULT '', sql_hash TEXT NOT NULL DEFAULT '',
- error_class TEXT NOT NULL DEFAULT '', cancellation_job_id UUID,
+ error_class TEXT NOT NULL DEFAULT '', recovery_job_id UUID,
  next_attempt_at TIMESTAMPTZ NOT NULL DEFAULT now(),
  created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
  trace_context JSONB NOT NULL DEFAULT '{}'::jsonb,

@@ -29,10 +29,10 @@ type Dispatcher interface {
 	Enqueue(context.Context, *dao.Store, ApprovedPlan, string) (string, error)
 }
 type RecoverySource struct {
-	JobID                                        string
-	RevisionID, DatabaseID                       int64
-	Fingerprint                                  string
-	Paused, PartiallyCommitted, SafeCompensation bool
+	JobID                                                   string
+	RevisionID, DatabaseID                                  int64
+	Fingerprint                                             string
+	Paused, PartiallyCommitted, SafeCompensation, CanResume bool
 }
 type RecoveryProvider interface {
 	CancellationSource(context.Context, string) (RecoverySource, error)

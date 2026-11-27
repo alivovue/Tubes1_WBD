@@ -113,26 +113,56 @@ CREATE INDEX group_database_permissions_database_id_idx
     ON public.group_database_permissions (database_id);
 
 
+-- Revisions are local to a target database, including changes reverted later.
 CREATE TABLE public.migration_authority_clock (
- singleton BOOLEAN PRIMARY KEY DEFAULT TRUE CHECK(singleton),
+ database_id BIGINT PRIMARY KEY REFERENCES public.managed_databases(id) ON DELETE CASCADE,
  revision BIGINT NOT NULL DEFAULT 1 CHECK(revision>0)
 );
-INSERT INTO public.migration_authority_clock(singleton) VALUES(TRUE);
 CREATE FUNCTION public.advance_migration_authority() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE affected BIGINT[];
 BEGIN
- UPDATE public.migration_authority_clock SET revision=revision+1 WHERE singleton;
+ IF TG_TABLE_NAME='managed_databases' THEN
+  IF TG_OP='UPDATE' AND ROW(OLD.dbms_type,OLD.host,OLD.port,OLD.database_name,OLD.db_username,
+     OLD.encrypted_password,OLD.connection_options,OLD.is_active)
+     IS NOT DISTINCT FROM ROW(NEW.dbms_type,NEW.host,NEW.port,NEW.database_name,NEW.db_username,
+     NEW.encrypted_password,NEW.connection_options,NEW.is_active) THEN RETURN NULL; END IF;
+  affected:=ARRAY[NEW.id];
+ ELSIF TG_TABLE_NAME='group_database_permissions' THEN
+  IF TG_OP='UPDATE' AND ROW(OLD.group_id,OLD.database_id,OLD.access_level)
+     IS NOT DISTINCT FROM ROW(NEW.group_id,NEW.database_id,NEW.access_level) THEN RETURN NULL; END IF;
+  affected:=ARRAY[CASE WHEN TG_OP<>'INSERT' THEN OLD.database_id END,
+                  CASE WHEN TG_OP<>'DELETE' THEN NEW.database_id END];
+ ELSIF TG_TABLE_NAME='access_groups' THEN
+  IF TG_OP='UPDATE' AND ROW(OLD.name,OLD.leader_user_id)
+     IS NOT DISTINCT FROM ROW(NEW.name,NEW.leader_user_id) THEN RETURN NULL; END IF;
+  SELECT array_agg(DISTINCT database_id) INTO affected FROM public.group_database_permissions
+   WHERE group_id IN(CASE WHEN TG_OP<>'INSERT' THEN OLD.id END,CASE WHEN TG_OP<>'DELETE' THEN NEW.id END);
+ ELSIF TG_TABLE_NAME='user_groups' THEN
+  SELECT array_agg(DISTINCT database_id) INTO affected FROM public.group_database_permissions
+   WHERE group_id IN(CASE WHEN TG_OP<>'INSERT' THEN OLD.group_id END,CASE WHEN TG_OP<>'DELETE' THEN NEW.group_id END);
+ ELSIF TG_TABLE_NAME='users' THEN
+  IF OLD.is_active IS NOT DISTINCT FROM NEW.is_active AND OLD.display_name IS NOT DISTINCT FROM NEW.display_name THEN
+   RETURN NULL;
+  END IF;
+  SELECT array_agg(DISTINCT p.database_id) INTO affected FROM public.group_database_permissions p
+   JOIN public.access_groups g ON g.id=p.group_id JOIN public.user_groups m ON m.group_id=g.id
+   WHERE m.user_id=NEW.id AND (OLD.is_active IS DISTINCT FROM NEW.is_active OR g.leader_user_id=NEW.id);
+ END IF;
+ INSERT INTO public.migration_authority_clock(database_id)
+  SELECT DISTINCT id FROM unnest(affected) id WHERE id IS NOT NULL ORDER BY id
+  ON CONFLICT(database_id) DO UPDATE SET revision=public.migration_authority_clock.revision+1;
  RETURN NULL;
 END $$;
 CREATE TRIGGER migration_authority_groups AFTER INSERT OR UPDATE OR DELETE ON public.access_groups
- FOR EACH STATEMENT EXECUTE FUNCTION public.advance_migration_authority();
+ FOR EACH ROW EXECUTE FUNCTION public.advance_migration_authority();
 CREATE TRIGGER migration_authority_memberships AFTER INSERT OR UPDATE OR DELETE ON public.user_groups
- FOR EACH STATEMENT EXECUTE FUNCTION public.advance_migration_authority();
+ FOR EACH ROW EXECUTE FUNCTION public.advance_migration_authority();
 CREATE TRIGGER migration_authority_grants AFTER INSERT OR UPDATE OR DELETE ON public.group_database_permissions
- FOR EACH STATEMENT EXECUTE FUNCTION public.advance_migration_authority();
-CREATE TRIGGER migration_authority_users AFTER INSERT OR UPDATE OR DELETE ON public.users
- FOR EACH STATEMENT EXECUTE FUNCTION public.advance_migration_authority();
-CREATE TRIGGER migration_authority_databases AFTER INSERT OR UPDATE OR DELETE ON public.managed_databases
- FOR EACH STATEMENT EXECUTE FUNCTION public.advance_migration_authority();
+ FOR EACH ROW EXECUTE FUNCTION public.advance_migration_authority();
+CREATE TRIGGER migration_authority_users AFTER UPDATE ON public.users
+ FOR EACH ROW EXECUTE FUNCTION public.advance_migration_authority();
+CREATE TRIGGER migration_authority_databases AFTER INSERT OR UPDATE ON public.managed_databases
+ FOR EACH ROW EXECUTE FUNCTION public.advance_migration_authority();
 CREATE FUNCTION public.check_group_leaders() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
  IF EXISTS (SELECT 1 FROM public.access_groups g JOIN public.users u ON u.id=g.leader_user_id

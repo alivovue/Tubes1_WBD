@@ -16,7 +16,7 @@ import (
 )
 
 func IsWorkflowRoute(path string) bool {
-	return path == "/migration-definitions" || strings.HasPrefix(path, "/migration-definitions/") || path == "/migration-reviews" || strings.HasPrefix(path, "/migration-reviews/") || path == "/migrations/history" || path == "/migrations/activities" || path == "/migrations/state" || strings.HasSuffix(path, "/rollback-reviews") || strings.HasSuffix(path, "/forward-reviews") || strings.HasSuffix(path, "/cancel-reviews")
+	return path == "/migration-definitions" || strings.HasPrefix(path, "/migration-definitions/") || path == "/migration-reviews" || strings.HasPrefix(path, "/migration-reviews/") || path == "/migrations/history" || path == "/migrations/activities" || path == "/migrations/state" || strings.HasSuffix(path, "/rollback-reviews") || strings.HasSuffix(path, "/forward-reviews") || strings.HasSuffix(path, "/cancel-reviews") || strings.HasSuffix(path, "/resume-reviews")
 }
 func decodeWorkflow(w http.ResponseWriter, r *http.Request, out any) error {
 	media, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
@@ -164,6 +164,14 @@ func (h Handler) ServeWorkflow(w http.ResponseWriter, r *http.Request, actor int
 			} else {
 				result, err = workflow.ForwardReview(r.Context(), actor, parts[1], in.ExpectedGeneration)
 			}
+			status = 201
+		}
+	case len(parts) == 3 && parts[0] == "migration-jobs" && parts[2] == "resume-reviews" && r.Method == "POST":
+		var in struct {
+			ExpectedGeneration int64 `json:"expected_generation"`
+		}
+		if err = decodeWorkflow(w, r, &in); err == nil {
+			result, err = workflow.ResumeReview(r.Context(), actor, parts[1], in.ExpectedGeneration)
 			status = 201
 		}
 	case len(parts) == 3 && parts[0] == "migration-jobs" && parts[2] == "cancel-reviews" && r.Method == "POST":

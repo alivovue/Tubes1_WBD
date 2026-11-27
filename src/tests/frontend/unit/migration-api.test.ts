@@ -61,3 +61,10 @@ test("cancellation, rollback, and forward request reviews against exact targets"
   assert.deepEqual(calls[0].body, { revision_id: 8, expected_generation: 4 });
   assert.deepEqual(calls[1].body, { expected_generation: 4 });
 });
+test("fresh resume approval targets the existing job and current generation", async t => {
+  const calls = capture(t);
+  await migrationsAPI.resumeReview({ job_id: "paused/job", expected_generation: 7 } as any, "csrf");
+  assert.equal(calls[0].path, "/api/migration-jobs/paused%2Fjob/resume-reviews");
+  assert.deepEqual(calls[0].body, { expected_generation: 7 });
+  assert.equal(calls[0].headers["X-CSRF-Token"], "csrf");
+});

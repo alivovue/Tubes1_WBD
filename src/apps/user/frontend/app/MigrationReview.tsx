@@ -211,6 +211,10 @@ function ReviewCard({
             cycle.
           </Notice>
         )}
+        {review.resumes_job_id && <Notice>
+          Resume job {review.resumes_job_id} from its saved checkpoint. Committed batches
+          remain applied and will not run again. This review authorizes the original SQL and row scope.
+        </Notice>}
         {review.target_execution_id && (
           <p>Exact target execution: #{review.target_execution_id}</p>
         )}

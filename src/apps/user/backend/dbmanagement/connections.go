@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"strconv"
+	"time"
 
 	"tubes1_wbd/backend/access"
 	"tubes1_wbd/backend/dbmanagement/adapters"
@@ -23,14 +24,18 @@ type Target struct {
 	Adapter adapters.Adapter
 }
 
-func (s *Service) connect(ctx context.Context, in ConnectionInput) (*sql.DB, error) {
+func (s *Service) connect(ctx context.Context, in ConnectionInput, timeout ...time.Duration) (*sql.DB, error) {
+	queryTimeout := s.config.QueryTimeout
+	if len(timeout) > 0 {
+		queryTimeout = timeout[0]
+	}
 	a, err := s.registry.Select(in.DBMS)
 	if err != nil {
 		return nil, err
 	}
-	return a.Connect(ctx, adapters.Connection{Host: in.Host, Port: in.Port, DatabaseName: in.DatabaseName, Username: in.Username, Password: in.Password, SSLMode: in.SSLMode, ConnectTimeout: s.config.ConnectTimeout, QueryTimeout: s.config.QueryTimeout})
+	return a.Connect(ctx, adapters.Connection{Host: in.Host, Port: in.Port, DatabaseName: in.DatabaseName, Username: in.Username, Password: in.Password, SSLMode: in.SSLMode, ConnectTimeout: s.config.ConnectTimeout, QueryTimeout: queryTimeout})
 }
-func (s *Service) open(ctx context.Context, actor, database int64, permission access.Permission) (Target, error) {
+func (s *Service) open(ctx context.Context, actor, database int64, permission access.Permission, timeout ...time.Duration) (Target, error) {
 	if err := s.access.RequirePermission(ctx, actor, database, permission); err != nil {
 		return Target{}, err
 	}
@@ -48,7 +53,7 @@ func (s *Service) open(ctx context.Context, actor, database int64, permission ac
 	if s.config.Production && m.SSLMode != "verify-full" {
 		return Target{}, ErrConnection
 	}
-	db, err := s.connect(ctx, ConnectionInput{DBMS: m.DBMS, Host: m.Host, Port: m.Port, DatabaseName: m.DatabaseName, Username: m.Username, Password: m.Password, SSLMode: m.SSLMode})
+	db, err := s.connect(ctx, ConnectionInput{DBMS: m.DBMS, Host: m.Host, Port: m.Port, DatabaseName: m.DatabaseName, Username: m.Username, Password: m.Password, SSLMode: m.SSLMode}, timeout...)
 	if err != nil {
 		return Target{}, err
 	}
@@ -56,6 +61,20 @@ func (s *Service) open(ctx context.Context, actor, database int64, permission ac
 }
 func (s *Service) OpenMigrationTarget(ctx context.Context, actor, database int64) (Target, error) {
 	return s.open(ctx, actor, database, access.ViewEdit)
+}
+
+// OpenWorkerTarget uses the job deadline; analysis and viewer connections retain
+// their short statement timeout. A canceled worker context still cancels SQL.
+func (s *Service) OpenWorkerTarget(ctx context.Context, actor, database int64) (Target, error) {
+	deadline, ok := ctx.Deadline()
+	if !ok {
+		return Target{}, ErrInvalid
+	}
+	remaining := time.Until(deadline)
+	if remaining <= 0 {
+		return Target{}, context.DeadlineExceeded
+	}
+	return s.open(ctx, actor, database, access.ViewEdit, max(remaining, time.Millisecond))
 }
 func (s *Service) OpenForMigration(ctx context.Context, actor, database int64) (*sql.DB, error) {
 	target, err := s.OpenMigrationTarget(ctx, actor, database)

@@ -38,10 +38,11 @@ func (w *Workflow) cancellation(ctx context.Context, tx *dao.Store, r dao.Migrat
 	return source, nil
 }
 func (w *Workflow) checkAction(ctx context.Context, tx *dao.Store, r dao.MigrationReview, revision dao.MigrationRevision, state dao.MigrationState) error {
+	resume := (r.Action == "up" || r.Action == "forward") && r.TargetJobID != nil
 	if state.BlockedReason != "" && r.Action != "batch_cancel" {
 		return ErrWorkflowConflict
 	}
-	if r.Action != "batch_cancel" {
+	if r.Action != "batch_cancel" && !resume {
 		blocked, err := tx.BlockingWorkflowJob(ctx, r.DatabaseID, r.QueuedJobID)
 		if err != nil {
 			return err
@@ -57,6 +58,22 @@ func (w *Workflow) checkAction(ctx context.Context, tx *dao.Store, r dao.Migrati
 		}
 		if source.Fingerprint != r.RecoveryFingerprint {
 			return errRecoveryScopeChanged
+		}
+	}
+	if resume {
+		if r.QueuedJobID != nil {
+			source, err := tx.Job(ctx, *r.TargetJobID)
+			if err != nil || source.RecoveryJobID == nil || *source.RecoveryJobID != *r.QueuedJobID {
+				return ErrWorkflowConflict
+			}
+		} else {
+			source, err := w.resumption(ctx, tx, r, revision)
+			if err != nil {
+				return err
+			}
+			if source.Fingerprint != r.RecoveryFingerprint {
+				return errRecoveryScopeChanged
+			}
 		}
 	}
 	return w.checkPosition(ctx, tx, r, revision, state)

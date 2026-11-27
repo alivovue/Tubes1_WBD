@@ -58,7 +58,7 @@ func RunJob(ctx context.Context, db *sql.DB, adapter adapters.Adapter, r engines
 		}
 		if exists {
 			source := r.JobID
-			if r.Operation == "batch_cancel" {
+			if r.OriginalJobID != "" {
 				source = r.OriginalJobID
 			}
 			p, _, _, readErr := readBatch(ctx, conn, r.Namespace, source)
@@ -88,7 +88,7 @@ func RunJob(ctx context.Context, db *sql.DB, adapter adapters.Adapter, r engines
 	if err != nil {
 		return out, err
 	}
-	tx, err := conn.BeginTx(ctx, nil)
+	tx, err := conn.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead})
 	if err != nil {
 		return out, err
 	}
@@ -103,7 +103,7 @@ func RunJob(ctx context.Context, db *sql.DB, adapter adapters.Adapter, r engines
 			observability.Event(ctx, event, rollbackErr, "job_id", r.JobID)
 		}
 	}()
-	versions, err := captureBatchVersions(ctx, tx, adapter, r.Namespace, nil, nil)
+	versions, err := captureBatchVersions(ctx, tx, adapter, r.Namespace, nil, nil, r.SQL)
 	if err != nil {
 		return out, err
 	}

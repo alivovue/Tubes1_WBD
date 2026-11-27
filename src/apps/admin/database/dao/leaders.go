@@ -48,8 +48,8 @@ func (d *Store) MigrationAuthority(ctx context.Context, actor, database int64) (
  (SELECT 1 FROM user_groups m WHERE m.group_id=g.id AND m.user_id=l.id),FALSE)) ORDER BY g.id)
  FROM group_database_permissions p JOIN access_groups g ON g.id=p.group_id
  LEFT JOIN users l ON l.id=g.leader_user_id WHERE p.database_id=d.id),'[]'::jsonb)
- FROM managed_databases d CROSS JOIN migration_authority_clock c
- WHERE d.id=$2 AND d.is_active AND c.singleton
+ FROM managed_databases d JOIN migration_authority_clock c ON c.database_id=d.id
+ WHERE d.id=$2 AND d.is_active
  AND EXISTS(SELECT 1 FROM users WHERE id=$1 AND is_active)
  AND EXISTS(SELECT 1 FROM user_groups m JOIN group_database_permissions p ON p.group_id=m.group_id
  WHERE m.user_id=$1 AND p.database_id=d.id)`, actor, database).Scan(&snapshot.DatabaseID, &snapshot.Revision, &connection, &groups)

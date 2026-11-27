@@ -145,6 +145,7 @@ func (v *Resources) Review(r dao.MigrationReview) (map[string]any, error) {
 		"action":                 resourceAction(r.Action, revision),
 		"target_execution_id":    r.TargetExecutionID,
 		"target_job_id":          r.TargetJobID,
+		"resumes_job_id":         resumeTarget(r),
 		"status":                 r.State,
 		"requested_by":           v.name(r.SubmittedBy),
 		"requested_at":           r.SubmittedAt,
@@ -156,7 +157,7 @@ func (v *Resources) Review(r dao.MigrationReview) (map[string]any, error) {
 		"irreversibility_reason": revision.IrreversibleReason,
 		"batch":                  batchResource(revision),
 		"required_groups":        groups,
-		"can_enqueue":            v.edit && (!v.blocked || r.Action == "batch_cancel") && r.State == "approved" && r.QueuedJobID == nil && allApproved(r),
+		"can_enqueue":            v.edit && (!v.blocked || r.Action == "batch_cancel" || resumeTarget(r) != nil) && r.State == "approved" && r.QueuedJobID == nil && allApproved(r),
 		"can_resubmit":           v.edit && (r.State == "rejected" || r.State == "invalidated"),
 		"job_id":                 r.QueuedJobID,
 		"expected_generation":    v.state.Generation,
@@ -263,7 +264,7 @@ func (v *Resources) ExecutionEvent(e dao.ExecutionEvent) (map[string]any, error)
 }
 
 func (v *Resources) canRetry(j dao.MigrationJob) bool {
-	return v.edit && j.CancellationJobID == nil && (j.Status == "uncertain" || (j.ActorID == v.actor && j.Attempt < j.MaxAttempts && (j.Status == "failed" || j.Status == "partial" || j.Status == "partially_reverted")))
+	return v.edit && j.RecoveryJobID == nil && (j.Status == "uncertain" || (j.ActorID == v.actor && j.Attempt < j.MaxAttempts && (j.Status == "failed" || j.Status == "partial" || j.Status == "partially_reverted")))
 }
 
 func (v *Resources) Job(j dao.MigrationJob, p dao.BatchProgress) (map[string]any, error) {
@@ -284,7 +285,8 @@ func (v *Resources) Job(j dao.MigrationJob, p dao.BatchProgress) (map[string]any
 		next = j.NextAttemptAt
 	}
 	retry := v.canRetry(j)
-	cancel := v.edit && j.CancellationJobID == nil && !r.Irreversible && batchResource(r) != nil && (j.Operation == "up" || j.Operation == "forward") && (j.Status == "partial" || j.Status == "uncertain" || j.Status == "partially_reverted") && p.Batches > p.RevertedBatches
+	resume := v.edit && !r.Irreversible && j.RecoveryJobID == nil && batchResource(r) != nil && (j.Operation == "up" || j.Operation == "forward") && j.Status == "partial" && p.Batches > 0 && p.RevertedBatches == 0
+	cancel := v.edit && j.RecoveryJobID == nil && !r.Irreversible && batchResource(r) != nil && (j.Operation == "up" || j.Operation == "forward") && (j.Status == "partial" || j.Status == "uncertain" || j.Status == "partially_reverted") && p.Batches > p.RevertedBatches
 	return map[string]any{
 		"job_id":              j.ID,
 		"database_id":         j.DatabaseID,
@@ -309,8 +311,18 @@ func (v *Resources) Job(j dao.MigrationJob, p dao.BatchProgress) (map[string]any
 		"last_cursor":         p.Cursor,
 		"retryable":           retry,
 		"can_cancel":          cancel,
+		"can_resume":          resume,
+		"resumes_job_id":      resumeTarget(review),
+		"recovery_job_id":     j.RecoveryJobID,
 		"blocked_reason":      v.state.BlockedReason,
 		"error":               j.ErrorClass,
 		"expected_generation": v.state.Generation,
 	}, nil
+}
+
+func resumeTarget(r dao.MigrationReview) *string {
+	if r.Action == "up" || r.Action == "forward" {
+		return r.TargetJobID
+	}
+	return nil
 }
