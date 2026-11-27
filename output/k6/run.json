@@ -1,0 +1,10 @@
+{
+  "completed_at_utc": "2026-11-27T14:25:20.822800+00:00",
+  "exit_code": 99,
+  "failed_thresholds": {
+    "api_latency_ms": "p(95)<750"
+  },
+  "fresh_targets": 3,
+  "worker_concurrency": 4,
+  "thresholds_not_relaxed": true
+}

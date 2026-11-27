@@ -1,0 +1,1074 @@
+{
+  "exemplars": {
+    "status": "success",
+    "data": [
+      {
+        "seriesLabels": {
+          "__name__": "schakker_migration_duration_seconds_bucket",
+          "instance": "127.0.0.1:9468",
+          "job": "schakker-bonus-fixture",
+          "le": "1.0",
+          "operation": "up",
+          "status": "succeeded"
+        },
+        "exemplars": [
+          {
+            "labels": {
+              "trace_id": "7c02681ddaa7392f625971a8bc44bd96"
+            },
+            "value": "0.976820387",
+            "timestamp": 1795789447.063
+          }
+        ]
+      },
+      {
+        "seriesLabels": {
+          "__name__": "schakker_migration_duration_seconds_bucket",
+          "instance": "127.0.0.1:9468",
+          "job": "schakker-bonus-fixture",
+          "le": "10.0",
+          "operation": "up",
+          "status": "succeeded"
+        },
+        "exemplars": [
+          {
+            "labels": {
+              "trace_id": "d8b5069be61bd1abbfccc607a59cce76"
+            },
+            "value": "6.027562667",
+            "timestamp": 1795789463.323
+          },
+          {
+            "labels": {
+              "trace_id": "39cd3411fa8e350baa02938a44259fa6"
+            },
+            "value": "6.509183559",
+            "timestamp": 1795789466.299
+          },
+          {
+            "labels": {
+              "trace_id": "369ef495581d58d9d0e14185ad3ccd26"
+            },
+            "value": "8.652164142",
+            "timestamp": 1795789474.022
+          },
+          {
+            "labels": {
+              "trace_id": "30e39b95d9e8f7b771a43facabf610f3"
+            },
+            "value": "7.66766844",
+            "timestamp": 1795789498.894
+          },
+          {
+            "labels": {
+              "trace_id": "b287504f87f4c5c628c2fecafe9eed01"
+            },
+            "value": "6.45546634",
+            "timestamp": 1795789502.583
+          },
+          {
+            "labels": {
+              "trace_id": "27b0d044c582563ea0464b92a9475ba9"
+            },
+            "value": "6.7066387259999996",
+            "timestamp": 1795789507.673
+          },
+          {
+            "labels": {
+              "trace_id": "6cde1110bc0128973de9f7644f05e96b"
+            },
+            "value": "6.690999299",
+            "timestamp": 1795789511.089
+          },
+          {
+            "labels": {
+              "trace_id": "3aad5fa70ce980d7024b149541107fb1"
+            },
+            "value": "9.654444532",
+            "timestamp": 1795789518.117
+          },
+          {
+            "labels": {
+              "trace_id": "fa480fd984c4e37d40c534c4b7bcb4da"
+            },
+            "value": "5.043832047",
+            "timestamp": 1795789520.102
+          }
+        ]
+      },
+      {
+        "seriesLabels": {
+          "__name__": "schakker_migration_duration_seconds_bucket",
+          "instance": "127.0.0.1:9468",
+          "job": "schakker-bonus-fixture",
+          "le": "2.5",
+          "operation": "up",
+          "status": "succeeded"
+        },
+        "exemplars": [
+          {
+            "labels": {
+              "trace_id": "cf91f02ddcee356c9f938669249cf4f8"
+            },
+            "value": "1.201717456",
+            "timestamp": 1795789443.663
+          },
+          {
+            "labels": {
+              "trace_id": "8421c3ec16d719b73c0876b87b0ced05"
+            },
+            "value": "1.129572131",
+            "timestamp": 1795789445.416
+          },
+          {
+            "labels": {
+              "trace_id": "0564aac9b016be29c25dffd491de9f86"
+            },
+            "value": "1.002327868",
+            "timestamp": 1795789448.613
+          },
+          {
+            "labels": {
+              "trace_id": "0053fd82d0dd4dfe4269120aa0fb2de3"
+            },
+            "value": "1.136010319",
+            "timestamp": 1795789451.815
+          },
+          {
+            "labels": {
+              "trace_id": "2bf03933bbab521c62ceda51d99f4152"
+            },
+            "value": "1.159316896",
+            "timestamp": 1795789453.54
+          },
+          {
+            "labels": {
+              "trace_id": "93aa9b1a2c047a89672d6309cadb09a5"
+            },
+            "value": "1.356361638",
+            "timestamp": 1795789454.25
+          },
+          {
+            "labels": {
+              "trace_id": "5ceaddb24f02d868890733f4da771c22"
+            },
+            "value": "1.255502772",
+            "timestamp": 1795789456.731
+          },
+          {
+            "labels": {
+              "trace_id": "9d605b96711c7a0b1a8a20bc8febce6a"
+            },
+            "value": "1.362400617",
+            "timestamp": 1795789458.957
+          },
+          {
+            "labels": {
+              "trace_id": "174e727425bdfbe9e43faa27086c5b47"
+            },
+            "value": "1.655355142",
+            "timestamp": 1795789460.914
+          },
+          {
+            "labels": {
+              "trace_id": "0a5b0998dc0bd77ba8da387ec5450eb7"
+            },
+            "value": "1.796704687",
+            "timestamp": 1795789463.862
+          },
+          {
+            "labels": {
+              "trace_id": "0e59561c6f0b0f7ae0f7b3e517bf63bc"
+            },
+            "value": "2.372714739",
+            "timestamp": 1795789466.567
+          },
+          {
+            "labels": {
+              "trace_id": "a2e58e1fd21c84719058b5725c07ee90"
+            },
+            "value": "2.247622657",
+            "timestamp": 1795789469.984
+          },
+          {
+            "labels": {
+              "trace_id": "61058cdd53ae9f97c6978f4419c9d57f"
+            },
+            "value": "2.125897698",
+            "timestamp": 1795789497.544
+          },
+          {
+            "labels": {
+              "trace_id": "79758b93a94c16177dff3283ff140a3a"
+            },
+            "value": "1.7038642309999998",
+            "timestamp": 1795789501.549
+          },
+          {
+            "labels": {
+              "trace_id": "1cde22595ba98e14a6d9eebb490f7786"
+            },
+            "value": "1.711873955",
+            "timestamp": 1795789503.831
+          },
+          {
+            "labels": {
+              "trace_id": "3639fcac914dc002ceb07672774b019c"
+            },
+            "value": "1.835992057",
+            "timestamp": 1795789504.949
+          },
+          {
+            "labels": {
+              "trace_id": "4e7ca504ed412ce484240662bad52ced"
+            },
+            "value": "2.05291779",
+            "timestamp": 1795789507.563
+          }
+        ]
+      },
+      {
+        "seriesLabels": {
+          "__name__": "schakker_migration_duration_seconds_bucket",
+          "instance": "127.0.0.1:9468",
+          "job": "schakker-bonus-fixture",
+          "le": "30.0",
+          "operation": "up",
+          "status": "succeeded"
+        },
+        "exemplars": [
+          {
+            "labels": {
+              "trace_id": "b16ac10045112da8ab30c807092b947c"
+            },
+            "value": "10.988130484",
+            "timestamp": 1795789481.417
+          },
+          {
+            "labels": {
+              "trace_id": "e49247797d77122fa5f5c5bf2fd2086d"
+            },
+            "value": "11.227007592",
+            "timestamp": 1795789486.514
+          },
+          {
+            "labels": {
+              "trace_id": "63e53b498d42b005615178a7143959c2"
+            },
+            "value": "10.032365447",
+            "timestamp": 1795789494.307
+          }
+        ]
+      },
+      {
+        "seriesLabels": {
+          "__name__": "schakker_migration_duration_seconds_bucket",
+          "instance": "127.0.0.1:9468",
+          "job": "schakker-bonus-fixture",
+          "le": "5.0",
+          "operation": "up",
+          "status": "succeeded"
+        },
+        "exemplars": [
+          {
+            "labels": {
+              "trace_id": "362c98d1b0a496eaa5922ce12efd600f"
+            },
+            "value": "4.647228903",
+            "timestamp": 1795789447.193
+          },
+          {
+            "labels": {
+              "trace_id": "8180009b49f253e40d278e835422c4df"
+            },
+            "value": "4.112499163",
+            "timestamp": 1795789450.109
+          },
+          {
+            "labels": {
+              "trace_id": "0ca3ef78ad914a75f88521cf0f2e9fd4"
+            },
+            "value": "4.362583706",
+            "timestamp": 1795789452.112
+          },
+          {
+            "labels": {
+              "trace_id": "8aacad823ecb3ce0c1abbdff64ee0abc"
+            },
+            "value": "3.969808537",
+            "timestamp": 1795789454.912
+          },
+          {
+            "labels": {
+              "trace_id": "cf0396ec79cca14ebbf68ade2edee0b2"
+            },
+            "value": "4.615072813",
+            "timestamp": 1795789458.648
+          },
+          {
+            "labels": {
+              "trace_id": "a1f6378f8ea6d363e4e908f2fe30bac6"
+            },
+            "value": "3.067934349",
+            "timestamp": 1795789473.989
+          },
+          {
+            "labels": {
+              "trace_id": "4d38c41a808f8ab92a72494f8c412e5a"
+            },
+            "value": "2.9486775659999998",
+            "timestamp": 1795789478.247
+          },
+          {
+            "labels": {
+              "trace_id": "61f1fa6091719c3a8953285321f58534"
+            },
+            "value": "3.214981796",
+            "timestamp": 1795789482.879
+          },
+          {
+            "labels": {
+              "trace_id": "87fdc452345aa25b9de0a3034f92158e"
+            },
+            "value": "2.9280039049999997",
+            "timestamp": 1795789485.861
+          },
+          {
+            "labels": {
+              "trace_id": "6085ab03b5f1fc9f78d20259bf80fad8"
+            },
+            "value": "2.777684229",
+            "timestamp": 1795789489.893
+          },
+          {
+            "labels": {
+              "trace_id": "4de1825e272d2c96577173a21438ffd4"
+            },
+            "value": "2.971731991",
+            "timestamp": 1795789491.074
+          },
+          {
+            "labels": {
+              "trace_id": "8bfb1b9c06f94b7299ea6b241b879d55"
+            },
+            "value": "2.805011903",
+            "timestamp": 1795789495.231
+          },
+          {
+            "labels": {
+              "trace_id": "d7f2e3d741c46406594b3cf44ca82a03"
+            },
+            "value": "2.571237513",
+            "timestamp": 1795789510.729
+          },
+          {
+            "labels": {
+              "trace_id": "81b103a2aac8eaa86ee029a0c206810e"
+            },
+            "value": "2.87528392",
+            "timestamp": 1795789514.732
+          },
+          {
+            "labels": {
+              "trace_id": "cf6af1653856bb22ee9019263e526ea9"
+            },
+            "value": "2.534514732",
+            "timestamp": 1795789518.023
+          }
+        ]
+      }
+    ]
+  },
+  "queries": {
+    "schakker_jobs": {
+      "status": "success",
+      "data": {
+        "resultType": "vector",
+        "result": [
+          {
+            "metric": {
+              "__name__": "schakker_jobs",
+              "instance": "127.0.0.1:9468",
+              "job": "schakker-bonus-fixture",
+              "operation": "batch_cancel",
+              "status": "failed"
+            },
+            "value": [
+              1795789530.467,
+              "0"
+            ]
+          },
+          {
+            "metric": {
+              "__name__": "schakker_jobs",
+              "instance": "127.0.0.1:9468",
+              "job": "schakker-bonus-fixture",
+              "operation": "batch_cancel",
+              "status": "partial"
+            },
+            "value": [
+              1795789530.467,
+              "0"
+            ]
+          },
+          {
+            "metric": {
+              "__name__": "schakker_jobs",
+              "instance": "127.0.0.1:9468",
+              "job": "schakker-bonus-fixture",
+              "operation": "batch_cancel",
+              "status": "partially_reverted"
+            },
+            "value": [
+              1795789530.467,
+              "0"
+            ]
+          },
+          {
+            "metric": {
+              "__name__": "schakker_jobs",
+              "instance": "127.0.0.1:9468",
+              "job": "schakker-bonus-fixture",
+              "operation": "batch_cancel",
+              "status": "pending"
+            },
+            "value": [
+              1795789530.467,
+              "0"
+            ]
+          },
+          {
+            "metric": {
+              "__name__": "schakker_jobs",
+              "instance": "127.0.0.1:9468",
+              "job": "schakker-bonus-fixture",
+              "operation": "batch_cancel",
+              "status": "reverted"
+            },
+            "value": [
+              1795789530.467,
+              "0"
+            ]
+          },
+          {
+            "metric": {
+              "__name__": "schakker_jobs",
+              "instance": "127.0.0.1:9468",
+              "job": "schakker-bonus-fixture",
+              "operation": "batch_cancel",
+              "status": "reverting"
+            },
+            "value": [
+              1795789530.467,
+              "0"
+            ]
+          },
+          {
+            "metric": {
+              "__name__": "schakker_jobs",
+              "instance": "127.0.0.1:9468",
+              "job": "schakker-bonus-fixture",
+              "operation": "batch_cancel",
+              "status": "running"
+            },
+            "value": [
+              1795789530.467,
+              "0"
+            ]
+          },
+          {
+            "metric": {
+              "__name__": "schakker_jobs",
+              "instance": "127.0.0.1:9468",
+              "job": "schakker-bonus-fixture",
+              "operation": "batch_cancel",
+              "status": "succeeded"
+            },
+            "value": [
+              1795789530.467,
+              "0"
+            ]
+          },
+          {
+            "metric": {
+              "__name__": "schakker_jobs",
+              "instance": "127.0.0.1:9468",
+              "job": "schakker-bonus-fixture",
+              "operation": "batch_cancel",
+              "status": "uncertain"
+            },
+            "value": [
+              1795789530.467,
+              "0"
+            ]
+          },
+          {
+            "metric": {
+              "__name__": "schakker_jobs",
+              "instance": "127.0.0.1:9468",
+              "job": "schakker-bonus-fixture",
+              "operation": "forward",
+              "status": "failed"
+            },
+            "value": [
+              1795789530.467,
+              "0"
+            ]
+          },
+          {
+            "metric": {
+              "__name__": "schakker_jobs",
+              "instance": "127.0.0.1:9468",
+              "job": "schakker-bonus-fixture",
+              "operation": "forward",
+              "status": "partial"
+            },
+            "value": [
+              1795789530.467,
+              "0"
+            ]
+          },
+          {
+            "metric": {
+              "__name__": "schakker_jobs",
+              "instance": "127.0.0.1:9468",
+              "job": "schakker-bonus-fixture",
+              "operation": "forward",
+              "status": "partially_reverted"
+            },
+            "value": [
+              1795789530.467,
+              "0"
+            ]
+          },
+          {
+            "metric": {
+              "__name__": "schakker_jobs",
+              "instance": "127.0.0.1:9468",
+              "job": "schakker-bonus-fixture",
+              "operation": "forward",
+              "status": "pending"
+            },
+            "value": [
+              1795789530.467,
+              "0"
+            ]
+          },
+          {
+            "metric": {
+              "__name__": "schakker_jobs",
+              "instance": "127.0.0.1:9468",
+              "job": "schakker-bonus-fixture",
+              "operation": "forward",
+              "status": "reverted"
+            },
+            "value": [
+              1795789530.467,
+              "0"
+            ]
+          },
+          {
+            "metric": {
+              "__name__": "schakker_jobs",
+              "instance": "127.0.0.1:9468",
+              "job": "schakker-bonus-fixture",
+              "operation": "forward",
+              "status": "reverting"
+            },
+            "value": [
+              1795789530.467,
+              "0"
+            ]
+          },
+          {
+            "metric": {
+              "__name__": "schakker_jobs",
+              "instance": "127.0.0.1:9468",
+              "job": "schakker-bonus-fixture",
+              "operation": "forward",
+              "status": "running"
+            },
+            "value": [
+              1795789530.467,
+              "0"
+            ]
+          },
+          {
+            "metric": {
+              "__name__": "schakker_jobs",
+              "instance": "127.0.0.1:9468",
+              "job": "schakker-bonus-fixture",
+              "operation": "forward",
+              "status": "succeeded"
+            },
+            "value": [
+              1795789530.467,
+              "0"
+            ]
+          },
+          {
+            "metric": {
+              "__name__": "schakker_jobs",
+              "instance": "127.0.0.1:9468",
+              "job": "schakker-bonus-fixture",
+              "operation": "forward",
+              "status": "uncertain"
+            },
+            "value": [
+              1795789530.467,
+              "0"
+            ]
+          },
+          {
+            "metric": {
+              "__name__": "schakker_jobs",
+              "instance": "127.0.0.1:9468",
+              "job": "schakker-bonus-fixture",
+              "operation": "rollback",
+              "status": "failed"
+            },
+            "value": [
+              1795789530.467,
+              "0"
+            ]
+          },
+          {
+            "metric": {
+              "__name__": "schakker_jobs",
+              "instance": "127.0.0.1:9468",
+              "job": "schakker-bonus-fixture",
+              "operation": "rollback",
+              "status": "partial"
+            },
+            "value": [
+              1795789530.467,
+              "0"
+            ]
+          },
+          {
+            "metric": {
+              "__name__": "schakker_jobs",
+              "instance": "127.0.0.1:9468",
+              "job": "schakker-bonus-fixture",
+              "operation": "rollback",
+              "status": "partially_reverted"
+            },
+            "value": [
+              1795789530.467,
+              "0"
+            ]
+          },
+          {
+            "metric": {
+              "__name__": "schakker_jobs",
+              "instance": "127.0.0.1:9468",
+              "job": "schakker-bonus-fixture",
+              "operation": "rollback",
+              "status": "pending"
+            },
+            "value": [
+              1795789530.467,
+              "0"
+            ]
+          },
+          {
+            "metric": {
+              "__name__": "schakker_jobs",
+              "instance": "127.0.0.1:9468",
+              "job": "schakker-bonus-fixture",
+              "operation": "rollback",
+              "status": "reverted"
+            },
+            "value": [
+              1795789530.467,
+              "0"
+            ]
+          },
+          {
+            "metric": {
+              "__name__": "schakker_jobs",
+              "instance": "127.0.0.1:9468",
+              "job": "schakker-bonus-fixture",
+              "operation": "rollback",
+              "status": "reverting"
+            },
+            "value": [
+              1795789530.467,
+              "0"
+            ]
+          },
+          {
+            "metric": {
+              "__name__": "schakker_jobs",
+              "instance": "127.0.0.1:9468",
+              "job": "schakker-bonus-fixture",
+              "operation": "rollback",
+              "status": "running"
+            },
+            "value": [
+              1795789530.467,
+              "0"
+            ]
+          },
+          {
+            "metric": {
+              "__name__": "schakker_jobs",
+              "instance": "127.0.0.1:9468",
+              "job": "schakker-bonus-fixture",
+              "operation": "rollback",
+              "status": "succeeded"
+            },
+            "value": [
+              1795789530.467,
+              "0"
+            ]
+          },
+          {
+            "metric": {
+              "__name__": "schakker_jobs",
+              "instance": "127.0.0.1:9468",
+              "job": "schakker-bonus-fixture",
+              "operation": "rollback",
+              "status": "uncertain"
+            },
+            "value": [
+              1795789530.467,
+              "0"
+            ]
+          },
+          {
+            "metric": {
+              "__name__": "schakker_jobs",
+              "instance": "127.0.0.1:9468",
+              "job": "schakker-bonus-fixture",
+              "operation": "up",
+              "status": "failed"
+            },
+            "value": [
+              1795789530.467,
+              "0"
+            ]
+          },
+          {
+            "metric": {
+              "__name__": "schakker_jobs",
+              "instance": "127.0.0.1:9468",
+              "job": "schakker-bonus-fixture",
+              "operation": "up",
+              "status": "partial"
+            },
+            "value": [
+              1795789530.467,
+              "0"
+            ]
+          },
+          {
+            "metric": {
+              "__name__": "schakker_jobs",
+              "instance": "127.0.0.1:9468",
+              "job": "schakker-bonus-fixture",
+              "operation": "up",
+              "status": "partially_reverted"
+            },
+            "value": [
+              1795789530.467,
+              "0"
+            ]
+          },
+          {
+            "metric": {
+              "__name__": "schakker_jobs",
+              "instance": "127.0.0.1:9468",
+              "job": "schakker-bonus-fixture",
+              "operation": "up",
+              "status": "pending"
+            },
+            "value": [
+              1795789530.467,
+              "0"
+            ]
+          },
+          {
+            "metric": {
+              "__name__": "schakker_jobs",
+              "instance": "127.0.0.1:9468",
+              "job": "schakker-bonus-fixture",
+              "operation": "up",
+              "status": "reverted"
+            },
+            "value": [
+              1795789530.467,
+              "0"
+            ]
+          },
+          {
+            "metric": {
+              "__name__": "schakker_jobs",
+              "instance": "127.0.0.1:9468",
+              "job": "schakker-bonus-fixture",
+              "operation": "up",
+              "status": "reverting"
+            },
+            "value": [
+              1795789530.467,
+              "0"
+            ]
+          },
+          {
+            "metric": {
+              "__name__": "schakker_jobs",
+              "instance": "127.0.0.1:9468",
+              "job": "schakker-bonus-fixture",
+              "operation": "up",
+              "status": "running"
+            },
+            "value": [
+              1795789530.467,
+              "0"
+            ]
+          },
+          {
+            "metric": {
+              "__name__": "schakker_jobs",
+              "instance": "127.0.0.1:9468",
+              "job": "schakker-bonus-fixture",
+              "operation": "up",
+              "status": "succeeded"
+            },
+            "value": [
+              1795789530.467,
+              "52"
+            ]
+          },
+          {
+            "metric": {
+              "__name__": "schakker_jobs",
+              "instance": "127.0.0.1:9468",
+              "job": "schakker-bonus-fixture",
+              "operation": "up",
+              "status": "uncertain"
+            },
+            "value": [
+              1795789530.467,
+              "0"
+            ]
+          }
+        ]
+      }
+    },
+    "schakker_database_pool_connections": {
+      "status": "success",
+      "data": {
+        "resultType": "vector",
+        "result": [
+          {
+            "metric": {
+              "__name__": "schakker_database_pool_connections",
+              "instance": "127.0.0.1:9468",
+              "job": "schakker-bonus-fixture",
+              "pool": "admin",
+              "state": "active"
+            },
+            "value": [
+              1795789530.469,
+              "0"
+            ]
+          },
+          {
+            "metric": {
+              "__name__": "schakker_database_pool_connections",
+              "instance": "127.0.0.1:9468",
+              "job": "schakker-bonus-fixture",
+              "pool": "admin",
+              "state": "idle"
+            },
+            "value": [
+              1795789530.469,
+              "5"
+            ]
+          },
+          {
+            "metric": {
+              "__name__": "schakker_database_pool_connections",
+              "instance": "127.0.0.1:9468",
+              "job": "schakker-bonus-fixture",
+              "pool": "platform",
+              "state": "active"
+            },
+            "value": [
+              1795789530.469,
+              "0"
+            ]
+          },
+          {
+            "metric": {
+              "__name__": "schakker_database_pool_connections",
+              "instance": "127.0.0.1:9468",
+              "job": "schakker-bonus-fixture",
+              "pool": "platform",
+              "state": "idle"
+            },
+            "value": [
+              1795789530.469,
+              "5"
+            ]
+          }
+        ]
+      }
+    },
+    "schakker_database_pool_wait_seconds_total": {
+      "status": "success",
+      "data": {
+        "resultType": "vector",
+        "result": [
+          {
+            "metric": {
+              "__name__": "schakker_database_pool_wait_seconds_total",
+              "instance": "127.0.0.1:9468",
+              "job": "schakker-bonus-fixture",
+              "pool": "admin"
+            },
+            "value": [
+              1795789530.471,
+              "0"
+            ]
+          },
+          {
+            "metric": {
+              "__name__": "schakker_database_pool_wait_seconds_total",
+              "instance": "127.0.0.1:9468",
+              "job": "schakker-bonus-fixture",
+              "pool": "platform"
+            },
+            "value": [
+              1795789530.471,
+              "2.774500677"
+            ]
+          }
+        ]
+      }
+    },
+    "schakker_database_pool_wait_total": {
+      "status": "success",
+      "data": {
+        "resultType": "vector",
+        "result": [
+          {
+            "metric": {
+              "__name__": "schakker_database_pool_wait_total",
+              "instance": "127.0.0.1:9468",
+              "job": "schakker-bonus-fixture",
+              "pool": "admin"
+            },
+            "value": [
+              1795789530.472,
+              "0"
+            ]
+          },
+          {
+            "metric": {
+              "__name__": "schakker_database_pool_wait_total",
+              "instance": "127.0.0.1:9468",
+              "job": "schakker-bonus-fixture",
+              "pool": "platform"
+            },
+            "value": [
+              1795789530.472,
+              "1121"
+            ]
+          }
+        ]
+      }
+    },
+    "schakker_migration_rows": {
+      "status": "success",
+      "data": {
+        "resultType": "vector",
+        "result": [
+          {
+            "metric": {
+              "__name__": "schakker_migration_rows",
+              "instance": "127.0.0.1:9468",
+              "job": "schakker-bonus-fixture",
+              "operation": "batch_cancel"
+            },
+            "value": [
+              1795789530.473,
+              "0"
+            ]
+          },
+          {
+            "metric": {
+              "__name__": "schakker_migration_rows",
+              "instance": "127.0.0.1:9468",
+              "job": "schakker-bonus-fixture",
+              "operation": "forward"
+            },
+            "value": [
+              1795789530.473,
+              "0"
+            ]
+          },
+          {
+            "metric": {
+              "__name__": "schakker_migration_rows",
+              "instance": "127.0.0.1:9468",
+              "job": "schakker-bonus-fixture",
+              "operation": "rollback"
+            },
+            "value": [
+              1795789530.473,
+              "0"
+            ]
+          },
+          {
+            "metric": {
+              "__name__": "schakker_migration_rows",
+              "instance": "127.0.0.1:9468",
+              "job": "schakker-bonus-fixture",
+              "operation": "up"
+            },
+            "value": [
+              1795789530.473,
+              "17000"
+            ]
+          }
+        ]
+      }
+    },
+    "schakker_database_lock_wait_seconds_count": {
+      "status": "success",
+      "data": {
+        "resultType": "vector",
+        "result": [
+          {
+            "metric": {
+              "__name__": "schakker_database_lock_wait_seconds_count",
+              "instance": "127.0.0.1:9468",
+              "job": "schakker-bonus-fixture",
+              "kind": "transaction",
+              "status": "succeeded"
+            },
+            "value": [
+              1795789530.474,
+              "52"
+            ]
+          },
+          {
+            "metric": {
+              "__name__": "schakker_database_lock_wait_seconds_count",
+              "instance": "127.0.0.1:9468",
+              "job": "schakker-bonus-fixture",
+              "kind": "session",
+              "status": "succeeded"
+            },
+            "value": [
+              1795789530.474,
+              "52"
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

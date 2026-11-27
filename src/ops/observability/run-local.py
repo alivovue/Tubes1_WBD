@@ -8,10 +8,12 @@ import shutil
 import signal
 import subprocess
 import time
+import re
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--tools-directory', type=Path, help='Search extracted official release archives here')
 parser.add_argument('--data-directory', type=Path, required=True, help='Persistent local data and service logs')
+parser.add_argument('--metrics-target', help='Scrape only this loopback fixture host:port for an isolated proof run')
 args = parser.parse_args()
 root = Path(__file__).resolve().parent
 data = args.data_directory.resolve()
@@ -19,7 +21,8 @@ data.mkdir(parents=True, exist_ok=True)
 
 def binary(name):
     if args.tools_directory:
-        for path in args.tools_directory.resolve().rglob(name):
+        candidates = sorted(args.tools_directory.resolve().rglob(name), key=lambda p: (p.parent.name != 'bin', str(p)))
+        for path in candidates:
             if path.is_file() and os.access(path, os.X_OK):
                 return path
     found = shutil.which(name)
@@ -42,6 +45,12 @@ credential = data / 'grafana_password'
 if not credential.exists():
     credential.write_text(secrets.token_urlsafe(32) + '\n')
 credential.chmod(0o600)
+prometheus_config = root / 'prometheus.yml'
+if args.metrics_target:
+    if not re.fullmatch(r'127\.0\.0\.1:[0-9]{1,5}', args.metrics_target) or not 0 < int(args.metrics_target.rsplit(':', 1)[1]) < 65536:
+        raise SystemExit('--metrics-target must be a loopback IPv4 address and valid port')
+    prometheus_config = data / 'prometheus.yml'
+    prometheus_config.write_text("global:\n  scrape_interval: 2s\nscrape_configs:\n  - job_name: schakker-bonus-fixture\n    static_configs:\n      - targets: ['" + args.metrics_target + "']\n")
 environment = dict(os.environ, LOKI_DATA_DIR=str(data / 'loki'), TEMPO_DATA_DIR=str(data / 'tempo'),
     GF_PATHS_DATA=str(data / 'grafana'), GF_PATHS_LOGS=str(data / 'grafana-logs'),
     GF_PATHS_PROVISIONING=str(provisioning), GF_SERVER_HTTP_ADDR='127.0.0.1', GF_SERVER_HTTP_PORT='3030',
@@ -62,7 +71,7 @@ try:
     commands = [
         ('loki', [str(loki), '-config.file=' + str(root / 'loki.yaml'), '-config.expand-env=true']),
         ('tempo', [str(tempo), '-config.file=' + str(root / 'tempo.yaml'), '-config.expand-env=true']),
-        ('prometheus', [str(prometheus), '--config.file=' + str(root / 'prometheus.yml'), '--storage.tsdb.path=' + str(data / 'prometheus'), '--storage.tsdb.retention.time=24h', '--web.listen-address=127.0.0.1:9090', '--enable-feature=exemplar-storage']),
+        ('prometheus', [str(prometheus), '--config.file=' + str(prometheus_config), '--storage.tsdb.path=' + str(data / 'prometheus'), '--storage.tsdb.retention.time=24h', '--web.listen-address=127.0.0.1:9090', '--enable-feature=exemplar-storage']),
         ('collector', [str(collector), '--config=' + str(root / 'collector.yaml')]),
         ('grafana', [str(grafana), 'server', '--homepath=' + str(grafana_home)]),
     ]

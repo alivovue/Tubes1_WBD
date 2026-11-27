@@ -1,0 +1,229 @@
+# HELP schakker_database_lock_wait_seconds Metadata lock acquisition time, including connection checkout.
+# TYPE schakker_database_lock_wait_seconds histogram
+schakker_database_lock_wait_seconds_bucket{kind="session",status="succeeded",le="0.001"} 8 # {trace_id="81b103a2aac8eaa86ee029a0c206810e"} 0.000985251 1.7957895118582323e+09
+schakker_database_lock_wait_seconds_bucket{kind="session",status="succeeded",le="0.005"} 46 # {trace_id="cf6af1653856bb22ee9019263e526ea9"} 0.001669982 1.7957895154913778e+09
+schakker_database_lock_wait_seconds_bucket{kind="session",status="succeeded",le="0.01"} 52 # {trace_id="8bfb1b9c06f94b7299ea6b241b879d55"} 0.009125246 1.7957894924363027e+09
+schakker_database_lock_wait_seconds_bucket{kind="session",status="succeeded",le="0.025"} 52
+schakker_database_lock_wait_seconds_bucket{kind="session",status="succeeded",le="0.05"} 52
+schakker_database_lock_wait_seconds_bucket{kind="session",status="succeeded",le="0.1"} 52
+schakker_database_lock_wait_seconds_bucket{kind="session",status="succeeded",le="0.25"} 52
+schakker_database_lock_wait_seconds_bucket{kind="session",status="succeeded",le="0.5"} 52
+schakker_database_lock_wait_seconds_bucket{kind="session",status="succeeded",le="1.0"} 52
+schakker_database_lock_wait_seconds_bucket{kind="session",status="succeeded",le="2.5"} 52
+schakker_database_lock_wait_seconds_bucket{kind="session",status="succeeded",le="5.0"} 52
+schakker_database_lock_wait_seconds_bucket{kind="session",status="succeeded",le="10.0"} 52
+schakker_database_lock_wait_seconds_bucket{kind="session",status="succeeded",le="30.0"} 52
+schakker_database_lock_wait_seconds_bucket{kind="session",status="succeeded",le="60.0"} 52
+schakker_database_lock_wait_seconds_bucket{kind="session",status="succeeded",le="180.0"} 52
+schakker_database_lock_wait_seconds_bucket{kind="session",status="succeeded",le="600.0"} 52
+schakker_database_lock_wait_seconds_bucket{kind="session",status="succeeded",le="+Inf"} 52
+schakker_database_lock_wait_seconds_sum{kind="session",status="succeeded"} 0.12896350799999998
+schakker_database_lock_wait_seconds_count{kind="session",status="succeeded"} 52
+schakker_database_lock_wait_seconds_bucket{kind="transaction",status="succeeded",le="0.001"} 0
+schakker_database_lock_wait_seconds_bucket{kind="transaction",status="succeeded",le="0.005"} 40 # {trace_id="5e9ad6b47b12f32b002f25f2281b8bdf"} 0.002928623 1.7957895148621397e+09
+schakker_database_lock_wait_seconds_bucket{kind="transaction",status="succeeded",le="0.01"} 50 # {trace_id="791c9180cc3facb353b797e94c671742"} 0.007248991 1.795789495468422e+09
+schakker_database_lock_wait_seconds_bucket{kind="transaction",status="succeeded",le="0.025"} 52 # {trace_id="4295477feb8bc514a1d9d27887085e15"} 0.010570222 1.795789483148223e+09
+schakker_database_lock_wait_seconds_bucket{kind="transaction",status="succeeded",le="0.05"} 52
+schakker_database_lock_wait_seconds_bucket{kind="transaction",status="succeeded",le="0.1"} 52
+schakker_database_lock_wait_seconds_bucket{kind="transaction",status="succeeded",le="0.25"} 52
+schakker_database_lock_wait_seconds_bucket{kind="transaction",status="succeeded",le="0.5"} 52
+schakker_database_lock_wait_seconds_bucket{kind="transaction",status="succeeded",le="1.0"} 52
+schakker_database_lock_wait_seconds_bucket{kind="transaction",status="succeeded",le="2.5"} 52
+schakker_database_lock_wait_seconds_bucket{kind="transaction",status="succeeded",le="5.0"} 52
+schakker_database_lock_wait_seconds_bucket{kind="transaction",status="succeeded",le="10.0"} 52
+schakker_database_lock_wait_seconds_bucket{kind="transaction",status="succeeded",le="30.0"} 52
+schakker_database_lock_wait_seconds_bucket{kind="transaction",status="succeeded",le="60.0"} 52
+schakker_database_lock_wait_seconds_bucket{kind="transaction",status="succeeded",le="180.0"} 52
+schakker_database_lock_wait_seconds_bucket{kind="transaction",status="succeeded",le="600.0"} 52
+schakker_database_lock_wait_seconds_bucket{kind="transaction",status="succeeded",le="+Inf"} 52
+schakker_database_lock_wait_seconds_sum{kind="transaction",status="succeeded"} 0.20447853400000002
+schakker_database_lock_wait_seconds_count{kind="transaction",status="succeeded"} 52
+# HELP schakker_database_pool_connections Connections in long-lived application database pools.
+# TYPE schakker_database_pool_connections gauge
+schakker_database_pool_connections{pool="admin",state="active"} 0.0
+schakker_database_pool_connections{pool="admin",state="idle"} 5.0
+schakker_database_pool_connections{pool="platform",state="active"} 0.0
+schakker_database_pool_connections{pool="platform",state="idle"} 5.0
+# HELP schakker_database_pool_wait_seconds Cumulative time waiting for an application database connection.
+# TYPE schakker_database_pool_wait_seconds counter
+schakker_database_pool_wait_seconds_total{pool="admin"} 0.0
+schakker_database_pool_wait_seconds_total{pool="platform"} 2.774500677
+# HELP schakker_database_pool_wait Cumulative application connection-pool waits.
+# TYPE schakker_database_pool_wait counter
+schakker_database_pool_wait_total{pool="admin"} 0.0
+schakker_database_pool_wait_total{pool="platform"} 1121.0
+# HELP schakker_http_request_duration_seconds Public API request duration without URL or identity labels.
+# TYPE schakker_http_request_duration_seconds histogram
+schakker_http_request_duration_seconds_bucket{method="GET",status_class="2xx",le="0.001"} 1
+schakker_http_request_duration_seconds_bucket{method="GET",status_class="2xx",le="0.005"} 2
+schakker_http_request_duration_seconds_bucket{method="GET",status_class="2xx",le="0.01"} 3
+schakker_http_request_duration_seconds_bucket{method="GET",status_class="2xx",le="0.025"} 51
+schakker_http_request_duration_seconds_bucket{method="GET",status_class="2xx",le="0.05"} 256
+schakker_http_request_duration_seconds_bucket{method="GET",status_class="2xx",le="0.1"} 823
+schakker_http_request_duration_seconds_bucket{method="GET",status_class="2xx",le="0.25"} 1344
+schakker_http_request_duration_seconds_bucket{method="GET",status_class="2xx",le="0.5"} 1608
+schakker_http_request_duration_seconds_bucket{method="GET",status_class="2xx",le="1.0"} 1797
+schakker_http_request_duration_seconds_bucket{method="GET",status_class="2xx",le="2.5"} 1846
+schakker_http_request_duration_seconds_bucket{method="GET",status_class="2xx",le="5.0"} 1846
+schakker_http_request_duration_seconds_bucket{method="GET",status_class="2xx",le="10.0"} 1846
+schakker_http_request_duration_seconds_bucket{method="GET",status_class="2xx",le="30.0"} 1846
+schakker_http_request_duration_seconds_bucket{method="GET",status_class="2xx",le="60.0"} 1846
+schakker_http_request_duration_seconds_bucket{method="GET",status_class="2xx",le="180.0"} 1846
+schakker_http_request_duration_seconds_bucket{method="GET",status_class="2xx",le="600.0"} 1846
+schakker_http_request_duration_seconds_bucket{method="GET",status_class="2xx",le="+Inf"} 1846
+schakker_http_request_duration_seconds_sum{method="GET",status_class="2xx"} 425.1172518909998
+schakker_http_request_duration_seconds_count{method="GET",status_class="2xx"} 1846
+schakker_http_request_duration_seconds_bucket{method="POST",status_class="2xx",le="0.001"} 0
+schakker_http_request_duration_seconds_bucket{method="POST",status_class="2xx",le="0.005"} 0
+schakker_http_request_duration_seconds_bucket{method="POST",status_class="2xx",le="0.01"} 0
+schakker_http_request_duration_seconds_bucket{method="POST",status_class="2xx",le="0.025"} 0
+schakker_http_request_duration_seconds_bucket{method="POST",status_class="2xx",le="0.05"} 0
+schakker_http_request_duration_seconds_bucket{method="POST",status_class="2xx",le="0.1"} 23
+schakker_http_request_duration_seconds_bucket{method="POST",status_class="2xx",le="0.25"} 90
+schakker_http_request_duration_seconds_bucket{method="POST",status_class="2xx",le="0.5"} 140
+schakker_http_request_duration_seconds_bucket{method="POST",status_class="2xx",le="1.0"} 156
+schakker_http_request_duration_seconds_bucket{method="POST",status_class="2xx",le="2.5"} 157
+schakker_http_request_duration_seconds_bucket{method="POST",status_class="2xx",le="5.0"} 157
+schakker_http_request_duration_seconds_bucket{method="POST",status_class="2xx",le="10.0"} 157
+schakker_http_request_duration_seconds_bucket{method="POST",status_class="2xx",le="30.0"} 157
+schakker_http_request_duration_seconds_bucket{method="POST",status_class="2xx",le="60.0"} 157
+schakker_http_request_duration_seconds_bucket{method="POST",status_class="2xx",le="180.0"} 157
+schakker_http_request_duration_seconds_bucket{method="POST",status_class="2xx",le="600.0"} 157
+schakker_http_request_duration_seconds_bucket{method="POST",status_class="2xx",le="+Inf"} 157
+schakker_http_request_duration_seconds_sum{method="POST",status_class="2xx"} 40.877823193
+schakker_http_request_duration_seconds_count{method="POST",status_class="2xx"} 157
+schakker_http_request_duration_seconds_bucket{method="POST",status_class="4xx",le="0.001"} 529
+schakker_http_request_duration_seconds_bucket{method="POST",status_class="4xx",le="0.005"} 767
+schakker_http_request_duration_seconds_bucket{method="POST",status_class="4xx",le="0.01"} 811
+schakker_http_request_duration_seconds_bucket{method="POST",status_class="4xx",le="0.025"} 838
+schakker_http_request_duration_seconds_bucket{method="POST",status_class="4xx",le="0.05"} 841
+schakker_http_request_duration_seconds_bucket{method="POST",status_class="4xx",le="0.1"} 841
+schakker_http_request_duration_seconds_bucket{method="POST",status_class="4xx",le="0.25"} 841
+schakker_http_request_duration_seconds_bucket{method="POST",status_class="4xx",le="0.5"} 841
+schakker_http_request_duration_seconds_bucket{method="POST",status_class="4xx",le="1.0"} 841
+schakker_http_request_duration_seconds_bucket{method="POST",status_class="4xx",le="2.5"} 841
+schakker_http_request_duration_seconds_bucket{method="POST",status_class="4xx",le="5.0"} 841
+schakker_http_request_duration_seconds_bucket{method="POST",status_class="4xx",le="10.0"} 841
+schakker_http_request_duration_seconds_bucket{method="POST",status_class="4xx",le="30.0"} 841
+schakker_http_request_duration_seconds_bucket{method="POST",status_class="4xx",le="60.0"} 841
+schakker_http_request_duration_seconds_bucket{method="POST",status_class="4xx",le="180.0"} 841
+schakker_http_request_duration_seconds_bucket{method="POST",status_class="4xx",le="600.0"} 841
+schakker_http_request_duration_seconds_bucket{method="POST",status_class="4xx",le="+Inf"} 841
+schakker_http_request_duration_seconds_sum{method="POST",status_class="4xx"} 1.6053508140000006
+schakker_http_request_duration_seconds_count{method="POST",status_class="4xx"} 841
+# HELP schakker_job_retries Durable retry claims (attempts after the first).
+# TYPE schakker_job_retries counter
+schakker_job_retries_total{operation="batch_cancel"} 0.0
+schakker_job_retries_total{operation="forward"} 0.0
+schakker_job_retries_total{operation="rollback"} 0.0
+schakker_job_retries_total{operation="up"} 0.0
+# HELP schakker_jobs Durable job counts from the metadata database.
+# TYPE schakker_jobs gauge
+schakker_jobs{operation="batch_cancel",status="failed"} 0.0
+schakker_jobs{operation="batch_cancel",status="partial"} 0.0
+schakker_jobs{operation="batch_cancel",status="partially_reverted"} 0.0
+schakker_jobs{operation="batch_cancel",status="pending"} 0.0
+schakker_jobs{operation="batch_cancel",status="reverted"} 0.0
+schakker_jobs{operation="batch_cancel",status="reverting"} 0.0
+schakker_jobs{operation="batch_cancel",status="running"} 0.0
+schakker_jobs{operation="batch_cancel",status="succeeded"} 0.0
+schakker_jobs{operation="batch_cancel",status="uncertain"} 0.0
+schakker_jobs{operation="forward",status="failed"} 0.0
+schakker_jobs{operation="forward",status="partial"} 0.0
+schakker_jobs{operation="forward",status="partially_reverted"} 0.0
+schakker_jobs{operation="forward",status="pending"} 0.0
+schakker_jobs{operation="forward",status="reverted"} 0.0
+schakker_jobs{operation="forward",status="reverting"} 0.0
+schakker_jobs{operation="forward",status="running"} 0.0
+schakker_jobs{operation="forward",status="succeeded"} 0.0
+schakker_jobs{operation="forward",status="uncertain"} 0.0
+schakker_jobs{operation="rollback",status="failed"} 0.0
+schakker_jobs{operation="rollback",status="partial"} 0.0
+schakker_jobs{operation="rollback",status="partially_reverted"} 0.0
+schakker_jobs{operation="rollback",status="pending"} 0.0
+schakker_jobs{operation="rollback",status="reverted"} 0.0
+schakker_jobs{operation="rollback",status="reverting"} 0.0
+schakker_jobs{operation="rollback",status="running"} 0.0
+schakker_jobs{operation="rollback",status="succeeded"} 0.0
+schakker_jobs{operation="rollback",status="uncertain"} 0.0
+schakker_jobs{operation="up",status="failed"} 0.0
+schakker_jobs{operation="up",status="partial"} 0.0
+schakker_jobs{operation="up",status="partially_reverted"} 0.0
+schakker_jobs{operation="up",status="pending"} 0.0
+schakker_jobs{operation="up",status="reverted"} 0.0
+schakker_jobs{operation="up",status="reverting"} 0.0
+schakker_jobs{operation="up",status="running"} 0.0
+schakker_jobs{operation="up",status="succeeded"} 52.0
+schakker_jobs{operation="up",status="uncertain"} 0.0
+# HELP schakker_metrics_collection_success Whether the last queue collection succeeded; zero exposes missing evidence.
+# TYPE schakker_metrics_collection_success gauge
+schakker_metrics_collection_success{source="queue"} 1.0
+# HELP schakker_migration_attempts Finished worker attempts by classified outcome.
+# TYPE schakker_migration_attempts counter
+schakker_migration_attempts_total{operation="up",status="succeeded"} 52.0
+# HELP schakker_migration_batches Projected committed batches, including partially applied jobs.
+# TYPE schakker_migration_batches gauge
+schakker_migration_batches{operation="batch_cancel"} 0.0
+schakker_migration_batches{operation="forward"} 0.0
+schakker_migration_batches{operation="rollback"} 0.0
+schakker_migration_batches{operation="up"} 170.0
+# HELP schakker_migration_duration_seconds Worker attempt duration, including lock wait and recovery.
+# TYPE schakker_migration_duration_seconds histogram
+schakker_migration_duration_seconds_bucket{operation="up",status="succeeded",le="0.001"} 0
+schakker_migration_duration_seconds_bucket{operation="up",status="succeeded",le="0.005"} 0
+schakker_migration_duration_seconds_bucket{operation="up",status="succeeded",le="0.01"} 0
+schakker_migration_duration_seconds_bucket{operation="up",status="succeeded",le="0.025"} 0
+schakker_migration_duration_seconds_bucket{operation="up",status="succeeded",le="0.05"} 0
+schakker_migration_duration_seconds_bucket{operation="up",status="succeeded",le="0.1"} 0
+schakker_migration_duration_seconds_bucket{operation="up",status="succeeded",le="0.25"} 0
+schakker_migration_duration_seconds_bucket{operation="up",status="succeeded",le="0.5"} 0
+schakker_migration_duration_seconds_bucket{operation="up",status="succeeded",le="1.0"} 1 # {trace_id="7c02681ddaa7392f625971a8bc44bd96"} 0.976820387 1.795789447063642e+09
+schakker_migration_duration_seconds_bucket{operation="up",status="succeeded",le="2.5"} 24 # {trace_id="4e7ca504ed412ce484240662bad52ced"} 2.05291779 1.7957895075639677e+09
+schakker_migration_duration_seconds_bucket{operation="up",status="succeeded",le="5.0"} 40 # {trace_id="cf6af1653856bb22ee9019263e526ea9"} 2.534514732 1.795789518023743e+09
+schakker_migration_duration_seconds_bucket{operation="up",status="succeeded",le="10.0"} 49 # {trace_id="fa480fd984c4e37d40c534c4b7bcb4da"} 5.043832047 1.7957895201029649e+09
+schakker_migration_duration_seconds_bucket{operation="up",status="succeeded",le="30.0"} 52 # {trace_id="63e53b498d42b005615178a7143959c2"} 10.032365447 1.795789494307279e+09
+schakker_migration_duration_seconds_bucket{operation="up",status="succeeded",le="60.0"} 52
+schakker_migration_duration_seconds_bucket{operation="up",status="succeeded",le="180.0"} 52
+schakker_migration_duration_seconds_bucket{operation="up",status="succeeded",le="600.0"} 52
+schakker_migration_duration_seconds_bucket{operation="up",status="succeeded",le="+Inf"} 52
+schakker_migration_duration_seconds_sum{operation="up",status="succeeded"} 185.85665602399993
+schakker_migration_duration_seconds_count{operation="up",status="succeeded"} 52
+# HELP schakker_migration_reverted_batches Projected compensated batches.
+# TYPE schakker_migration_reverted_batches gauge
+schakker_migration_reverted_batches{operation="batch_cancel"} 0.0
+schakker_migration_reverted_batches{operation="forward"} 0.0
+schakker_migration_reverted_batches{operation="rollback"} 0.0
+schakker_migration_reverted_batches{operation="up"} 0.0
+# HELP schakker_migration_reverted_rows Projected compensated rows.
+# TYPE schakker_migration_reverted_rows gauge
+schakker_migration_reverted_rows{operation="batch_cancel"} 0.0
+schakker_migration_reverted_rows{operation="forward"} 0.0
+schakker_migration_reverted_rows{operation="rollback"} 0.0
+schakker_migration_reverted_rows{operation="up"} 0.0
+# HELP schakker_migration_rows Projected committed rows, including partially applied jobs.
+# TYPE schakker_migration_rows gauge
+schakker_migration_rows{operation="batch_cancel"} 0.0
+schakker_migration_rows{operation="forward"} 0.0
+schakker_migration_rows{operation="rollback"} 0.0
+schakker_migration_rows{operation="up"} 17000.0
+# HELP schakker_queue_wait_seconds Time before the first worker claim; excludes retries.
+# TYPE schakker_queue_wait_seconds histogram
+schakker_queue_wait_seconds_bucket{operation="up",le="0.001"} 0
+schakker_queue_wait_seconds_bucket{operation="up",le="0.005"} 0
+schakker_queue_wait_seconds_bucket{operation="up",le="0.01"} 0
+schakker_queue_wait_seconds_bucket{operation="up",le="0.025"} 0
+schakker_queue_wait_seconds_bucket{operation="up",le="0.05"} 0
+schakker_queue_wait_seconds_bucket{operation="up",le="0.1"} 1 # {trace_id="8aacad823ecb3ce0c1abbdff64ee0abc"} 0.09055443 1.79578945094236e+09
+schakker_queue_wait_seconds_bucket{operation="up",le="0.25"} 34 # {trace_id="cf6af1653856bb22ee9019263e526ea9"} 0.235754467 1.795789515489252e+09
+schakker_queue_wait_seconds_bucket{operation="up",le="0.5"} 52 # {trace_id="3aad5fa70ce980d7024b149541107fb1"} 0.289106546 1.7957895084635205e+09
+schakker_queue_wait_seconds_bucket{operation="up",le="1.0"} 52
+schakker_queue_wait_seconds_bucket{operation="up",le="2.5"} 52
+schakker_queue_wait_seconds_bucket{operation="up",le="5.0"} 52
+schakker_queue_wait_seconds_bucket{operation="up",le="10.0"} 52
+schakker_queue_wait_seconds_bucket{operation="up",le="30.0"} 52
+schakker_queue_wait_seconds_bucket{operation="up",le="60.0"} 52
+schakker_queue_wait_seconds_bucket{operation="up",le="180.0"} 52
+schakker_queue_wait_seconds_bucket{operation="up",le="600.0"} 52
+schakker_queue_wait_seconds_bucket{operation="up",le="+Inf"} 52
+schakker_queue_wait_seconds_sum{operation="up"} 11.814605454999997
+schakker_queue_wait_seconds_count{operation="up"} 52

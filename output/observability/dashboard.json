@@ -1,0 +1,585 @@
+{
+  "meta": {
+    "type": "db",
+    "canSave": true,
+    "canEdit": true,
+    "canAdmin": true,
+    "canStar": true,
+    "canDelete": true,
+    "slug": "a2b3fb5",
+    "url": "/d/schakker-migrations/a2b3fb5",
+    "expires": "0001-01-01T00:00:00Z",
+    "created": "2026-11-27T21:23:05+07:00",
+    "updated": "2026-11-27T21:23:05+07:00",
+    "updatedBy": "Anonymous",
+    "createdBy": "Anonymous",
+    "version": 1,
+    "hasAcl": false,
+    "isFolder": false,
+    "apiVersion": "v0alpha1",
+    "folderId": 621888918945792,
+    "folderUid": "bg5kluubabqbkd",
+    "folderTitle": "Schakker",
+    "folderUrl": "/dashboards/f/bg5kluubabqbkd/schakker",
+    "provisioned": true,
+    "provisionedExternalId": "migrations.json",
+    "annotationsPermissions": {
+      "dashboard": {
+        "canAdd": true,
+        "canEdit": true,
+        "canDelete": true
+      }
+    }
+  },
+  "dashboard": {
+    "id": 621889095303168,
+    "links": [
+      {
+        "title": "Logs",
+        "type": "link",
+        "url": "/explore?left={\"datasource\":\"schakker-loki\"}"
+      },
+      {
+        "title": "Traces",
+        "type": "link",
+        "url": "/explore?left={\"datasource\":\"schakker-tempo\"}"
+      }
+    ],
+    "panels": [
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "schakker-prometheus"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "drawStyle": "line",
+              "fillOpacity": 10
+            },
+            "unit": "short"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 0
+        },
+        "id": 1,
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "bottom"
+          },
+          "tooltip": {
+            "mode": "multi"
+          }
+        },
+        "targets": [
+          {
+            "exemplar": true,
+            "expr": "sum by(status) (max by(operation,status) (schakker_jobs))",
+            "legendFormat": "{{status}}",
+            "refId": "A"
+          }
+        ],
+        "title": "Jobs per status (durable, deduplicated)",
+        "type": "timeseries"
+      },
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "schakker-prometheus"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "drawStyle": "line",
+              "fillOpacity": 10
+            },
+            "unit": "s"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 0
+        },
+        "id": 2,
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "bottom"
+          },
+          "tooltip": {
+            "mode": "multi"
+          }
+        },
+        "targets": [
+          {
+            "exemplar": true,
+            "expr": "histogram_quantile(0.95, sum by(le) (rate(schakker_queue_wait_seconds_bucket[2m])))",
+            "legendFormat": "p95",
+            "refId": "A"
+          },
+          {
+            "exemplar": true,
+            "expr": "histogram_quantile(0.50, sum by(le) (rate(schakker_queue_wait_seconds_bucket[2m])))",
+            "legendFormat": "p50",
+            "refId": "B"
+          }
+        ],
+        "title": "Queue wait — p50 / p95",
+        "type": "timeseries"
+      },
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "schakker-prometheus"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "drawStyle": "line",
+              "fillOpacity": 10
+            },
+            "unit": "s"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 8
+        },
+        "id": 3,
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "bottom"
+          },
+          "tooltip": {
+            "mode": "multi"
+          }
+        },
+        "targets": [
+          {
+            "exemplar": true,
+            "expr": "histogram_quantile(0.95, sum by(le,operation) (rate(schakker_migration_duration_seconds_bucket[2m])))",
+            "legendFormat": "{{operation}} {{status}}",
+            "refId": "A"
+          }
+        ],
+        "title": "Migration attempt duration — p95",
+        "type": "timeseries"
+      },
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "schakker-prometheus"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "drawStyle": "line",
+              "fillOpacity": 10
+            },
+            "unit": "s"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 8
+        },
+        "id": 4,
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "bottom"
+          },
+          "tooltip": {
+            "mode": "multi"
+          }
+        },
+        "targets": [
+          {
+            "exemplar": true,
+            "expr": "histogram_quantile(0.95, sum by(le,kind) (rate(schakker_database_lock_wait_seconds_bucket[2m])))",
+            "legendFormat": "{{kind}}",
+            "refId": "A"
+          }
+        ],
+        "title": "Database lock wait — p95",
+        "type": "timeseries"
+      },
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "schakker-prometheus"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "drawStyle": "line",
+              "fillOpacity": 10
+            },
+            "unit": "ops"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 16
+        },
+        "id": 5,
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "bottom"
+          },
+          "tooltip": {
+            "mode": "multi"
+          }
+        },
+        "targets": [
+          {
+            "exemplar": true,
+            "expr": "sum by(status) (rate(schakker_migration_attempts_total[2m]))",
+            "legendFormat": "{{status}}",
+            "refId": "A"
+          }
+        ],
+        "title": "Worker attempt completion throughput",
+        "type": "timeseries"
+      },
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "schakker-prometheus"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "drawStyle": "line",
+              "fillOpacity": 10
+            },
+            "unit": "short"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 16
+        },
+        "id": 6,
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "bottom"
+          },
+          "tooltip": {
+            "mode": "multi"
+          }
+        },
+        "targets": [
+          {
+            "exemplar": true,
+            "expr": "max by(operation) (schakker_job_retries_total)",
+            "legendFormat": "{{operation}} {{status}}",
+            "refId": "A"
+          }
+        ],
+        "title": "Retries (durable)",
+        "type": "timeseries"
+      },
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "schakker-prometheus"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "drawStyle": "line",
+              "fillOpacity": 10
+            },
+            "unit": "short"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 24
+        },
+        "id": 7,
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "bottom"
+          },
+          "tooltip": {
+            "mode": "multi"
+          }
+        },
+        "targets": [
+          {
+            "exemplar": true,
+            "expr": "max by(operation) (schakker_migration_rows)",
+            "legendFormat": "rows {{operation}}",
+            "refId": "A"
+          },
+          {
+            "expr": "max by(operation) (schakker_migration_batches)",
+            "legendFormat": "batches {{operation}}",
+            "refId": "B"
+          }
+        ],
+        "title": "Committed batch / row progress",
+        "type": "timeseries"
+      },
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "schakker-prometheus"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "drawStyle": "line",
+              "fillOpacity": 10
+            },
+            "unit": "short"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 24
+        },
+        "id": 8,
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "bottom"
+          },
+          "tooltip": {
+            "mode": "multi"
+          }
+        },
+        "targets": [
+          {
+            "exemplar": true,
+            "expr": "max by(operation) (schakker_migration_reverted_rows)",
+            "legendFormat": "reverted rows {{operation}}",
+            "refId": "A"
+          },
+          {
+            "expr": "max by(operation) (schakker_migration_reverted_batches)",
+            "legendFormat": "batches {{operation}}",
+            "refId": "B"
+          }
+        ],
+        "title": "Compensated batch / row progress",
+        "type": "timeseries"
+      },
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "schakker-prometheus"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "drawStyle": "line",
+              "fillOpacity": 10
+            },
+            "unit": "short"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 32
+        },
+        "id": 9,
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "bottom"
+          },
+          "tooltip": {
+            "mode": "multi"
+          }
+        },
+        "targets": [
+          {
+            "exemplar": true,
+            "expr": "sum by(pool,state) (schakker_database_pool_connections)",
+            "legendFormat": "{{pool}} {{state}}",
+            "refId": "A"
+          }
+        ],
+        "title": "Database pool active / idle connections",
+        "type": "timeseries"
+      },
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "schakker-prometheus"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "drawStyle": "line",
+              "fillOpacity": 10
+            },
+            "unit": "s"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 32
+        },
+        "id": 10,
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "bottom"
+          },
+          "tooltip": {
+            "mode": "multi"
+          }
+        },
+        "targets": [
+          {
+            "exemplar": true,
+            "expr": "sum by(pool) (rate(schakker_database_pool_wait_seconds_total[2m]))",
+            "legendFormat": "{{pool}}",
+            "refId": "A"
+          }
+        ],
+        "title": "Database connection wait time",
+        "type": "timeseries"
+      },
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "schakker-prometheus"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "drawStyle": "line",
+              "fillOpacity": 10
+            },
+            "unit": "s"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 40
+        },
+        "id": 11,
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "bottom"
+          },
+          "tooltip": {
+            "mode": "multi"
+          }
+        },
+        "targets": [
+          {
+            "exemplar": true,
+            "expr": "histogram_quantile(0.95, sum by(le,method) (rate(schakker_http_request_duration_seconds_bucket[2m])))",
+            "legendFormat": "{{method}}",
+            "refId": "A"
+          }
+        ],
+        "title": "API response time — p95",
+        "type": "timeseries"
+      },
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "schakker-prometheus"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "drawStyle": "line",
+              "fillOpacity": 10
+            },
+            "unit": "short"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 40
+        },
+        "id": 12,
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "bottom"
+          },
+          "tooltip": {
+            "mode": "multi"
+          }
+        },
+        "targets": [
+          {
+            "exemplar": true,
+            "expr": "min(schakker_metrics_collection_success)",
+            "legendFormat": "collection success",
+            "refId": "A"
+          }
+        ],
+        "title": "Queue metric collection health",
+        "type": "stat"
+      }
+    ],
+    "refresh": "5s",
+    "schemaVersion": 41,
+    "tags": [
+      "schakker",
+      "milestone2"
+    ],
+    "time": {
+      "from": "now-15m",
+      "to": "now"
+    },
+    "timezone": "browser",
+    "title": "Schakker — queue, migrations and connection pools",
+    "uid": "schakker-migrations",
+    "version": 1
+  }
+}

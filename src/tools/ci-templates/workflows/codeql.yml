@@ -41,7 +41,7 @@ jobs:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
           queries: security-extended
-          config-file: ./tools/ci-templates/codeql/config.yml
+          config-file: ./src/tools/ci-templates/codeql/config.yml
       - name: Build every Go workspace module, including the worker
         if: matrix.language == 'go'
         shell: bash

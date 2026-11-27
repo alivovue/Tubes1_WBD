@@ -1,0 +1,239 @@
+{
+  "run_id": "20261127T140507Z",
+  "started_at_utc": "2026-11-27T14:05:07.033833+00:00",
+  "stages": {
+    "codeql": {
+      "status": "scan completed and every finding reviewed",
+      "scans": [
+        {
+          "language": "go",
+          "sarif": "output/codeql/go.sarif",
+          "sha256": "d28376cfb0912012122de437640595958f37c2a1a2619d3f8296476ddb83ae3d",
+          "findings": 3,
+          "execution_successful": true
+        },
+        {
+          "language": "javascript",
+          "sarif": "output/codeql/javascript.sarif",
+          "sha256": "afca3543c425c1e5705e11444ba20020385b679f2de901bd02fc72f07161be73",
+          "findings": 10,
+          "execution_successful": true
+        }
+      ],
+      "review": "output/codeql/review.json",
+      "findings": 13,
+      "false_positives": 9,
+      "accepted_risks": 4,
+      "findings_requiring_fix": 0
+    },
+    "batch": {
+      "status": "passed",
+      "result": "output/batch/benchmark.json"
+    },
+    "k6": {
+      "status": "threshold failure retained",
+      "failed_thresholds": {
+        "api_latency_ms": "p(95)<750"
+      }
+    },
+    "observability": {
+      "status": "passed",
+      "trace_id": "7c02681ddaa7392f625971a8bc44bd96"
+    }
+  },
+  "commands": [
+    {
+      "name": "codeql-create-go",
+      "argv": [
+        "/home/audric/go-tmp/schakker-bonuses/tools/codeql/codeql/codeql",
+        "database",
+        "create",
+        "/home/audric/kuliah/wbd/tubes/Tubes1_WBD/.schakker/bonus-proof/20261127T140507Z/codeql-go",
+        "--source-root=/home/audric/kuliah/wbd/tubes/Tubes1_WBD",
+        "--language=go",
+        "--threads=2",
+        "--ram=4096",
+        "--codescanning-config=/home/audric/kuliah/wbd/tubes/Tubes1_WBD/src/tools/ci-templates/codeql/config.yml",
+        "--command=bash src/tools/codeql-build.sh"
+      ],
+      "started_at_utc": "2026-11-27T14:05:17.301652+00:00",
+      "exit_code": 0,
+      "finished_at_utc": "2026-11-27T14:15:03.913533+00:00"
+    },
+    {
+      "name": "codeql-analyze-go",
+      "argv": [
+        "/home/audric/go-tmp/schakker-bonuses/tools/codeql/codeql/codeql",
+        "database",
+        "analyze",
+        "/home/audric/kuliah/wbd/tubes/Tubes1_WBD/.schakker/bonus-proof/20261127T140507Z/codeql-go",
+        "codeql/go-queries:codeql-suites/go-security-extended.qls",
+        "--format=sarif-latest",
+        "--output=/home/audric/kuliah/wbd/tubes/Tubes1_WBD/output/codeql/go.sarif",
+        "--threads=2",
+        "--ram=4096",
+        "--sarif-category=go",
+        "--sarif-add-snippets"
+      ],
+      "started_at_utc": "2026-11-27T14:15:03.914647+00:00",
+      "exit_code": 0,
+      "finished_at_utc": "2026-11-27T14:17:07.537254+00:00"
+    },
+    {
+      "name": "codeql-create-javascript",
+      "argv": [
+        "/home/audric/go-tmp/schakker-bonuses/tools/codeql/codeql/codeql",
+        "database",
+        "create",
+        "/home/audric/kuliah/wbd/tubes/Tubes1_WBD/.schakker/bonus-proof/20261127T140507Z/codeql-javascript",
+        "--source-root=/home/audric/kuliah/wbd/tubes/Tubes1_WBD",
+        "--language=javascript",
+        "--threads=2",
+        "--ram=4096",
+        "--codescanning-config=/home/audric/kuliah/wbd/tubes/Tubes1_WBD/src/tools/ci-templates/codeql/config.yml",
+        "--build-mode=none"
+      ],
+      "started_at_utc": "2026-11-27T14:17:07.664858+00:00",
+      "exit_code": 0,
+      "finished_at_utc": "2026-11-27T14:17:53.717228+00:00"
+    },
+    {
+      "name": "codeql-analyze-javascript",
+      "argv": [
+        "/home/audric/go-tmp/schakker-bonuses/tools/codeql/codeql/codeql",
+        "database",
+        "analyze",
+        "/home/audric/kuliah/wbd/tubes/Tubes1_WBD/.schakker/bonus-proof/20261127T140507Z/codeql-javascript",
+        "codeql/javascript-queries:codeql-suites/javascript-security-extended.qls",
+        "--format=sarif-latest",
+        "--output=/home/audric/kuliah/wbd/tubes/Tubes1_WBD/output/codeql/javascript.sarif",
+        "--threads=2",
+        "--ram=4096",
+        "--sarif-category=javascript",
+        "--sarif-add-snippets"
+      ],
+      "started_at_utc": "2026-11-27T14:17:53.719645+00:00",
+      "exit_code": 0,
+      "finished_at_utc": "2026-11-27T14:20:17.970478+00:00"
+    },
+    {
+      "name": "codeql-inventory",
+      "argv": [
+        "/usr/bin/python3",
+        "src/tools/codeql-report.py",
+        "output/codeql/go.sarif",
+        "output/codeql/javascript.sarif",
+        "--output",
+        "output/codeql/review.json"
+      ],
+      "started_at_utc": "2026-11-27T14:20:18.041345+00:00",
+      "exit_code": 0,
+      "finished_at_utc": "2026-11-27T14:20:18.156808+00:00"
+    },
+    {
+      "name": "batch-benchmark",
+      "argv": [
+        "go",
+        "-C",
+        "src/tests",
+        "test",
+        "-count=1",
+        "-timeout=30m",
+        "-v",
+        "-run",
+        "^TestBatchPerformanceEvidence$",
+        "./integration"
+      ],
+      "started_at_utc": "2026-11-27T14:20:18.158588+00:00",
+      "exit_code": 0,
+      "finished_at_utc": "2026-11-27T14:22:48.818347+00:00"
+    },
+    {
+      "name": "build-loadfixture",
+      "argv": [
+        "go",
+        "-C",
+        "src/tools",
+        "build",
+        "-o",
+        "/home/audric/kuliah/wbd/tubes/Tubes1_WBD/.schakker/bonus-proof/20261127T140507Z/loadfixture",
+        "./cmd/loadfixture"
+      ],
+      "started_at_utc": "2026-11-27T14:23:35.971761+00:00",
+      "exit_code": 0,
+      "finished_at_utc": "2026-11-27T14:23:46.548675+00:00"
+    },
+    {
+      "name": "k6-stress",
+      "argv": [
+        "/home/audric/go-tmp/schakker-bonuses/tools/k6/k6-v2.4.0-linux-amd64/k6",
+        "run",
+        "src/tests/k6/stress.js"
+      ],
+      "started_at_utc": "2026-11-27T14:24:00.574543+00:00",
+      "exit_code": 99,
+      "finished_at_utc": "2026-11-27T14:25:20.582429+00:00"
+    },
+    {
+      "name": "grafana-screenshot",
+      "argv": [
+        "node",
+        "src/tools/capture-grafana.mjs",
+        "/home/audric/kuliah/wbd/tubes/Tubes1_WBD/.schakker/bonus-proof/20261127T140507Z/observability/grafana_password",
+        "/home/audric/kuliah/wbd/tubes/Tubes1_WBD/output/observability/grafana.png"
+      ],
+      "started_at_utc": "2026-11-27T14:25:30.500325+00:00",
+      "exit_code": 0,
+      "finished_at_utc": "2026-11-27T14:26:00.056560+00:00"
+    }
+  ],
+  "status": "completed",
+  "cleanup": {
+    "processes": [
+      {
+        "service": "fixture",
+        "exit_code": 0
+      },
+      {
+        "service": "observability-stack",
+        "exit_code": 0
+      }
+    ],
+    "remaining_test_clusters": []
+  },
+  "finished_at_utc": "2026-11-27T14:26:01.250608+00:00",
+  "requested_stage": "all",
+  "all_thresholds_passed": false,
+  "verification_checks": {
+    "fresh_run_no_prior_results_reused": true,
+    "scanned_sources_match_current_files": true,
+    "fixture_credentials_excluded": true,
+    "grafana_screenshot_visually_inspected": true,
+    "readme_links_and_json_valid": true,
+    "proof_git_allowlist_verified": true,
+    "development_services_left_running": true,
+    "timeout_child_cleanup_verified": true
+  },
+  "finalized_at_utc": "2026-11-27T14:32:07.099918+00:00",
+  "artifact_sha256": {
+    "batch/benchmark.json": "9820348aadd09e70f4b8745d9142fcd6759c20a7a816de831b92d1f443c90de4",
+    "batch/run.json": "287bab556e848a827b86b40b559830721b4cb6eb77f0a3ebd57e69d783eb1e83",
+    "codeql/go.sarif": "d28376cfb0912012122de437640595958f37c2a1a2619d3f8296476ddb83ae3d",
+    "codeql/javascript.sarif": "afca3543c425c1e5705e11444ba20020385b679f2de901bd02fc72f07161be73",
+    "codeql/manifest.json": "0e434b9d33b5185c178bbfddae7c765aaac2f2fb6f9f1d86ea398dd77761d05a",
+    "codeql/review.json": "41d3b887a3e258e0966ab7261393e4fe57104b9b02e2b1cb3922b88b57d40b77",
+    "environment.json": "b5a1bceb1e3766cdbac5ab6695ced9a5f205ab0d4de4d0f026c026eb64ed13e1",
+    "k6/results.md": "b0012666e4da321b193e5a54ae75aafbcd1ffea6480f0d6cea75a4c53e96e275",
+    "k6/run.json": "1a9f2135ffc5b1e8294f6f8b6cd8b9fec3b7d6dfe83358d3f5ff9992eeb342c2",
+    "k6/summary.json": "edfdcc5fac99686842333ff0e08b188d7bd97d1fb5e3194488fa0032f713ef36",
+    "observability/config.json": "427c5ae3ae8cae6f406f5f42fd4cb14b6fd92428f49af1e76f8ce1dd098e925e",
+    "observability/dashboard.json": "4092ca9e9c198dd857df771fa60b231d3e2171a9d189746858de3179b3d625c4",
+    "observability/grafana.png": "8b8ee9f220c4a0a7cf1663318abe37681046fe1bd4fe3aaada8227fd3eef20c0",
+    "observability/logs.json": "c89dff2ba334c31ebc87257c51f7a2abb5b6e506316f595b6e66ee3a6bafe381",
+    "observability/metrics.json": "86028414cab361f811fa9b1d48be30b0c2df69ae36eac0e3d5c34870f98672dd",
+    "observability/metrics.prom": "929dd222bc1da6fc286d409248aa190a3dab579bc2b90cd64f20156a5f636a34",
+    "observability/trace.json": "0f06e96c7f4c33aae4fb5b4314c133a964df27cc64935e3a6234ed82649d57b4",
+    "observability/verification.json": "87be3b7476c34545ab51abe87972b4778b543ec5d0f45e6a9331dd781bc4d060",
+    "source-manifest.json": "0774dcbe0435bf027cf2b5ed0d98ac32f2aee9439c015a86ab65273fb3a5f649"
+  }
+}

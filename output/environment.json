@@ -1,0 +1,24 @@
+{
+  "recorded_at_utc": "2026-11-27T14:05:16.575701+00:00",
+  "os": "Linux-6.8.0-138-generic-x86_64-with-glibc2.35",
+  "architecture": "x86_64",
+  "cpu": "AMD Ryzen 7 7840U w/ Radeon(TM) 780M Graphics",
+  "logical_cpus": 16,
+  "ram_bytes": 16033816576,
+  "versions": {
+    "go": "go version go1.27.3 linux/amd64",
+    "node": "v22.23.3",
+    "codeql": "{\n  \"productName\" : \"CodeQL\",\n  \"vendor\" : \"GitHub\",\n  \"version\" : \"2.27.4\",\n  \"sha\" : \"7eb0047c90fffaeb822564a0ac56d585dc871f30\",\n  \"branches\" : [\n    \"codeql-cli-2.27.4\"\n  ],\n  \"copyright\" : \"Copyright (C) 2019-2026 GitHub, Inc.\",\n  \"unpackedLocation\" : \"/home/audric/go-tmp/schakker-bonuses/tools/codeql/codeql\",\n  \"configFileLocation\" : \"/home/audric/.config/codeql/config\",\n  \"configFileFound\" : false,\n  \"overlayVersion\" : 4,\n  \"features\" : {\n    \"analysisSummaryV2Default\" : true,\n    \"buildModeOption\" : true,\n    \"bundleSupportsIncludeDiagnostics\" : true,\n    \"bundleSupportsIncludeLogs\" : true,\n    \"bundleSupportsOverlay\" : true,\n    \"databaseInterpretResultsSupportsSarifRunProperty\" : true,\n    \"featuresInVersionResult\" : true,\n    \"indirectTracingSupportsStaticBinaries\" : false,\n    \"informsAboutUnsupportedPathFilters\" : true,\n    \"supportsPython312\" : true,\n    \"mrvaPackCreate\" : true,\n    \"threatModelOption\" : true,\n    \"traceCommandUseBuildMode\" : true,\n    \"v2ramSizing\" : true,\n    \"mrvaPackCreateMultipleQueries\" : true,\n    \"setsCodeqlRunnerEnvVar\" : true,\n    \"sarifMergeRunsFromEqualCategory\" : true,\n    \"forceOverwrite\" : true,\n    \"generateSummarySymbolMap\" : true,\n    \"pythonDefaultIsToNotExtractStdlib\" : true,\n    \"queryServerRunQueries\" : true,\n    \"queryServerTrimCacheWithMode\" : true,\n    \"builtinExtractorsSpecifyDefaultQueries\" : true,\n    \"bqrsDiffResultSets\" : true,\n    \"bundleSupportsIncludeOption\" : true,\n    \"suppressesMissingFileBaselineWarning\" : true,\n    \"jsonDataExtensions\" : true\n  }\n}",
+    "k6": "k6 v2.4.0 (commit/dd9395906d, go1.26.11, linux/amd64)",
+    "collector": "otelcol-contrib version 0.165.0",
+    "grafana": "grafana version 13.3.1",
+    "loki": "loki, version 3.7.10 (branch: release-3.7.x, revision: c792f585)\n  build user:       root@d3ca4d55ebe5\n  build date:       2026-11-13T00:20:52Z\n  go version:       go1.26.10\n  platform:         linux/amd64\n  tags:             netgo",
+    "tempo": "tempo, version 2.10.3 (branch: HEAD, revision: 4aeafc237)\n  build user:       \n  build date:       \n  go version:       go1.25.7\n  platform:         linux/amd64\n  tags:             unknown",
+    "prometheus": "prometheus, version 3.16.0 (branch: HEAD, revision: e2e28adeee2c5883d000fc82aca6008cfbf7e96d)\n  build user:       root@880187fc0808\n  build date:       20261105-15:13:16\n  go version:       go1.27.3\n  platform:         linux/amd64\n  tags:             netgo,builtinassets",
+    "chrome": "Google Chrome 133.0.6943.98",
+    "postgresql_server": "14.24 (Ubuntu 14.24-0ubuntu0.22.04.1)",
+    "python": "Python 3.10.12"
+  },
+  "measurement_isolation": "CodeQL and batch finish before k6; existing development services are not load targets",
+  "supplementary_versions_recorded_at_utc": "2026-11-27T14:30:41.877270+00:00"
+}
