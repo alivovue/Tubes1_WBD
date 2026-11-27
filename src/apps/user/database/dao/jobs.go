@@ -31,6 +31,8 @@ type MigrationJob struct {
 	SQLHash       string            `json:"-"`
 	TraceContext  map[string]string `json:"-"`
 	RecoveryJobID *string           `json:"-"`
+	// Only ClaimJob sets this flag while consuming a durable retry request.
+	ManualCompensationRetry bool `json:"-"`
 }
 type BatchProgress struct {
 	Batches         int64  `json:"committed_batches"`
@@ -129,9 +131,9 @@ func (d *Store) ClaimJob(ctx context.Context, owner string, lease time.Duration)
 		return out, ErrInvalid
 	}
 	err = d.Transaction(ctx, func(tx *Store) error {
-		var id string
-		err := tx.q.QueryRowContext(ctx, `SELECT j.id FROM migration_jobs j WHERE
- (((j.status='pending' OR (j.status IN('partial','partially_reverted') AND j.error_class='temporary_failure')) AND j.next_attempt_at<=clock_timestamp() AND (j.attempt<j.max_attempts OR j.error_class='reconcile_only'))
+		var id, requestClass string
+		err := tx.q.QueryRowContext(ctx, `SELECT j.id,j.error_class FROM migration_jobs j WHERE
+ (((j.status='pending' OR (j.status IN('partial','partially_reverted') AND j.error_class='temporary_failure')) AND j.next_attempt_at<=clock_timestamp() AND (j.attempt<j.max_attempts OR j.error_class='reconcile_only' OR (j.operation='batch_cancel' AND j.error_class='manual_compensation_retry')))
  OR (j.status IN('running','reverting') AND j.lease_until<clock_timestamp()))
  AND j.recovery_job_id IS NULL
  AND NOT EXISTS(SELECT 1 FROM migration_jobs b WHERE b.database_id=j.database_id AND b.id<>j.id
@@ -142,20 +144,21 @@ func (d *Store) ClaimJob(ctx context.Context, owner string, lease time.Duration)
  AND (EXISTS(SELECT 1 FROM migration_jobs source WHERE source.recovery_job_id=j.id)
  OR NOT EXISTS(SELECT 1 FROM migration_jobs p WHERE p.database_id=j.database_id AND p.status='pending'
  AND (p.created_at,p.id)<(j.created_at,j.id)))
- ORDER BY j.created_at,j.id FOR UPDATE OF j SKIP LOCKED LIMIT 1`).Scan(&id)
+ ORDER BY j.created_at,j.id FOR UPDATE OF j SKIP LOCKED LIMIT 1`).Scan(&id, &requestClass)
 		if err != nil {
 			return sqldb.Classify(err)
 		}
 		if _, err = tx.q.ExecContext(ctx, `UPDATE migration_job_attempts SET finished_at=clock_timestamp(),outcome='uncertain',error_class='lease_expired' WHERE job_id=$1 AND finished_at IS NULL`, id); err != nil {
 			return err
 		}
-		if _, err = tx.q.ExecContext(ctx, `UPDATE migration_jobs SET attempt=attempt+1,lease_owner=$2,lease_until=clock_timestamp()+$3*interval '1 millisecond',error_class=CASE WHEN status IN('running','reverting') AND error_class<>'reconcile_only' THEN 'lease_recovery' ELSE error_class END,status=CASE WHEN operation='batch_cancel' THEN 'reverting' ELSE 'running' END,updated_at=clock_timestamp() WHERE id=$1`, id, owner, lease.Milliseconds()); err != nil {
+		if _, err = tx.q.ExecContext(ctx, `UPDATE migration_jobs SET attempt=attempt+1,lease_owner=$2,lease_until=clock_timestamp()+$3*interval '1 millisecond',error_class=CASE WHEN status IN('running','reverting') AND error_class<>'reconcile_only' THEN 'lease_recovery' WHEN error_class='manual_compensation_retry' THEN '' ELSE error_class END,status=CASE WHEN operation='batch_cancel' THEN 'reverting' ELSE 'running' END,updated_at=clock_timestamp() WHERE id=$1`, id, owner, lease.Milliseconds()); err != nil {
 			return err
 		}
 		out, err = tx.Job(ctx, id)
 		if err != nil {
 			return err
 		}
+		out.ManualCompensationRetry = requestClass == "manual_compensation_retry"
 		_, err = tx.q.ExecContext(ctx, `INSERT INTO migration_job_attempts(job_id,attempt_no,definition_id,revision_id,database_id,actor_id,operation,logical_version,sql_snapshot,target_execution_id)
  SELECT j.id,j.attempt,r.definition_id,r.id,j.database_id,j.requested_by,j.operation,
  CASE WHEN j.operation='rollback' THEN v.expected_active_version ELSE v.expected_active_version+1 END,
@@ -250,6 +253,9 @@ func (d *Store) FinishJob(ctx context.Context, j MigrationJob, status, errorClas
 		return sqldb.Classify(err)
 	})
 }
+
+// An explicit, approval-validated compensation retry permits one more attempt.
+// Claim consumes the marker; failures beyond the automatic budget stay paused.
 func (d *Store) RetryJob(ctx context.Context, id string, recoveryActor ...int64) error {
 	class := ""
 	actor := int64(0)
@@ -259,7 +265,7 @@ func (d *Store) RetryJob(ctx context.Context, id string, recoveryActor ...int64)
 	if actor > 0 {
 		class = "reconcile_only"
 	}
-	err := sqldb.Affected(d.q.ExecContext(ctx, `UPDATE migration_jobs SET status='pending',error_class=$2,trace_context=CASE WHEN $3::bigint>0 THEN trace_context||jsonb_build_object('recovery_actor_id',$3::text) ELSE trace_context-'recovery_actor_id' END,next_attempt_at=clock_timestamp(),updated_at=clock_timestamp() WHERE id=$1 AND status IN('failed','partial','uncertain','partially_reverted') AND (attempt<max_attempts OR (status='uncertain' AND $2='reconcile_only')) AND recovery_job_id IS NULL AND lease_owner IS NULL`, id, class, actor))
+	err := sqldb.Affected(d.q.ExecContext(ctx, `UPDATE migration_jobs SET status='pending',error_class=CASE WHEN operation='batch_cancel' AND attempt>=max_attempts AND $2='' THEN 'manual_compensation_retry' ELSE $2 END,trace_context=CASE WHEN $3::bigint>0 THEN trace_context||jsonb_build_object('recovery_actor_id',$3::text) ELSE trace_context-'recovery_actor_id' END,next_attempt_at=clock_timestamp(),updated_at=clock_timestamp() WHERE id=$1 AND status IN('failed','partial','uncertain','partially_reverted') AND (attempt<max_attempts OR (operation='batch_cancel' AND status IN('failed','partial','partially_reverted')) OR (status='uncertain' AND $2='reconcile_only')) AND recovery_job_id IS NULL AND lease_owner IS NULL`, id, class, actor))
 	if errors.Is(err, ErrNotFound) {
 		return ErrConflict
 	}

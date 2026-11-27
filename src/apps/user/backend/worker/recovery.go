@@ -2,6 +2,7 @@ package worker
 
 import (
 	"context"
+	"schakker_shared/observability"
 
 	"tubes1_wbd/backend/dbmanagement"
 	"tubes1_wbd/backend/migration"
@@ -62,7 +63,7 @@ func (r Recovery) CancellationSourceFor(ctx context.Context, actor int64, id str
 	if err != nil {
 		return source, err
 	}
-	progress, fingerprint, safe, err := pgengine.BatchRecovery(ctx, target.DB, target.Adapter, namespace, origin.ID)
+	progress, fingerprint, safe, err := pgengine.BatchRecovery(ctx, observability.WrapSQL(target.DB), target.Adapter, namespace, origin.ID)
 	if err != nil {
 		return source, err
 	}

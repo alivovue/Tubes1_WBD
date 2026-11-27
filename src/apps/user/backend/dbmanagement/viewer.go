@@ -73,7 +73,7 @@ func (s *Service) ReadQuery(ctx context.Context, actor, database int64, query st
 	}()
 	if dbms == "mariadb" {
 		var name string
-		if tx.QueryRowContext(ctx, "SELECT DATABASE()").Scan(&name) != nil {
+		if observability.WrapSQL(tx).QueryRowContext(ctx, "SELECT DATABASE()").Scan(&name) != nil {
 			return result, ErrQuery
 		}
 		if err := adapters.ValidateMariaReferences(name, statement); err != nil {

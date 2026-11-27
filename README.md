@@ -126,6 +126,8 @@ Statement timeout koneksi worker mengikuti sisa deadline job, terpisah dari time
 
 Log SQL menyertakan struktur query, hash SQL asli, jumlah/tipe parameter, durasi dan SQLSTATE. Literal, komentar dan nilai parameter disamarkan. Log worker menyertakan salinan SQL yang disamarkan serta migration/definition, revision, job, execution, attempt dan batch ID jika relevan; salinan SQL asli tetap tersimpan pada execution history.
 
+Hasil query dan span SQL diselesaikan setelah pembacaan hasil selesai, gagal atau ditutup. Error yang baru muncul saat membaca row atau melakukan Scan tetap dicatat, termasuk SQLSTATE; durasi mencakup pembacaan hasil. Analisis EXPLAIN, fingerprint schema, advisory lock serta commit/rollback metadata memakai instrumentasi yang sama.
+
 ## Penjelasan dan bukti Milestone 2
 
 Bagian ini mengikuti spesifikasi **IF3110 — Milestone 2 — Pengembangan Aplikasi Web**, versi pembaruan yang diberikan, serta sheet **QnA 2**. Nomor halaman di bawah mengacu pada halaman PDF. Penjelasan dan bukti dikumpulkan pada README root ini.
@@ -156,6 +158,8 @@ Runner menjalankan scan CodeQL, benchmark batch, lalu k6 bersama stack observabi
 API hanya mengantrekan pekerjaan setelah seluruh approval yang diperlukan tersedia, lalu mengembalikan job ID. Tombol eksekusi tetap perlu ditekan pengguna; approval tidak otomatis menjalankan SQL. Self-approval diperbolehkan, tetapi setiap group yang memiliki akses view maupun view+edit tetap mempunyai keputusan tersendiri. Worker memvalidasi ulang permission, authority database, revisi immutable, hash SQL dan posisi migration sebelum melakukan perubahan.
 
 Queue berada pada tabel PostgreSQL `migration_jobs` di database platform. Claim menggunakan `FOR UPDATE SKIP LOCKED`, identitas worker, nomor attempt dan lease. Default worker: concurrency **2**, lease **30 detik**, heartbeat setiap **10 detik**, dan deadline job **30 menit**. Konfigurasi proses tersedia melalui `SCHAKKER_WORKER_CONCURRENCY`, `SCHAKKER_WORKER_LEASE_SECONDS` dan `SCHAKKER_WORKER_TIMEOUT_SECONDS`. Job secara default dibatasi **5 attempt**; kegagalan sementara mendapat exponential backoff 1, 2, 4, 8 detik dan seterusnya, dengan batas jeda 64 detik.
+
+Untuk pembatalan batch yang belum selesai setelah batas retry otomatis habis, executor awal dapat menekan **Resume / retry from checkpoint**. Permission dan approval tetap divalidasi ulang. Setiap permintaan eksplisit mengizinkan satu attempt tambahan pada job dan checkpoint asli, tanpa menghapus history atau menaikkan batas retry otomatis. Jika attempt tambahan itu gagal, job kembali berhenti sampai ada permintaan retry baru. Perubahan authority yang membatalkan approval tetap memerlukan review pembatalan baru.
 
 Serialisasi satu database memakai session advisory lock PostgreSQL pada koneksi metadata khusus, dengan key `-database_id`. Lock dipertahankan selama seluruh job, termasuk di antara commit batch. Target PostgreSQL juga memakai session advisory lock `73421108` untuk melindungi eksekusi dan receipt pada target fisik. Database target yang berbeda dapat dikerjakan paralel. Kode utamanya berada pada [database_lock.go](src/apps/user/database/dao/database_lock.go), [jobs.go](src/apps/user/database/dao/jobs.go) dan [runner.go](src/apps/user/backend/worker/runner.go).
 
@@ -368,7 +372,7 @@ Analisis tiap fase:
 
 ### Security scanning dengan CodeQL
 
-Scan baru memakai CodeQL CLI **2.27.4**, query pack Go **1.6.14**, JavaScript **2.5.0**, dan suite **security-extended**. Database analisis dibuat baru dari source saat ini; hasil lama tidak dipakai. [manifest.json](output/codeql/manifest.json) mencatat SHA-256 SARIF, source archive dan cakupan; [review.json](output/codeql/review.json) mencatat review setiap temuan. Semua source yang diarsipkan scanner telah dibandingkan dengan file saat ini dan cocok.
+Scan tanggal 27 November 2026 memakai CodeQL CLI **2.27.4**, query pack Go **1.6.14**, JavaScript **2.5.0**, dan suite **security-extended**. Database analisis dibuat baru dari snapshot source yang dicatat dalam [manifest.json](output/codeql/manifest.json), tanpa memakai hasil lama. Manifest mencatat SHA-256 SARIF, source archive dan cakupan; [review.json](output/codeql/review.json) mencatat review setiap temuan. Bukti ini berlaku untuk snapshot run tersebut; perubahan source setelahnya memerlukan scan ulang untuk menghasilkan bukti yang sesuai.
 
 | Scan | Source bahasa yang diarsipkan | Temuan | Bukti |
 | --- | ---: | ---: | --- |

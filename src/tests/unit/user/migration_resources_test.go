@@ -128,6 +128,12 @@ func TestJobResourceRetryAndCompensationCapabilitiesUseOwnershipProgressAndPermi
 		{name: "other actor", status: "partial", permission: dao.ViewEdit, actor: 8, cancel: true},
 		{name: "uncertain other actor", status: "uncertain", permission: dao.ViewEdit, actor: 8, retry: true, cancel: true},
 		{name: "exhausted", status: "partial", permission: dao.ViewEdit, actor: 7, attempt: 3, cancel: true},
+		{name: "exhausted compensation", status: "partially_reverted", operation: "batch_cancel", permission: dao.ViewEdit, actor: 7, attempt: 22, retry: true},
+		{name: "exhausted compensation before first reversal", status: "partial", operation: "batch_cancel", permission: dao.ViewEdit, actor: 7, attempt: 3, retry: true},
+		{name: "exhausted compensation failure", status: "failed", operation: "batch_cancel", permission: dao.ViewEdit, actor: 7, attempt: 3, retry: true},
+		{name: "exhausted compensation reader", status: "partially_reverted", operation: "batch_cancel", permission: dao.ViewOnly, actor: 7, attempt: 3},
+		{name: "exhausted compensation other actor", status: "partially_reverted", operation: "batch_cancel", permission: dao.ViewEdit, actor: 8, attempt: 3},
+		{name: "exhausted compensation superseded", status: "partially_reverted", operation: "batch_cancel", permission: dao.ViewEdit, actor: 7, attempt: 3, reserved: true},
 		{name: "reserved", status: "partial", permission: dao.ViewEdit, actor: 7, reserved: true},
 		{name: "fully compensated", status: "partial", permission: dao.ViewEdit, actor: 7, allReverted: true, retry: true},
 		{name: "irreversible", status: "partial", permission: dao.ViewEdit, actor: 7, irreversible: true, retry: true},
@@ -141,6 +147,10 @@ func TestJobResourceRetryAndCompensationCapabilitiesUseOwnershipProgressAndPermi
 			r.Irreversible = tc.irreversible
 			stub.append(resourceJSON(t, "migration_reviews", dao.MigrationReview{RevisionID: r.ID}), resourceJSON(t, "migration_revisions", r), queryStep("SELECT min(a.started_at)", []string{"started", "completed"}, []driver.Value{nil, nil}), resourceActor())
 			j := dao.MigrationJob{ID: "job", ReviewID: 22, ActorID: tc.actor, Operation: "up", Status: tc.status, Attempt: max(1, tc.attempt), MaxAttempts: 3}
+			operation := "up_batch"
+			if tc.operation != "" {
+				j.Operation, operation = tc.operation, "cancel_batch"
+			}
 			if tc.reserved {
 				reserved := "cancellation-job"
 				j.RecoveryJobID = &reserved
@@ -153,11 +163,11 @@ func TestJobResourceRetryAndCompensationCapabilitiesUseOwnershipProgressAndPermi
 			if err != nil {
 				t.Fatal(err)
 			}
-			resume := tc.permission == dao.ViewEdit && tc.status == "partial" && !tc.reserved && !tc.allReverted && !tc.irreversible
+			resume := j.Operation == "up" && tc.permission == dao.ViewEdit && tc.status == "partial" && !tc.reserved && !tc.allReverted && !tc.irreversible
 			if body["can_resume"] != resume {
 				t.Fatalf("wrong fresh approval resume capability: %#v", body)
 			}
-			if body["retryable"] != tc.retry || body["can_cancel"] != tc.cancel || body["operation"] != "up_batch" || body["committed_rows"] != int64(100) {
+			if body["retryable"] != tc.retry || body["can_cancel"] != tc.cancel || body["operation"] != operation || body["committed_rows"] != int64(100) {
 				t.Fatalf("wrong job capabilities: %#v", body)
 			}
 		})

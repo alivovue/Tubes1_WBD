@@ -28,20 +28,20 @@ func RunJob(ctx context.Context, db *sql.DB, adapter adapters.Adapter, r engines
 	}
 	defer conn.Close()
 	lockCtx, span := observability.Start(ctx, "target.lock.wait")
-	_, err = conn.ExecContext(lockCtx, `SELECT pg_catalog.pg_advisory_lock(73421108)`)
+	_, err = observability.WrapSQL(conn).ExecContext(lockCtx, `SELECT pg_catalog.pg_advisory_lock(73421108)`)
 	span.End()
 	if err != nil {
 		return out, err
 	}
 	defer func() {
-		cleanup, stop := context.WithTimeout(context.Background(), 5*time.Second)
+		cleanup, stop := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 		defer stop()
 		var unlocked bool
-		if conn.QueryRowContext(cleanup, `SELECT pg_catalog.pg_advisory_unlock(73421108)`).Scan(&unlocked) != nil || !unlocked {
+		if observability.WrapSQL(conn).QueryRowContext(cleanup, `SELECT pg_catalog.pg_advisory_unlock(73421108)`).Scan(&unlocked) != nil || !unlocked {
 			conn.Raw(func(any) error { return driver.ErrBadConn })
 		}
 	}()
-	found, err := ReadJobReceipt(ctx, conn, r, &out)
+	found, err := ReadJobReceipt(ctx, observability.WrapSQL(conn), r, &out)
 	if err != nil {
 		return out, engines.ErrJobUncertain
 	}
@@ -53,7 +53,7 @@ func RunJob(ctx context.Context, db *sql.DB, adapter adapters.Adapter, r engines
 	}
 	if r.Batch != nil && r.Operation != "rollback" {
 		var exists bool
-		if err = conn.QueryRowContext(ctx, `SELECT to_regclass('_schakker.batch_jobs') IS NOT NULL`).Scan(&exists); err != nil {
+		if err = observability.WrapSQL(conn).QueryRowContext(ctx, `SELECT to_regclass('_schakker.batch_jobs') IS NOT NULL`).Scan(&exists); err != nil {
 			return out, engines.ErrJobUncertain
 		}
 		if exists {
@@ -61,7 +61,7 @@ func RunJob(ctx context.Context, db *sql.DB, adapter adapters.Adapter, r engines
 			if r.OriginalJobID != "" {
 				source = r.OriginalJobID
 			}
-			p, _, _, readErr := readBatch(ctx, conn, r.Namespace, source)
+			p, _, _, readErr := readBatch(ctx, observability.WrapSQL(conn), r.Namespace, source)
 			if readErr == nil {
 				out.Progress = p
 			} else if !errors.Is(readErr, sql.ErrNoRows) {
@@ -145,7 +145,7 @@ func RunJob(ctx context.Context, db *sql.DB, adapter adapters.Adapter, r engines
 		return out, err
 	}
 	var confirmed engines.JobReceipt
-	if found, err = ReadJobReceipt(ctx, tx, r, &confirmed); err != nil || !found || confirmed.Proof() != out.Proof() {
+	if found, err = ReadJobReceipt(ctx, observability.WrapSQL(tx), r, &confirmed); err != nil || !found || confirmed.Proof() != out.Proof() {
 		return out, engines.ErrProtectedMetadata
 	}
 	if err = refreshBatchVersions(ctx, tx, adapter, versions); err != nil {
@@ -160,7 +160,6 @@ func RunJob(ctx context.Context, db *sql.DB, adapter adapters.Adapter, r engines
 }
 
 func ReadJobReceipt(ctx context.Context, q adapters.Querier, r engines.JobRequest, out *engines.JobReceipt) (bool, error) {
-	q = observability.WrapSQL(q)
 	var exists bool
 	if err := q.QueryRowContext(ctx, `SELECT to_regclass('_schakker.job_receipts') IS NOT NULL`).Scan(&exists); err != nil {
 		return false, err

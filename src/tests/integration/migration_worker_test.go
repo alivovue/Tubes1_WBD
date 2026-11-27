@@ -491,48 +491,100 @@ func TestUnsafeCancellationDoesNotOverwriteExternalChanges(t *testing.T) {
 }
 
 func TestPartialCompensationCanResumeInReverseOrder(t *testing.T) {
-	f, jobs, r := newWorkerFixture(t)
-	revision := batchDefinition(t, f, 25, 10)
-	review := f.approve(t, f.submit(t, revision))
-	id, err := f.workflow.Enqueue(f.ctx, f.editor, review.ID, "reverse-resume")
-	must(t, err)
-	stopAfterBatch(r, 2)
-	_, _ = r.RunOnce(f.ctx)
-	cancel, err := f.workflow.SubmitReview(f.ctx, f.editor, migration.ReviewInput{RevisionID: revision.ID, Action: "batch_cancel", TargetJobID: &id})
-	must(t, err)
-	cancel = f.approve(t, cancel)
-	undo, err := f.workflow.Enqueue(f.ctx, f.editor, cancel.ID, "reverse-approved")
-	must(t, err)
-	r.Execute = func(ctx context.Context, target *dbmanagement.Target, request engines.JobRequest, h engines.JobHooks) (engines.JobReceipt, error) {
-		original := h.Progress
-		h.Progress = func(ctx context.Context, p engines.JobProgress) error {
-			if err := original(ctx, p); err != nil {
-				return err
+	for _, limit := range []int{1, 5} {
+		t.Run(fmt.Sprintf("retry-budget-%d", limit), func(t *testing.T) {
+			f, jobs, r := newWorkerFixture(t)
+			other := f.user(t, "other.retry.editor")
+			must(t, f.adminAuth.SetMembership(f.ctx, f.admin, other.ID, f.editors.ID, true))
+			revision := batchDefinition(t, f, 25, 10)
+			review := f.approve(t, f.submit(t, revision))
+			id, err := f.workflow.Enqueue(f.ctx, f.editor, review.ID, "reverse-resume")
+			must(t, err)
+			stopAfterBatch(r, 2)
+			_, _ = r.RunOnce(f.ctx)
+			cancel, err := f.workflow.SubmitReview(f.ctx, f.editor, migration.ReviewInput{RevisionID: revision.ID, Action: "batch_cancel", TargetJobID: &id})
+			must(t, err)
+			cancel = f.approve(t, cancel)
+			undo, err := f.workflow.Enqueue(f.ctx, f.editor, cancel.ID, "reverse-approved")
+			must(t, err)
+			_, err = f.dbs.Website.ExecContext(f.ctx, `UPDATE migration_jobs SET max_attempts=$2 WHERE id=$1`, undo, limit)
+			must(t, err)
+			r.Execute = func(ctx context.Context, target *dbmanagement.Target, request engines.JobRequest, h engines.JobHooks) (engines.JobReceipt, error) {
+				original := h.Progress
+				h.Progress = func(ctx context.Context, p engines.JobProgress) error {
+					if err := original(ctx, p); err != nil {
+						return err
+					}
+					if p.RevertedBatches >= 1 {
+						return context.Canceled
+					}
+					return nil
+				}
+				return pgengine.RunJob(ctx, target.DB, target.Adapter, request, h)
 			}
-			if p.RevertedBatches >= 1 {
-				return context.Canceled
+			_, err = r.RunOnce(f.ctx)
+			if err == nil {
+				t.Fatal("compensation interruption missing")
 			}
-			return nil
-		}
-		return pgengine.RunJob(ctx, target.DB, target.Adapter, request, h)
+			assertJob(t, f, undo, "partially_reverted")
+			var first, last int
+			must(t, f.dbs.Managed.QueryRowContext(f.ctx, `SELECT value FROM batch_counters WHERE id=1`).Scan(&first))
+			must(t, f.dbs.Managed.QueryRowContext(f.ctx, `SELECT value FROM batch_counters WHERE id=11`).Scan(&last))
+			if first != 3 || last != 0 {
+				t.Fatal("batches were not reversed in descending order")
+			}
+			resources, err := f.workflow.Resources(f.ctx, f.editor, f.database)
+			must(t, err)
+			paused, progress, err := jobs.Status(f.ctx, f.editor, undo)
+			must(t, err)
+			view, err := resources.Job(paused, progress)
+			must(t, err)
+			if view["retryable"] != true {
+				t.Fatal("SPA cannot explicitly resume exhausted compensation")
+			}
+			_, err = jobs.Retry(f.ctx, f.reader.ID, undo)
+			wantError(t, err, access.ErrForbidden)
+			_, err = jobs.Retry(f.ctx, other.ID, undo)
+			wantError(t, err, access.ErrForbidden)
+			if limit == 1 {
+				ran, err := r.RunOnce(f.ctx)
+				wantError(t, err, dao.ErrNotFound)
+				if ran {
+					t.Fatal("exhausted compensation retried automatically")
+				}
+				_, err = jobs.Retry(f.ctx, f.editor, undo)
+				must(t, err)
+				_, err = r.RunOnce(f.ctx)
+				if err == nil {
+					t.Fatal("expected another interrupted manual attempt")
+				}
+				assertJob(t, f, undo, "partially_reverted")
+				ran, err = r.RunOnce(f.ctx)
+				wantError(t, err, dao.ErrNotFound)
+				if ran {
+					t.Fatal("one manual retry allowed further automatic attempts")
+				}
+			}
+			_, err = jobs.Retry(f.ctx, f.editor, undo)
+			must(t, err)
+			r.Execute = nil
+			_, err = r.RunOnce(f.ctx)
+			must(t, err)
+			result := assertJob(t, f, undo, "reverted")
+			wantAttempts := 2
+			if limit == 1 {
+				wantAttempts = 3
+			}
+			if result.Attempt != wantAttempts || result.MaxAttempts != limit {
+				t.Fatal("manual recovery reset attempt history or automatic retry budget")
+			}
+			assertJob(t, f, id, "reverted")
+			must(t, f.dbs.Managed.QueryRowContext(f.ctx, `SELECT sum(value) FROM batch_counters`).Scan(&first))
+			if first != 0 {
+				t.Fatal("compensation failed to finish from its original checkpoint")
+			}
+		})
 	}
-	_, err = r.RunOnce(f.ctx)
-	if err == nil {
-		t.Fatal("compensation interruption missing")
-	}
-	assertJob(t, f, undo, "partially_reverted")
-	var first, last int
-	must(t, f.dbs.Managed.QueryRowContext(f.ctx, `SELECT value FROM batch_counters WHERE id=1`).Scan(&first))
-	must(t, f.dbs.Managed.QueryRowContext(f.ctx, `SELECT value FROM batch_counters WHERE id=11`).Scan(&last))
-	if first != 3 || last != 0 {
-		t.Fatal("batches were not reversed in descending order")
-	}
-	_, err = jobs.Retry(f.ctx, f.editor, undo)
-	must(t, err)
-	r.Execute = nil
-	_, err = r.RunOnce(f.ctx)
-	must(t, err)
-	assertJob(t, f, undo, "reverted")
 }
 func TestCompletedBatchRollbackAndForwardUseOriginalSQL(t *testing.T) {
 	f, _, r := newWorkerFixture(t)

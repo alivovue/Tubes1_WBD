@@ -2,6 +2,7 @@ package unit_test
 
 import (
 	"context"
+	"schakker_shared/observability"
 	"strings"
 	"testing"
 
@@ -67,14 +68,14 @@ func TestExplorerRejectsInvalidPaginationWithoutQuerying(t *testing.T) {
 	db, _, _ := newSQLStub(t)
 	for _, adapter := range []adapters.Adapter{postgres.New(), mariadb.New()} {
 		for _, options := range []adapters.PageOptions{{Limit: -1}, {Limit: 501}, {Offset: -1}, {OrderBy: make([]adapters.SortColumn, 17)}} {
-			_, err := adapter.TableData(context.Background(), db, "target", "people", options)
+			_, err := adapter.TableData(context.Background(), observability.WrapSQL(db), "target", "people", options)
 			wantError(t, err, adapters.ErrInvalid)
 		}
 	}
 }
 func TestMariaDBExplorerRejectsOtherDatabase(t *testing.T) {
 	db, _, _ := newSQLStub(t, scalarStep("SELECT DATABASE()", "allowed"))
-	_, err := mariadb.New().Tables(context.Background(), db, "forbidden")
+	_, err := mariadb.New().Tables(context.Background(), observability.WrapSQL(db), "forbidden")
 	wantError(t, err, adapters.ErrInvalid)
 }
 

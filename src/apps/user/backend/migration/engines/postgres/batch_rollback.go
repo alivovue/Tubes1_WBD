@@ -11,14 +11,14 @@ import (
 )
 
 func rollbackCompletedBatch(ctx context.Context, conn *sql.Conn, a adapters.Adapter, r engines.JobRequest, h engines.JobHooks, out engines.JobReceipt) (engines.JobReceipt, error) {
-	p, _, spec, err := readBatch(ctx, conn, r.Namespace, r.OriginalJobID)
+	p, _, spec, err := readBatch(ctx, observability.WrapSQL(conn), r.Namespace, r.OriginalJobID)
 	if err != nil {
 		return out, err
 	}
 	if spec != *r.Batch || p.State != "completed" || p.Rows != p.Total {
 		return out, engines.ErrUnsafeCompensation
 	}
-	if err = validateBatchTable(ctx, conn, spec); err != nil {
+	if err = validateBatchTable(ctx, observability.WrapSQL(conn), spec); err != nil {
 		return out, err
 	}
 	table, key, column, err := batchIdentifiers(a, spec)
@@ -29,11 +29,11 @@ func rollbackCompletedBatch(ctx context.Context, conn *sql.Conn, a adapters.Adap
 	if err != nil {
 		return out, err
 	}
-	defer tx.Rollback()
+	defer observability.Rollback(ctx, tx.Rollback)
 	if _, err = observability.WrapSQL(tx).ExecContext(ctx, `LOCK TABLE `+table+` IN SHARE ROW EXCLUSIVE MODE`); err != nil {
 		return out, err
 	}
-	if err = validateBatchTable(ctx, tx, spec); err != nil {
+	if err = validateBatchTable(ctx, observability.WrapSQL(tx), spec); err != nil {
 		return out, err
 	}
 	var count int64

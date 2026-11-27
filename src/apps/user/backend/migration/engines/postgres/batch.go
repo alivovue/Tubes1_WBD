@@ -25,7 +25,6 @@ func batchIdentifiers(a adapters.Adapter, s engines.BatchSpec) (table, key, colu
 	return
 }
 func validateBatchTable(ctx context.Context, q adapters.Querier, s engines.BatchSpec) error {
-	q = observability.WrapSQL(q)
 	var valid bool
 	err := q.QueryRowContext(ctx, `SELECT c.relkind='r' AND NOT c.relrowsecurity AND NOT c.relforcerowsecurity
  AND NOT EXISTS(SELECT 1 FROM pg_inherits WHERE inhrelid=c.oid OR inhparent=c.oid)
@@ -47,7 +46,6 @@ func validateBatchTable(ctx context.Context, q adapters.Querier, s engines.Batch
 	return nil
 }
 func readBatch(ctx context.Context, q adapters.Querier, namespace, id string) (p engines.JobProgress, hash string, spec engines.BatchSpec, err error) {
-	q = observability.WrapSQL(q)
 	var raw []byte
 	var cursor *int64
 	err = q.QueryRowContext(ctx, `SELECT action_hash,spec,batches,rows_count,last_cursor,total_rows,reverted_batches,reverted_rows,state FROM _schakker.batch_jobs WHERE namespace=$1 AND job_id=$2`, namespace, id).Scan(&hash, &raw, &p.Batches, &p.Rows, &cursor, &p.Total, &p.RevertedBatches, &p.RevertedRows, &p.State)
@@ -60,14 +58,14 @@ func readBatch(ctx context.Context, q adapters.Querier, namespace, id string) (p
 	return
 }
 func initBatch(ctx context.Context, conn *sql.Conn, a adapters.Adapter, r engines.JobRequest, h engines.JobHooks) error {
-	_, _, _, err := readBatch(ctx, conn, r.Namespace, r.JobID)
+	_, _, _, err := readBatch(ctx, observability.WrapSQL(conn), r.Namespace, r.JobID)
 	if err == nil {
 		return nil
 	}
 	if !errors.Is(err, sql.ErrNoRows) {
 		return err
 	}
-	if err = validateBatchTable(ctx, conn, *r.Batch); err != nil {
+	if err = validateBatchTable(ctx, observability.WrapSQL(conn), *r.Batch); err != nil {
 		return err
 	}
 	table, key, _, err := batchIdentifiers(a, *r.Batch)
@@ -78,11 +76,11 @@ func initBatch(ctx context.Context, conn *sql.Conn, a adapters.Adapter, r engine
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer observability.Rollback(ctx, tx.Rollback)
 	if _, err = observability.WrapSQL(tx).ExecContext(ctx, `LOCK TABLE `+table+` IN SHARE ROW EXCLUSIVE MODE`); err != nil {
 		return err
 	}
-	if err = validateBatchTable(ctx, tx, *r.Batch); err != nil {
+	if err = validateBatchTable(ctx, observability.WrapSQL(tx), *r.Batch); err != nil {
 		return err
 	}
 	var total int64
@@ -125,7 +123,7 @@ func runBatch(ctx context.Context, conn *sql.Conn, a adapters.Adapter, r engines
 		}
 	}
 	for {
-		p, hash, spec, err := readBatch(ctx, conn, r.Namespace, source)
+		p, hash, spec, err := readBatch(ctx, observability.WrapSQL(conn), r.Namespace, source)
 		out.Progress = p
 		if err != nil {
 			return out, err
@@ -143,7 +141,7 @@ func runBatch(ctx context.Context, conn *sql.Conn, a adapters.Adapter, r engines
 		if err = h.Guard(ctx); err != nil {
 			return out, err
 		}
-		if err = validateBatchTable(ctx, conn, spec); err != nil {
+		if err = validateBatchTable(ctx, observability.WrapSQL(conn), spec); err != nil {
 			return out, err
 		}
 		batchCtx, span := observability.Start(ctx, "migration.batch")
@@ -181,7 +179,7 @@ func batchTransaction(ctx context.Context, conn *sql.Conn, a adapters.Adapter, r
 	if _, err = observability.WrapSQL(tx).ExecContext(ctx, `LOCK TABLE `+table+` IN SHARE ROW EXCLUSIVE MODE`); err != nil {
 		return false, err
 	}
-	if err = validateBatchTable(ctx, tx, s); err != nil {
+	if err = validateBatchTable(ctx, observability.WrapSQL(tx), s); err != nil {
 		return false, err
 	}
 	reverse := r.Operation == "batch_cancel"
@@ -335,7 +333,7 @@ func batchTransaction(ctx context.Context, conn *sql.Conn, a adapters.Adapter, r
 		return false, engines.ErrJobUncertain
 	}
 	committed = true
-	p, _, _, err := readBatch(ctx, conn, r.Namespace, source)
+	p, _, _, err := readBatch(ctx, observability.WrapSQL(conn), r.Namespace, source)
 	if err != nil {
 		return false, engines.ErrJobUncertain
 	}
@@ -345,7 +343,6 @@ func batchTransaction(ctx context.Context, conn *sql.Conn, a adapters.Adapter, r
 }
 
 func BatchRecovery(ctx context.Context, q adapters.Querier, a adapters.Adapter, namespace, job string) (engines.JobProgress, string, bool, error) {
-	q = observability.WrapSQL(q)
 	p, hash, spec, err := readBatch(ctx, q, namespace, job)
 	if err != nil {
 		return p, "", false, err

@@ -17,8 +17,24 @@ var (
 
 type Executor interface {
 	ExecContext(context.Context, string, ...any) (sql.Result, error)
-	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
-	QueryRowContext(context.Context, string, ...any) *sql.Row
+	QueryContext(context.Context, string, ...any) (Rows, error)
+	QueryRowContext(context.Context, string, ...any) Row
+}
+
+// Result interfaces allow instrumentation to follow a query through reading,
+// conversion and closure, when database/sql can still report a query failure.
+type Rows interface {
+	Next() bool
+	Scan(...any) error
+	Err() error
+	Close() error
+	Columns() ([]string, error)
+	ColumnTypes() ([]*sql.ColumnType, error)
+}
+
+type Row interface {
+	Scan(...any) error
+	Err() error
 }
 
 func Classify(err error) error {

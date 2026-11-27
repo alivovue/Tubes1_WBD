@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"net"
+	"schakker_shared/observability"
 	"strconv"
 	"strings"
 	"time"
@@ -57,7 +58,7 @@ func (Adapter) Connect(ctx context.Context, in adapters.Connection) (*sql.DB, er
 	check, cancel := context.WithTimeout(ctx, in.ConnectTimeout)
 	defer cancel()
 	var version, name string
-	if err := db.QueryRowContext(check, `SELECT VERSION(),DATABASE()`).Scan(&version, &name); err != nil {
+	if err := observability.WrapSQL(db).QueryRowContext(check, `SELECT VERSION(),DATABASE()`).Scan(&version, &name); err != nil {
 		db.Close()
 		return nil, adapters.ErrConnection
 	}

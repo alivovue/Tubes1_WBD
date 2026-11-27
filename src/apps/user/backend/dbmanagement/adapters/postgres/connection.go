@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"net"
 	"net/url"
+	"schakker_shared/observability"
 	"strconv"
 
 	"github.com/jackc/pgx/v5"
@@ -42,7 +43,7 @@ func (Adapter) Connect(ctx context.Context, in adapters.Connection) (*sql.DB, er
 	var platform bool
 	// The two application databases have separate authentication schemas. Neither
 	// may be exposed through an attached target, regardless of the supplied role.
-	err = db.QueryRowContext(check, `SELECT
+	err = observability.WrapSQL(db).QueryRowContext(check, `SELECT
  (to_regclass('public.users') IS NOT NULL
   AND to_regclass('public.sessions') IS NOT NULL
   AND to_regclass('public.session_tokens') IS NOT NULL

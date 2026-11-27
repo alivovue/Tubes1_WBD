@@ -92,6 +92,7 @@ func ValidateSQL(query string, dbms ...string) ([]Statement, error) {
 	return engine.Parse(query)
 }
 func (s *Service) Analyze(ctx context.Context, actor, database int64, query string) (Analysis, error) {
+	ctx = observability.WithActor(ctx, actor, database)
 	if err := s.access.RequirePermission(ctx, actor, database, access.ViewEdit); err != nil {
 		return Analysis{}, err
 	}
@@ -119,8 +120,8 @@ func (s *Service) Analyze(ctx context.Context, actor, database int64, query stri
 	if err != nil {
 		return Analysis{}, dbmanagement.ErrConnection
 	}
-	defer tx.Rollback()
-	mode, warnings, err := engine.Assess(ctx, tx, statements)
+	defer observability.Rollback(ctx, tx.Rollback)
+	mode, warnings, err := engine.Assess(ctx, observability.WrapSQL(tx), statements)
 	if err != nil {
 		return Analysis{}, err
 	}
@@ -128,15 +129,15 @@ func (s *Service) Analyze(ctx context.Context, actor, database int64, query stri
 	if err != nil {
 		return Analysis{}, err
 	}
-	fingerprint, err := target.Adapter.Fingerprint(ctx, tx)
+	fingerprint, err := target.Adapter.Fingerprint(ctx, observability.WrapSQL(tx))
 	if err != nil {
 		return Analysis{}, err
 	}
-	plans, err := target.Adapter.QueryPlans(ctx, tx, statements)
+	plans, err := target.Adapter.QueryPlans(ctx, observability.WrapSQL(tx), statements)
 	if err != nil {
 		return Analysis{}, err
 	}
-	if err := tx.Commit(); err != nil {
+	if err := observability.Commit(ctx, tx.Commit); err != nil {
 		return Analysis{}, dbmanagement.ErrQuery
 	}
 	currentConnection, err := s.databases.ConnectionFingerprint(ctx, actor, database)

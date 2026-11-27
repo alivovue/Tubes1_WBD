@@ -2,6 +2,7 @@ package unit_test
 
 import (
 	"context"
+	"schakker_shared/observability"
 	"strings"
 	"testing"
 
@@ -79,7 +80,7 @@ func TestMigrationEngineModesAndRegistry(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			mode, warnings, err := maria.Assess(context.Background(), db, statements)
+			mode, warnings, err := maria.Assess(context.Background(), observability.WrapSQL(db), statements)
 			if err != nil || mode != tc.mode {
 				t.Fatalf("mode = %s, %v; want %s", mode, err, tc.mode)
 			}

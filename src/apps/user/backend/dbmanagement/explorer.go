@@ -39,15 +39,13 @@ func (s *Service) read(ctx context.Context, actor, database int64, permission ac
 	if err != nil {
 		return ErrConnection
 	}
-	defer tx.Rollback()
+	defer observability.Rollback(ctx, tx.Rollback)
 	if err := action(ctx, observability.WrapSQL(tx), target.Adapter); err != nil {
 		return err
 	}
-	if err := tx.Commit(); err != nil {
-		observability.Event(ctx, "sql.commit", err, "database_id", database, "actor_id", actor, "read_only", true)
+	if err := observability.Commit(ctx, tx.Commit); err != nil {
 		return ErrQuery
 	}
-	observability.Event(ctx, "sql.commit", nil, "database_id", database, "actor_id", actor, "read_only", true)
 	return nil
 }
 func (s *Service) Schemas(ctx context.Context, actor, database int64) ([]Schema, error) {

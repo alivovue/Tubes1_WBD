@@ -143,7 +143,7 @@ func (r *Runner) RunOnce(ctx context.Context) (claimed bool, err error) {
 			if j.ErrorClass == "reconcile_only" {
 				return errReconcileOnly
 			}
-			if j.Attempt > j.MaxAttempts {
+			if j.Attempt > j.MaxAttempts && !(j.Operation == "batch_cancel" && j.ManualCompensationRetry) {
 				return errAttemptsExhausted
 			}
 			plan, err := policy.ValidateApprovedExecution(check, j.ReviewID, j.ID)
@@ -297,11 +297,11 @@ func reconcile(ctx context.Context, target *dbmanagement.Target, request engines
 	if err != nil {
 		return false, receipt, err
 	}
-	defer tx.Rollback()
-	if _, err = tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(73421108)`); err != nil {
+	defer observability.Rollback(ctx, tx.Rollback)
+	if _, err = observability.WrapSQL(tx).ExecContext(ctx, `SELECT pg_advisory_xact_lock(73421108)`); err != nil {
 		return false, receipt, err
 	}
-	found, err := pgengine.ReadJobReceipt(ctx, tx, request, &receipt)
+	found, err := pgengine.ReadJobReceipt(ctx, observability.WrapSQL(tx), request, &receipt)
 	return found, receipt, err
 }
 func Retryable(err error) bool {

@@ -3,6 +3,7 @@ package unit_test
 import (
 	"context"
 	"database/sql/driver"
+	"schakker_shared/observability"
 	"testing"
 
 	"tubes1_wbd/backend/dbmanagement/adapters"
@@ -40,7 +41,7 @@ func TestTableDataPaginationSortingAndRowBufferIsolation(t *testing.T) {
 			data.check = func(args []driver.NamedValue) { wantArg(t, args, 0, int64(2)); wantArg(t, args, 1, int64(2)) }
 			steps := append(tableMetadataSteps(adapter.Name()), data)
 			db, _, _ := newSQLStub(t, steps...)
-			page, err := adapter.TableData(context.Background(), db, schema, "people", adapters.PageOptions{Limit: 1, Offset: 2, OrderBy: []adapters.SortColumn{{Name: "id", Descending: true}}})
+			page, err := adapter.TableData(context.Background(), observability.WrapSQL(db), schema, "people", adapters.PageOptions{Limit: 1, Offset: 2, OrderBy: []adapters.SortColumn{{Name: "id", Descending: true}}})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -62,7 +63,7 @@ func TestTableDataRejectsUnknownSortColumns(t *testing.T) {
 			if adapter.Name() == "mariadb" {
 				schema = "target"
 			}
-			_, err := adapter.TableData(context.Background(), db, schema, "people", adapters.PageOptions{OrderBy: []adapters.SortColumn{{Name: "id; DROP TABLE people"}}})
+			_, err := adapter.TableData(context.Background(), observability.WrapSQL(db), schema, "people", adapters.PageOptions{OrderBy: []adapters.SortColumn{{Name: "id; DROP TABLE people"}}})
 			wantError(t, err, adapters.ErrInvalid)
 		})
 	}
@@ -70,12 +71,12 @@ func TestTableDataRejectsUnknownSortColumns(t *testing.T) {
 func TestPostgreSQLExplorerHidesInternalSchemas(t *testing.T) {
 	db, _, _ := newSQLStub(t)
 	for _, schema := range []string{"_schakker", "information_schema", "pg_catalog", "pg_temp_1"} {
-		_, err := postgres.New().Tables(context.Background(), db, schema)
+		_, err := postgres.New().Tables(context.Background(), observability.WrapSQL(db), schema)
 		wantError(t, err, adapters.ErrInvalid)
 	}
 	step := queryStep("FROM pg_catalog.pg_namespace", []string{"schema", "owner"}, []driver.Value{"public", "owner"})
 	db, _, _ = newSQLStub(t, step)
-	schemas, err := postgres.New().Schemas(context.Background(), db)
+	schemas, err := postgres.New().Schemas(context.Background(), observability.WrapSQL(db))
 	if err != nil || len(schemas) != 1 || schemas[0].Name != "public" {
 		t.Fatalf("schema catalog not read: %#v, %v", schemas, err)
 	}

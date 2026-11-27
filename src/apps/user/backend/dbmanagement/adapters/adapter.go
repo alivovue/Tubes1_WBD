@@ -7,6 +7,7 @@ import (
 	"errors"
 	"time"
 
+	sqldb "schakker_shared/database"
 	"tubes1_wbd/database/dao"
 )
 
@@ -18,11 +19,7 @@ var (
 	ErrUnsupported = errors.New("operation is not supported by this database adapter")
 )
 
-type Querier interface {
-	ExecContext(context.Context, string, ...any) (sql.Result, error)
-	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
-	QueryRowContext(context.Context, string, ...any) *sql.Row
-}
+type Querier = sqldb.Executor
 
 type Connection struct {
 	Host           string

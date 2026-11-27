@@ -264,7 +264,7 @@ func (v *Resources) ExecutionEvent(e dao.ExecutionEvent) (map[string]any, error)
 }
 
 func (v *Resources) canRetry(j dao.MigrationJob) bool {
-	return v.edit && j.RecoveryJobID == nil && (j.Status == "uncertain" || (j.ActorID == v.actor && j.Attempt < j.MaxAttempts && (j.Status == "failed" || j.Status == "partial" || j.Status == "partially_reverted")))
+	return v.edit && j.RecoveryJobID == nil && (j.Status == "uncertain" || (j.ActorID == v.actor && (j.Attempt < j.MaxAttempts || j.Operation == "batch_cancel") && (j.Status == "failed" || j.Status == "partial" || j.Status == "partially_reverted")))
 }
 
 func (v *Resources) Job(j dao.MigrationJob, p dao.BatchProgress) (map[string]any, error) {

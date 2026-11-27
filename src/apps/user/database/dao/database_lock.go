@@ -31,13 +31,13 @@ func (d *Store) WithDatabaseLock(ctx context.Context, id int64, action func(*Sto
 	}
 	defer conn.Close()
 	defer func() {
-		cleanup, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 		defer cancel()
-		if _, err := conn.ExecContext(cleanup, `SELECT pg_advisory_unlock($1)`, -id); err != nil {
+		if _, err := observability.WrapSQL(conn).ExecContext(cleanup, `SELECT pg_advisory_unlock($1)`, -id); err != nil {
 			conn.Raw(func(any) error { return driver.ErrBadConn })
 		}
 	}()
-	if _, err := conn.ExecContext(ctx, `SELECT pg_advisory_lock($1)`, -id); err != nil {
+	if _, err := observability.WrapSQL(conn).ExecContext(ctx, `SELECT pg_advisory_lock($1)`, -id); err != nil {
 		observability.LockWait(ctx, "session", time.Since(started), err)
 		return err
 	}
